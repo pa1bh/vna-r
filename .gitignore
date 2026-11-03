@@ -1,0 +1,10 @@
+/target
+*.s2p
+*.csv
+/*.png
+.DS_Store
+
+# Large third-party binaries in assets/ (>400 MB together); PDFs, firmware .bin and notes stay tracked
+assets/*.zip
+assets/*.7z
+assets/nanovna-saver

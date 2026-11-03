@@ -1,0 +1,12 @@
+[package]
+name = "litevna"
+version = "0.1.0"
+description = "Protocol and device driver for LiteVNA / NanoVNA V2 vector network analysers"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serialport = { workspace = true }
+num-complex = { workspace = true }
+thiserror = { workspace = true }

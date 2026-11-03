@@ -1,0 +1,18 @@
+[package]
+name = "vna-cli"
+version = "0.1.0"
+description = "Proof-of-concept command line tool for the LiteVNA 67"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vna-cli"
+path = "src/main.rs"
+
+[dependencies]
+litevna = { path = "../litevna" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+num-complex = { workspace = true }
+png = { workspace = true }

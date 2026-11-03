@@ -1,0 +1,25 @@
+//! `litevna` — a small, dependency-light driver for the LiteVNA family
+//! (LiteVNA 62 / 64 / 67) and other devices speaking the NanoVNA V2
+//! ("S-A-A-2") binary register protocol.
+//!
+//! The crate is split in layers so the protocol can be unit-tested without
+//! hardware:
+//!
+//! * [`protocol`] — pure functions: opcode/register constants, command
+//!   encoders and the 32-byte FIFO record parser.
+//! * [`device`] — [`LiteVna`], which drives a serial port and exposes a
+//!   typed API (device info, sweeps, screenshots, ...).
+//! * [`discovery`] — find candidate USB serial ports.
+//! * [`touchstone`] — export sweeps as Touchstone `.s2p` files.
+//! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
+
+pub mod device;
+pub mod discovery;
+pub mod error;
+pub mod freq;
+pub mod protocol;
+pub mod touchstone;
+
+pub use device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};
+pub use error::{Error, Result};
+pub use protocol::FifoPoint;
