@@ -1,0 +1,21 @@
+[package]
+name = "vna-gui"
+version = "0.1.0"
+description = "Desktop GUI for the LiteVNA 67 (egui)"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "vna-gui"
+path = "src/main.rs"
+
+[dependencies]
+litevna = { path = "../litevna" }
+anyhow = { workspace = true }
+num-complex = { workspace = true }
+eframe = { workspace = true }
+egui = { workspace = true }
+egui_plot = { workspace = true }
+rfd = { workspace = true }
+png = { workspace = true }

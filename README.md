@@ -12,6 +12,7 @@ het protocolonderzoek.
 |---|---|
 | `crates/litevna` | Library: protocol (opcodes, registers, FIFO-records), device-API, poortdetectie, Touchstone-export. Geen UI. |
 | `crates/vna-cli` | Commandline-POC bovenop de library. |
+| `crates/vna-gui` | Desktop-GUI (egui/eframe): live Smith-chart, logmag, SWR, fase, marker, calibratie, export. |
 
 ## Gebruik
 
@@ -37,6 +38,22 @@ cargo build --release
 
 Handig bij problemen: `--trace` toont elke verzonden/ontvangen byte, `peek F0` leest een register.
 Na een sweep geeft de CLI het scherm terug aan het apparaat; met `release` kun je dat ook los doen.
+
+### GUI
+
+```bash
+cargo run --release -p vna-gui
+```
+
+Kies de poort (★ = LiteVNA), **Connect**, **Run**. Links de sweep-instellingen en het calibratiepaneel:
+meet open/short/load (en optioneel through/isolation) op het huidige raster, zet **apply** aan en sla
+de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`. Klik in een grafiek
+of op de Smith-chart voor een marker met frequentie, S11, impedantie, SWR en S21.
+
+### Calibratie
+
+Zie [docs/03-calibratie.md](docs/03-calibratie.md). Kort: `vna-cli cal open|short|load|through --file x.json`,
+daarna `vna-cli sweep --cal x.json`. Een ander raster binnen het gecalibreerde bereik wordt geïnterpoleerd.
 
 ## Platform
 

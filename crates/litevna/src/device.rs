@@ -152,6 +152,8 @@ pub struct LiteVna {
     pub trace: bool,
     /// Hand the screen back to the device UI when this handle is dropped (default `true`).
     pub release_on_drop: bool,
+    /// Sweep the device is currently programmed with (while in USB data mode).
+    configured: Option<SweepConfig>,
 }
 
 impl LiteVna {
@@ -160,7 +162,7 @@ impl LiteVna {
     pub fn open(path: &str) -> Result<Self> {
         // Baud rate is meaningless for USB CDC but must be set.
         let port = serialport::new(path, 115_200).timeout(Duration::from_millis(250)).open()?;
-        let mut dev = LiteVna { port, trace: false, release_on_drop: true };
+        let mut dev = LiteVna { port, trace: false, release_on_drop: true, configured: None };
         dev.reset_protocol()?;
         Ok(dev)
     }
@@ -296,6 +298,9 @@ impl LiteVna {
     pub fn set_data_mode(&mut self, mode: DataMode) -> Result<()> {
         self.write_u8(reg::RAW_SAMPLES_MODE, mode as u8)?;
         std::thread::sleep(WRITE_SETTLE);
+        if mode != DataMode::Usb && mode != DataMode::Calibrated {
+            self.configured = None;
+        }
         Ok(())
     }
 
@@ -347,6 +352,7 @@ impl LiteVna {
         bytes.extend_from_slice(&proto::encode_write2(reg::VALUES_PER_FREQ, cfg.values_per_freq.max(1)));
         self.send(&bytes)?;
         std::thread::sleep(WRITE_SETTLE);
+        self.configured = Some(*cfg);
         Ok(())
     }
 
@@ -394,7 +400,9 @@ impl LiteVna {
     /// the first read, otherwise points are fetched in chunks of 255 like
     /// NanoVNA-Saver does.
     pub fn sweep(&mut self, cfg: &SweepConfig, fifo_all: bool) -> Result<SweepResult> {
-        self.configure_sweep(cfg)?;
+        if self.configured.as_ref() != Some(cfg) {
+            self.configure_sweep(cfg)?;
+        }
         self.clear_fifo()?;
         let started = Instant::now();
         let n = cfg.points as usize;
@@ -455,6 +463,7 @@ impl LiteVna {
     /// display, i.e. about 1.2 MB over full-speed USB, so allow some seconds.
     pub fn screenshot(&mut self) -> Result<Screenshot> {
         self.reset_protocol()?;
+        self.configured = None; // the device redraws its UI for the capture
         self.send(&proto::encode_write(reg::SCREENSHOT, 0))?;
         let mut header = [0u8; 5];
         self.recv_exact(&mut header, Duration::from_secs(5))?;
