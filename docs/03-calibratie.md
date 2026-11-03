@@ -104,9 +104,15 @@ calibratie:
 ./target/release/vna-cli sweep --cal hf.cal.json --s2p antenne.s2p
 ```
 
+Een ander raster binnen het gecalibreerde bereik mag ook; de library interpoleert dan:
+
+```bash
+./target/release/vna-cli sweep --cal hf.cal.json --start 3.5M --stop 3.8M --points 101
+```
+
 Regels:
-- Calibratie geldt alleen voor **exact hetzelfde raster** (start, stop, punten). Interpolatie naar
-  een ander raster is een logische volgende stap voor de library.
+- Een calibratie geldt voor haar eigen **frequentiebereik**. Binnen dat bereik wordt naar elk
+  raster geïnterpoleerd (zie §7), erbuiten weigert de library.
 - Meet de standaarden met dezelfde `--average` als je latere metingen, anders verschilt de ruis.
 - Het referentievlak ligt waar je de standaarden aansluit. Calibreer dus aan het eind van de kabel
   die je ook voor de meting gebruikt.
@@ -157,3 +163,37 @@ De echte herhaalbaarheidstest is een standaard losdraaien en opnieuw aansluiten;
 randcapaciteit van de N-open is tot 1 GHz dus niet zichtbaar boven de meetruis; de ideale kit volstaat
 hier. Deze sweep bevatte bovendien 32 verouderde FIFO-records, die de lees-tot-compleet-logica van
 de library correct opving.
+
+## 7. Interpolatie naar een ander raster
+
+De fouttermen veranderen glad met de frequentie, dus tussen twee calibratiepunten kun je ze
+schatten. De library interpoleert niet de fouttermen zelf maar de **ruwe metingen van de
+standaarden** (complex, lineair in reëel en imaginair deel) naar het nieuwe raster en lost daarna
+opnieuw op. Voordelen: het JSON-bestand blijft de enige bron van waarheid, en een through of
+isolation die later wordt toegevoegd doet automatisch mee.
+
+Twee grenzen:
+
+1. **Bereik.** Buiten het gecalibreerde bereik is er niets om tussen te interpoleren; dat wordt
+   geweigerd. Calibreer dus liever één keer breed (bijvoorbeeld 50 kHz – 1 GHz met 401 punten) en
+   zoom daarna in.
+2. **Fasedraaiing per stap.** Lineair interpoleren in re/im gaat mis zodra de fase tussen twee
+   buurpunten meer dan ~90° draait; dan is onduidelijk welke kant op. De library meet de grootste
+   fasestap van de Open en weigert boven 90°. Vuistregel: hoe langer de kabel tussen VNA en
+   referentievlak, hoe sneller de fase draait en hoe meer calibratiepunten je nodig hebt.
+
+Synthetische test: 101 calibratiepunten over 10 MHz – 1 GHz, geïnterpoleerd naar 401 punten die
+er precies tussenin liggen, geeft een restfout kleiner dan 2·10⁻⁴ op |Γ| = 0,4.
+
+**Gemeten op de LiteVNA 67** met de calibratie van §6 (201 punten, 1 MHz – 1 GHz) en de Open nog
+aangesloten:
+
+| Raster | \|S11\| | fase |
+|---|---|---|
+| 1 MHz – 1 GHz, 201 pt (eigen raster) | -0,01 … +0,01 dB | -0,1 … +0,1° |
+| 50 – 900 MHz, 301 pt (geïnterpoleerd) | -0,02 … +0,01 dB | -0,4 … +0,3° |
+| 140 – 150 MHz, 51 pt (geïnterpoleerd) | -0,006 … +0,003 dB | -0,04 … +0,05° |
+
+De iets grotere fasefout op het brede geïnterpoleerde raster komt doordat de fase van de Open
+tussen de calibratiepunten (stap 5 MHz) een paar graden draait en lineair wordt benaderd. Meer
+calibratiepunten verkleinen dat direct.

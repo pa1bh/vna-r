@@ -273,6 +273,99 @@ impl CalibrationSet {
     }
 }
 
+/// Largest phase step (radians) between adjacent points that linear
+/// interpolation in re/im can still follow without ambiguity.
+pub const MAX_INTERPOLATION_PHASE_STEP: f64 = PI / 2.0;
+
+impl CalibrationSet {
+    /// Resample every stored standard onto `freqs_hz` by linear interpolation
+    /// of the complex values (real and imaginary parts separately).
+    ///
+    /// Fails when `freqs_hz` reaches outside the calibrated span, or when the
+    /// calibration grid is so coarse that the open's phase turns more than
+    /// 90° between neighbouring points (then the interpolation is ambiguous).
+    pub fn interpolate(&self, freqs_hz: &[u64]) -> Result<CalibrationSet> {
+        if freqs_hz.is_empty() {
+            return Err(Error::Calibration("empty target grid".into()));
+        }
+        let (lo, hi) = (self.freqs_hz[0], *self.freqs_hz.last().unwrap());
+        let (tlo, thi) = (*freqs_hz.iter().min().unwrap(), *freqs_hz.iter().max().unwrap());
+        if tlo < lo || thi > hi {
+            return Err(Error::Calibration(format!(
+                "target grid {}..{} Hz lies outside the calibrated span {}..{} Hz",
+                tlo, thi, lo, hi
+            )));
+        }
+        if let Some(open) = &self.open {
+            let step = max_phase_step(&open.s11);
+            if step > MAX_INTERPOLATION_PHASE_STEP {
+                return Err(Error::Calibration(format!(
+                    "calibration grid too coarse to interpolate: open phase jumps {:.0}° between points",
+                    step.to_degrees()
+                )));
+            }
+        }
+        let resample = |m: &StandardMeasurement| StandardMeasurement {
+            s11: interpolate_complex(&self.freqs_hz, &m.s11, freqs_hz),
+            s21: interpolate_complex(&self.freqs_hz, &m.s21, freqs_hz),
+        };
+        Ok(CalibrationSet {
+            freqs_hz: freqs_hz.to_vec(),
+            kit: self.kit.clone(),
+            note: self.note.clone(),
+            open: self.open.as_ref().map(resample),
+            short: self.short.as_ref().map(resample),
+            load: self.load.as_ref().map(resample),
+            through: self.through.as_ref().map(resample),
+            isolation: self.isolation.as_ref().map(resample),
+        })
+    }
+
+    /// `solve()`, interpolating first when `freqs_hz` differs from this set's grid.
+    pub fn solve_for(&self, freqs_hz: &[u64]) -> Result<Calibration> {
+        if freqs_hz == self.freqs_hz.as_slice() {
+            self.solve()
+        } else {
+            self.interpolate(freqs_hz)?.solve()
+        }
+    }
+}
+
+/// Largest absolute phase difference between neighbouring values.
+fn max_phase_step(values: &[C64]) -> f64 {
+    values
+        .windows(2)
+        .map(|w| {
+            let d = (w[1].arg() - w[0].arg()).abs();
+            d.min(2.0 * PI - d)
+        })
+        .fold(0.0, f64::max)
+}
+
+/// Piecewise-linear interpolation of complex samples `ys` at `xs` (sorted,
+/// strictly increasing) onto `targets` (each within `xs`' range).
+fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> {
+    targets
+        .iter()
+        .map(|&t| {
+            // first index with xs[i] >= t
+            let i = xs.partition_point(|&x| x < t);
+            if i == 0 {
+                return ys[0];
+            }
+            if i >= xs.len() {
+                return ys[xs.len() - 1];
+            }
+            if xs[i] == t {
+                return ys[i];
+            }
+            let (x0, x1) = (xs[i - 1] as f64, xs[i] as f64);
+            let w = (t as f64 - x0) / (x1 - x0);
+            ys[i - 1] * (1.0 - w) + ys[i] * w
+        })
+        .collect()
+}
+
 /// Solve `e00 + (Γa·Γm)·e11 − Γa·Δ = Γm` for three standards (Cramer's rule).
 fn solve_one_port(standards: &[(C64, C64); 3]) -> Option<(C64, C64, C64)> {
     let one = C64::new(1.0, 0.0);
@@ -481,6 +574,86 @@ mod tests {
         // 30 ps one-way offset at 1 GHz: round trip 2·2π·1e9·30e-12 ≈ 0.377 rad
         let delayed = StandardModel { offset_delay_s: 30e-12, termination: Termination::Open { c: [0.0; 4] } };
         assert!((delayed.gamma(1e9).arg() + 0.37699).abs() < 1e-4);
+    }
+
+    /// Smooth, frequency-dependent error terms (for interpolation tests).
+    fn terms_at_freq(f: f64) -> ErrorTerms {
+        let g = f / 1e9;
+        ErrorTerms {
+            e00: C64::new(0.02 + 0.01 * g, -0.015 + 0.005 * g * g),
+            e11: C64::new(-0.05 + 0.02 * g, 0.03 - 0.01 * g),
+            e10e01: C64::from_polar(0.8 - 0.1 * g, -1.5 * g),
+            e30: C64::new(1e-4, -2e-4),
+            e10e32: Some(C64::from_polar(0.9 - 0.05 * g, -1.2 * g)),
+        }
+    }
+
+    fn standards_on(freqs: &[u64], kit: &CalKit) -> CalibrationSet {
+        let mut set = CalibrationSet::new(freqs.to_vec(), kit.clone());
+        for std in Standard::ALL {
+            let (mut s11, mut s21) = (Vec::new(), Vec::new());
+            for &f in freqs {
+                let fh = f as f64;
+                let (a11, a21) = match std {
+                    Standard::Open => (kit.open.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Short => (kit.short.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Load => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Through => (C64::new(0.0, 0.0), kit.through_s21(fh)),
+                    Standard::Isolation => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
+                };
+                let (m11, m21) = measure(&terms_at_freq(fh), a11, a21);
+                s11.push(m11);
+                s21.push(m21);
+            }
+            set.set(std, &sweep_from(freqs, s11, s21)).unwrap();
+        }
+        set
+    }
+
+    #[test]
+    fn interpolation_tracks_smooth_terms() {
+        let kit = CalKit::ideal();
+        let coarse: Vec<u64> = (0..=100).map(|i| 10_000_000 + i * 9_900_000).collect(); // 10 MHz..1 GHz
+        let set = standards_on(&coarse, &kit);
+        // Fine grid, offset so no point coincides with the coarse grid.
+        let fine: Vec<u64> = (0..=400).map(|i| 123_456_789 + i * 1_234_567).collect();
+        let cal = set.solve_for(&fine).unwrap();
+        assert_eq!(cal.freqs_hz, fine);
+
+        let dut11 = C64::from_polar(0.4, 1.0);
+        let dut21 = C64::from_polar(0.6, -2.0);
+        let mut worst = 0.0f64;
+        for (i, &f) in fine.iter().enumerate() {
+            let (m11, m21) = measure(&terms_at_freq(f as f64), dut11, dut21);
+            let (a11, a21) = cal.correct(i, m11, m21);
+            worst = worst.max((a11 - dut11).norm()).max((a21 - dut21).norm());
+        }
+        assert!(worst < 2e-4, "interpolation error {worst}");
+
+        // Exact grid points reproduce the direct solution.
+        let direct = set.solve().unwrap();
+        let via = set.solve_for(&coarse).unwrap();
+        assert_eq!(direct, via);
+    }
+
+    #[test]
+    fn interpolation_rejects_out_of_range_and_coarse_grids() {
+        let kit = CalKit::ideal();
+        let coarse: Vec<u64> = (0..=10).map(|i| 100_000_000 + i * 90_000_000).collect();
+        let set = standards_on(&coarse, &kit);
+        assert!(set.interpolate(&[50_000_000]).is_err());
+        assert!(set.interpolate(&[1_500_000_000]).is_err());
+        // Open phase turns 1.5 rad/GHz · 0.09 GHz ≈ 7.7° per step here: fine.
+        assert!(set.interpolate(&[150_000_000, 500_000_000]).is_ok());
+        // A grid whose open phase jumps >90° per step must be refused.
+        let mut bad = set.clone();
+        if let Some(open) = &mut bad.open {
+            for (i, v) in open.s11.iter_mut().enumerate() {
+                *v = C64::from_polar(1.0, 2.0 * i as f64); // 115° per step
+            }
+        }
+        let err = bad.interpolate(&[150_000_000]).unwrap_err().to_string();
+        assert!(err.contains("too coarse"), "{err}");
     }
 
     #[test]

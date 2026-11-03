@@ -46,8 +46,9 @@ enum Cmd {
         grid: GridArgs,
         #[command(flatten)]
         measure: MeasureArgs,
-        /// Apply a host-side calibration made with `cal` (sets the grid when
-        /// --start/--stop/--points are omitted).
+        /// Apply a host-side calibration made with `cal`. Without --start/--stop/
+        /// --points the calibrated grid is used; another grid inside the calibrated
+        /// span is interpolated.
         #[arg(long)]
         cal: Option<PathBuf>,
         /// Write a Touchstone .s2p file.
@@ -323,22 +324,31 @@ fn sweep(
     rows: usize,
     keep_usb_mode: bool,
 ) -> Result<()> {
-    let calibration: Option<Calibration> = match &cal_file {
+    // With a calibration file the grid defaults to the calibrated one; an
+    // explicit --start/--stop/--points inside that span is interpolated.
+    let (cfg, calibration): (SweepConfig, Option<Calibration>) = match &cal_file {
         Some(path) => {
             let set = load_cal(path)?;
-            let cal = set.solve().with_context(|| format!("calibration {} is incomplete", path.display()))?;
+            let cfg = grid.config(Some(&set.freqs_hz))?;
+            let freqs = cfg.frequencies();
+            let interpolated = freqs != set.freqs_hz;
+            let cal = set
+                .solve_for(&freqs)
+                .with_context(|| format!("cannot use calibration {} on this grid", path.display()))?;
             eprintln!(
-                "using calibration {} ({} points, kit {:?}{})",
+                "using calibration {} ({} points {} → {}, kit {}{}){}",
                 path.display(),
-                cal.freqs_hz.len(),
+                set.freqs_hz.len(),
+                format_hz(set.freqs_hz[0]),
+                format_hz(*set.freqs_hz.last().unwrap()),
                 set.kit.name,
-                if cal.has_through() { ", with through" } else { ", S21 uncorrected" }
+                if cal.has_through() { ", with through" } else { ", S21 uncorrected" },
+                if interpolated { format!(", interpolated to {} points", freqs.len()) } else { String::new() }
             );
-            Some(cal)
+            (cfg, Some(cal))
         }
-        None => None,
+        None => (grid.config(None)?, None),
     };
-    let cfg = grid.config(calibration.as_ref().map(|c| c.freqs_hz.as_slice()))?;
 
     let mut dev = open(conn)?;
     let raw = measure(&mut dev, &cfg, &m)?;
@@ -349,7 +359,7 @@ fn sweep(
     }
 
     let result = match &calibration {
-        Some(cal) => cal.apply(&raw).context("grid of this sweep differs from the calibration; omit --start/--stop/--points to reuse the calibration grid")?,
+        Some(cal) => cal.apply(&raw)?,
         None => raw.clone(),
     };
 
