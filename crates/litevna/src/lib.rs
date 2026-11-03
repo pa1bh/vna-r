@@ -10,9 +10,11 @@
 //! * [`device`] — [`LiteVna`], which drives a serial port and exposes a
 //!   typed API (device info, sweeps, screenshots, ...).
 //! * [`discovery`] — find candidate USB serial ports.
+//! * [`calibration`] — SOL(T) error-term calibration applied on the host.
 //! * [`touchstone`] — export sweeps as Touchstone `.s2p` files.
 //! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
 
+pub mod calibration;
 pub mod device;
 pub mod discovery;
 pub mod error;
@@ -20,6 +22,7 @@ pub mod freq;
 pub mod protocol;
 pub mod touchstone;
 
+pub use calibration::{CalKit, Calibration, CalibrationSet, Standard};
 pub use device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};
 pub use error::{Error, Result};
 pub use protocol::FifoPoint;

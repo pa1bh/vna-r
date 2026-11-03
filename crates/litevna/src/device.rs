@@ -55,6 +55,23 @@ impl SweepConfig {
         Ok(SweepConfig { start_hz, step_hz, points, values_per_freq: 1, calibrated: false })
     }
 
+    /// Rebuild a config from a uniformly spaced frequency list (e.g. from a
+    /// saved calibration).
+    pub fn from_frequencies(freqs: &[u64]) -> Result<Self> {
+        if freqs.len() < 2 || freqs.len() > u16::MAX as usize {
+            return Err(Error::InvalidArgument(format!("{} frequencies: need 2..=65535", freqs.len())));
+        }
+        let step = freqs[1].checked_sub(freqs[0]).filter(|s| *s > 0).ok_or_else(|| {
+            Error::InvalidArgument("frequencies must be strictly increasing".into())
+        })?;
+        for w in freqs.windows(2) {
+            if w[1].wrapping_sub(w[0]) != step {
+                return Err(Error::InvalidArgument("frequencies are not uniformly spaced".into()));
+            }
+        }
+        Ok(SweepConfig { start_hz: freqs[0], step_hz: step, points: freqs.len() as u16, values_per_freq: 1, calibrated: false })
+    }
+
     pub fn stop_hz(&self) -> u64 {
         self.start_hz + self.step_hz * (self.points as u64 - 1)
     }

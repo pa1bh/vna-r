@@ -1,16 +1,17 @@
 //! `vna-cli` — proof of concept for talking to a LiteVNA 67 from Rust.
 
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufWriter};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use litevna::calibration::{CalKit, Calibration, CalibrationSet, Standard};
 use litevna::discovery;
 use litevna::freq::{format_hz, parse_hz};
-use litevna::protocol::{Channel, DataMode, reg};
+use litevna::protocol::{reg, Channel, DataMode};
 use litevna::touchstone::{db, swr, write_csv, write_s2p};
-use litevna::{LiteVna, SweepConfig};
+use litevna::{LiteVna, SweepConfig, SweepResult};
 
 #[derive(Parser)]
 #[command(name = "vna-cli", version, about = "LiteVNA 67 proof of concept (PA1BH)")]
@@ -41,29 +42,14 @@ enum Cmd {
     },
     /// Run one sweep and print / export S11 and S21.
     Sweep {
-        /// Start frequency, e.g. 1M, 50k, 1.3G.
-        #[arg(long, default_value = "1M")]
-        start: String,
-        /// Stop frequency.
-        #[arg(long, default_value = "30M")]
-        stop: String,
-        /// Number of points (2..=65535).
-        #[arg(long, default_value_t = 101)]
-        points: u16,
-        /// IF bandwidth multiplier 1..=80 (higher = slower, quieter). Note: this also
-        /// changes the bandwidth setting in the device menu, and register 0x40 cannot be
-        /// read back reliably, so it is not restored exactly.
+        #[command(flatten)]
+        grid: GridArgs,
+        #[command(flatten)]
+        measure: MeasureArgs,
+        /// Apply a host-side calibration made with `cal` (sets the grid when
+        /// --start/--stop/--points are omitted).
         #[arg(long)]
-        average: Option<u8>,
-        /// Only measure one channel: s11 or s21.
-        #[arg(long)]
-        channel: Option<String>,
-        /// Ask for data with the on-device calibration applied (LiteVNA mode 3).
-        #[arg(long)]
-        calibrated: bool,
-        /// Use the LiteVNA "READFIFO 0" request instead of 255-point chunks.
-        #[arg(long)]
-        fifo_all: bool,
+        cal: Option<PathBuf>,
         /// Write a Touchstone .s2p file.
         #[arg(long)]
         s2p: Option<PathBuf>,
@@ -76,9 +62,26 @@ enum Cmd {
         /// Leave the device in USB data mode afterwards (screen stays frozen).
         #[arg(long)]
         keep_usb_mode: bool,
-        /// Do not restore the device's previous average/channel settings afterwards.
+    },
+    /// Measure a calibration standard into a calibration file, or inspect one.
+    ///
+    /// Connect the standard, then run e.g. `cal open --file hf.cal.json`.
+    /// The first standard fixes the frequency grid (--start/--stop/--points);
+    /// later ones reuse it. Needs open, short and load; through and isolation
+    /// are optional. Use `cal show` to see what is in the file.
+    Cal {
+        /// open | short | load | through | isolation | show | clear
+        what: String,
+        /// Calibration file (JSON).
+        #[arg(long, short)]
+        file: PathBuf,
+        #[command(flatten)]
+        grid: GridArgs,
+        #[command(flatten)]
+        measure: MeasureArgs,
+        /// Free text stored in the file (e.g. "N kit, 50 cm cable").
         #[arg(long)]
-        keep_settings: bool,
+        note: Option<String>,
     },
     /// Grab the device screen as PNG.
     Screenshot {
@@ -92,55 +95,83 @@ enum Cmd {
     Release,
 }
 
-fn main() -> Result<()> {
-    let cli = Cli::parse();
-    let conn = Conn { port: cli.port.clone(), trace: cli.trace };
-    match cli.cmd {
-        Cmd::List => list(),
-        Cmd::Info => {
-            let mut dev = open(&conn)?;
-            info(&mut dev)
-        }
-        Cmd::Peek { addr, size } => {
-            let mut dev = open(&conn)?;
-            peek(&mut dev, &addr, size)
-        }
-        Cmd::Sweep {
-            start,
-            stop,
-            points,
-            average,
-            channel,
-            calibrated,
-            fifo_all,
-            s2p,
-            csv,
-            rows,
-            keep_usb_mode,
-            keep_settings,
-        } => {
-            let mut dev = open(&conn)?;
-            sweep(
-                &mut dev,
-                SweepArgs { start, stop, points, average, channel, calibrated, fifo_all, s2p, csv, rows, keep_usb_mode, keep_settings },
-            )
-        }
-        Cmd::Screenshot { out, little_endian } => {
-            let mut dev = open(&conn)?;
-            screenshot(&mut dev, &out, !little_endian)
-        }
-        Cmd::Release => {
-            let mut dev = open(&conn)?;
-            dev.exit_usb_mode()?;
-            println!("device UI released");
-            Ok(())
-        }
+#[derive(Args, Clone)]
+struct GridArgs {
+    /// Start frequency, e.g. 1M, 50k, 1.3G.
+    #[arg(long)]
+    start: Option<String>,
+    /// Stop frequency.
+    #[arg(long)]
+    stop: Option<String>,
+    /// Number of points (2..=65535).
+    #[arg(long)]
+    points: Option<u16>,
+}
+
+impl GridArgs {
+    fn is_empty(&self) -> bool {
+        self.start.is_none() && self.stop.is_none() && self.points.is_none()
     }
+
+    /// Build a config, falling back to `default` (e.g. a calibration grid)
+    /// and finally to 1–30 MHz, 101 points.
+    fn config(&self, default: Option<&[u64]>) -> Result<SweepConfig> {
+        if self.is_empty() {
+            if let Some(freqs) = default {
+                return Ok(SweepConfig::from_frequencies(freqs)?);
+            }
+        }
+        let start = parse_hz(self.start.as_deref().unwrap_or("1M"))?;
+        let stop = parse_hz(self.stop.as_deref().unwrap_or("30M"))?;
+        let points = self.points.unwrap_or(101);
+        Ok(SweepConfig::linear(start, stop, points)?)
+    }
+}
+
+#[derive(Args, Clone)]
+struct MeasureArgs {
+    /// IF bandwidth multiplier 1..=80 (higher = slower, quieter). Note: this also
+    /// changes the bandwidth setting in the device menu, and register 0x40 cannot be
+    /// read back reliably, so it is not restored exactly.
+    #[arg(long)]
+    average: Option<u8>,
+    /// Only measure one channel: s11 or s21.
+    #[arg(long)]
+    channel: Option<String>,
+    /// Ask for data with the on-device calibration applied (LiteVNA mode 3).
+    #[arg(long)]
+    calibrated: bool,
+    /// Use the LiteVNA "READFIFO 0" request instead of 255-point chunks.
+    #[arg(long)]
+    fifo_all: bool,
+    /// Do not restore the device's previous average/channel settings afterwards.
+    #[arg(long)]
+    keep_settings: bool,
 }
 
 struct Conn {
     port: Option<String>,
     trace: bool,
+}
+
+fn main() -> Result<()> {
+    let cli = Cli::parse();
+    let conn = Conn { port: cli.port.clone(), trace: cli.trace };
+    match cli.cmd {
+        Cmd::List => list(),
+        Cmd::Info => info(&mut open(&conn)?),
+        Cmd::Peek { addr, size } => peek(&mut open(&conn)?, &addr, size),
+        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode } => {
+            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode)
+        }
+        Cmd::Cal { what, file, grid, measure, note } => cal(&conn, &what, &file, grid, measure, note),
+        Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
+        Cmd::Release => {
+            open(&conn)?.exit_usb_mode()?;
+            println!("device UI released");
+            Ok(())
+        }
+    }
 }
 
 fn open(conn: &Conn) -> Result<LiteVna> {
@@ -188,7 +219,11 @@ fn list() -> Result<()> {
 
 fn info(dev: &mut LiteVna) -> Result<()> {
     let i = dev.device_info()?;
-    println!("device variant     : 0x{:02X}{}", i.variant, if i.variant == 0x02 { " (NanoVNA V2 / LiteVNA family)" } else { "" });
+    println!(
+        "device variant     : 0x{:02X}{}",
+        i.variant,
+        if i.variant == 0x02 { " (NanoVNA V2 / LiteVNA family)" } else { "" }
+    );
     println!("protocol version   : 0x{:02X}", i.protocol_version);
     println!("hardware revision  : 0x{:02X}", i.hardware_revision);
     if i.in_dfu_mode() {
@@ -216,29 +251,13 @@ fn peek(dev: &mut LiteVna, addr: &str, size: u8) -> Result<()> {
     Ok(())
 }
 
-struct SweepArgs {
-    start: String,
-    stop: String,
-    points: u16,
-    average: Option<u8>,
-    channel: Option<String>,
-    calibrated: bool,
-    fifo_all: bool,
-    s2p: Option<PathBuf>,
-    csv: Option<PathBuf>,
-    rows: usize,
-    keep_usb_mode: bool,
-    keep_settings: bool,
-}
-
-fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
-    let start = parse_hz(&a.start)?;
-    let stop = parse_hz(&a.stop)?;
-    let mut cfg = SweepConfig::linear(start, stop, a.points)?;
-    cfg.calibrated = a.calibrated;
+/// One sweep with the measurement options applied and device settings restored.
+fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepResult> {
+    let mut cfg = *cfg;
+    cfg.calibrated = m.calibrated;
 
     // These registers persist in the device, so remember what was there.
-    let prev_average = match a.average {
+    let prev_average = match m.average {
         Some(avg) => {
             let prev = dev.average()?;
             dev.set_average(avg)?;
@@ -246,8 +265,8 @@ fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
         }
         None => None,
     };
-    let prev_channel = if a.channel.is_some() { Some(dev.channel()?) } else { None };
-    if let Some(ch) = &a.channel {
+    let prev_channel = if m.channel.is_some() { Some(dev.channel()?) } else { None };
+    if let Some(ch) = &m.channel {
         let ch = match ch.to_ascii_lowercase().as_str() {
             "s11" => Channel::S11Only,
             "s21" => Channel::S21Only,
@@ -265,8 +284,9 @@ fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
         format_hz(cfg.step_hz),
         if cfg.calibrated { ", device-calibrated data" } else { ", raw data" }
     );
-    let result = dev.sweep(&cfg, a.fifo_all)?;
-    if !a.keep_settings {
+    let result = dev.sweep(&cfg, m.fifo_all);
+
+    if !m.keep_settings {
         if let Some(prev) = prev_average {
             dev.write_u8(reg::AVERAGE, prev)?;
         }
@@ -274,12 +294,7 @@ fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
             dev.write_u8(reg::CHANNEL_SELECT, prev)?;
         }
     }
-    if a.keep_usb_mode {
-        dev.release_on_drop = false;
-    } else {
-        dev.exit_usb_mode()?;
-    }
-
+    let result = result?;
     eprintln!(
         "got {} points in {:.0} ms ({:.0} pts/s), missing {}, duplicates (stale FIFO records) {}, checksum ok {} / bad {}",
         result.points.len() - result.missing_points(),
@@ -294,9 +309,87 @@ fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
         let idx = result.missing_indexes();
         eprintln!("missing indexes: {:?}{}", &idx[..idx.len().min(40)], if idx.len() > 40 { " …" } else { "" });
     }
+    Ok(result)
+}
 
+#[allow(clippy::too_many_arguments)]
+fn sweep(
+    conn: &Conn,
+    grid: GridArgs,
+    m: MeasureArgs,
+    cal_file: Option<PathBuf>,
+    s2p: Option<PathBuf>,
+    csv: Option<PathBuf>,
+    rows: usize,
+    keep_usb_mode: bool,
+) -> Result<()> {
+    let calibration: Option<Calibration> = match &cal_file {
+        Some(path) => {
+            let set = load_cal(path)?;
+            let cal = set.solve().with_context(|| format!("calibration {} is incomplete", path.display()))?;
+            eprintln!(
+                "using calibration {} ({} points, kit {:?}{})",
+                path.display(),
+                cal.freqs_hz.len(),
+                set.kit.name,
+                if cal.has_through() { ", with through" } else { ", S21 uncorrected" }
+            );
+            Some(cal)
+        }
+        None => None,
+    };
+    let cfg = grid.config(calibration.as_ref().map(|c| c.freqs_hz.as_slice()))?;
+
+    let mut dev = open(conn)?;
+    let raw = measure(&mut dev, &cfg, &m)?;
+    if keep_usb_mode {
+        dev.release_on_drop = false;
+    } else {
+        dev.exit_usb_mode()?;
+    }
+
+    let result = match &calibration {
+        Some(cal) => cal.apply(&raw).context("grid of this sweep differs from the calibration; omit --start/--stop/--points to reuse the calibration grid")?,
+        None => raw.clone(),
+    };
+
+    print_table(&result, rows);
+    if let Some(p) = raw.points.iter().flatten().next() {
+        eprintln!(
+            "first raw record: fwd0=({},{}) rev0=({},{}) rev1=({},{}) reserved={:02X?} checksum=0x{:02X}",
+            p.fwd0_re, p.fwd0_im, p.rev0_re, p.rev0_im, p.rev1_re, p.rev1_im, p.reserved, p.checksum
+        );
+    }
+
+    if let Some(path) = &s2p {
+        let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
+        let comment = format!(
+            "LiteVNA sweep, {} points, {}",
+            cfg.points,
+            match (&cal_file, cfg.calibrated) {
+                (Some(c), _) => format!("host calibration {}", c.display()),
+                (None, true) => "device calibrated".to_string(),
+                (None, false) => "uncalibrated raw".to_string(),
+            }
+        );
+        write_s2p(f, &result, Some(&comment))?;
+        eprintln!("wrote {}", path.display());
+    }
+    if let Some(path) = &csv {
+        if path.as_os_str() == "-" {
+            write_csv(io::stdout().lock(), &result)?;
+        } else {
+            let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
+            write_csv(f, &result)?;
+            eprintln!("wrote {}", path.display());
+        }
+    }
+    Ok(())
+}
+
+fn print_table(result: &SweepResult, rows: usize) {
     let n = result.freqs_hz.len();
-    let shown = if a.rows == 0 { n } else { a.rows.min(n) };
+    let shown = if rows == 0 { n } else { rows.min(n) };
     let stride = (n + shown - 1) / shown.max(1);
     println!("{:>14} {:>9} {:>8} {:>7} {:>9} {:>8}", "freq", "S11 dB", "S11 °", "SWR", "S21 dB", "S21 °");
     for i in (0..n).step_by(stride.max(1)) {
@@ -312,32 +405,134 @@ fn sweep(dev: &mut LiteVna, a: SweepArgs) -> Result<()> {
             s21.arg().to_degrees()
         );
     }
-    if let Some(p) = result.points.iter().flatten().next() {
-        eprintln!(
-            "first raw record: fwd0=({},{}) rev0=({},{}) rev1=({},{}) reserved={:02X?} checksum=0x{:02X}",
-            p.fwd0_re, p.fwd0_im, p.rev0_re, p.rev0_im, p.rev1_re, p.rev1_im, p.reserved, p.checksum
-        );
+}
+
+fn load_cal(path: &Path) -> Result<CalibrationSet> {
+    let text = fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    Ok(CalibrationSet::from_json(&text)?)
+}
+
+fn save_cal(path: &Path, set: &CalibrationSet) -> Result<()> {
+    fs::write(path, set.to_json()?).with_context(|| format!("writing {}", path.display()))
+}
+
+fn cal(conn: &Conn, what: &str, file: &Path, grid: GridArgs, m: MeasureArgs, note: Option<String>) -> Result<()> {
+    let existing = if file.exists() { Some(load_cal(file)?) } else { None };
+
+    match what.to_ascii_lowercase().as_str() {
+        "show" => {
+            let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
+            return show_cal(&set);
+        }
+        "clear" => {
+            if file.exists() {
+                fs::remove_file(file)?;
+                println!("removed {}", file.display());
+            }
+            return Ok(());
+        }
+        _ => {}
+    }
+    let standard = Standard::parse(what).with_context(|| {
+        format!("unknown standard {what:?}; use open, short, load, through, isolation, show or clear")
+    })?;
+
+    // Grid: from the existing file unless this is the first standard.
+    let mut set = match existing {
+        Some(set) => {
+            if !grid.is_empty() {
+                let wanted = grid.config(None)?;
+                if wanted.frequencies() != set.freqs_hz {
+                    bail!(
+                        "{} already has a grid of {} points {}..{}; omit --start/--stop/--points or use `cal clear`",
+                        file.display(),
+                        set.freqs_hz.len(),
+                        format_hz(set.freqs_hz[0]),
+                        format_hz(*set.freqs_hz.last().unwrap())
+                    );
+                }
+            }
+            set
+        }
+        None => {
+            if grid.is_empty() {
+                bail!("new calibration file: give --start, --stop and --points for the first standard");
+            }
+            let cfg = grid.config(None)?;
+            CalibrationSet::new(cfg.frequencies(), CalKit::ideal())
+        }
+    };
+    if note.is_some() {
+        set.note = note;
     }
 
-    if let Some(path) = &a.s2p {
-        let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
-        let comment = format!("LiteVNA sweep, {} points, {}", cfg.points, if cfg.calibrated { "device calibrated" } else { "uncalibrated raw" });
-        write_s2p(f, &result, Some(&comment))?;
-        eprintln!("wrote {}", path.display());
+    let cfg = SweepConfig::from_frequencies(&set.freqs_hz)?;
+    eprintln!("measuring standard {:?} — make sure it is connected to port 1{}", standard.name(), match standard {
+        Standard::Through => " and port 2",
+        Standard::Isolation => " (loads on both ports)",
+        _ => "",
+    });
+    let mut dev = open(conn)?;
+    let sweep = measure(&mut dev, &cfg, &m)?;
+    dev.exit_usb_mode()?;
+
+    // Quick sanity numbers so a wrong standard is noticed immediately.
+    let mid = sweep.freqs_hz.len() / 2;
+    eprintln!(
+        "raw at {}: |S11| {:.2} dB ∠{:.0}°, |S21| {:.1} dB",
+        format_hz(sweep.freqs_hz[mid]),
+        db(sweep.s11[mid].norm()),
+        sweep.s11[mid].arg().to_degrees(),
+        db(sweep.s21[mid].norm())
+    );
+
+    set.set(standard, &sweep)?;
+    save_cal(file, &set)?;
+    println!("stored {} in {}", standard.name(), file.display());
+    show_cal(&set)
+}
+
+fn show_cal(set: &CalibrationSet) -> Result<()> {
+    println!(
+        "grid     : {} points, {} → {} (step {})",
+        set.freqs_hz.len(),
+        format_hz(set.freqs_hz[0]),
+        format_hz(*set.freqs_hz.last().unwrap()),
+        format_hz(set.freqs_hz.get(1).copied().unwrap_or(0) - set.freqs_hz[0])
+    );
+    println!("kit      : {}", set.kit.name);
+    if let Some(n) = &set.note {
+        println!("note     : {n}");
     }
-    if let Some(path) = &a.csv {
-        if path.as_os_str() == "-" {
-            write_csv(io::stdout().lock(), &result)?;
-        } else {
-            let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
-            write_csv(f, &result)?;
-            eprintln!("wrote {}", path.display());
+    let have: Vec<_> = Standard::ALL.iter().filter(|s| set.has(**s)).map(|s| s.name()).collect();
+    let missing: Vec<_> = [Standard::Open, Standard::Short, Standard::Load].iter().filter(|s| !set.has(**s)).map(|s| s.name()).collect();
+    println!("measured : {}", if have.is_empty() { "nothing yet".to_string() } else { have.join(", ") });
+    match set.solve() {
+        Ok(cal) => {
+            println!(
+                "status   : complete for S11{}",
+                if cal.has_through() { " and S21 (through measured)" } else { "; S21 uncorrected until a through is measured" }
+            );
+            // Show the error terms at a few points: a feel for the hardware.
+            println!("{:>14} {:>12} {:>12} {:>12}", "freq", "|e00| dB", "|e11| dB", "|e10e01| dB");
+            let n = cal.freqs_hz.len();
+            for i in (0..n).step_by((n / 5).max(1)) {
+                let t = &cal.terms[i];
+                println!(
+                    "{:>14} {:>12.1} {:>12.1} {:>12.2}",
+                    format_hz(cal.freqs_hz[i]),
+                    db(t.e00.norm()),
+                    db(t.e11.norm()),
+                    db(t.e10e01.norm())
+                );
+            }
         }
+        Err(_) => println!("status   : incomplete, still needed: {}", missing.join(", ")),
     }
     Ok(())
 }
 
-fn screenshot(dev: &mut LiteVna, out: &PathBuf, big_endian: bool) -> Result<()> {
+fn screenshot(dev: &mut LiteVna, out: &Path, big_endian: bool) -> Result<()> {
     eprintln!("requesting screenshot (register 0x{:02X}) …", reg::SCREENSHOT);
     let shot = dev.screenshot()?;
     eprintln!("{}x{} @ {} bpp, {} bytes", shot.width, shot.height, shot.bits_per_pixel, shot.data.len());
@@ -353,8 +548,6 @@ fn screenshot(dev: &mut LiteVna, out: &PathBuf, big_endian: bool) -> Result<()> 
     w.write_image_data(&rgb)?;
     w.finish()?;
     println!("wrote {}", out.display());
-    // make sure the UI is alive again
     dev.set_data_mode(DataMode::Normal)?;
     Ok(())
 }
-

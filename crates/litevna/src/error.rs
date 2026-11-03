@@ -13,6 +13,10 @@ pub enum Error {
     Protocol(String),
     #[error("invalid argument: {0}")]
     InvalidArgument(String),
+    #[error("calibration error: {0}")]
+    Calibration(String),
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
