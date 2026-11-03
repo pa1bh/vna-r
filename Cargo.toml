@@ -5,7 +5,7 @@ members = ["crates/litevna", "crates/vna-cli", "crates/vna-gui"]
 [workspace.package]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/bashendriks/vna-r"
+repository = "https://github.com/pa1bh/vna-r"
 
 [workspace.dependencies]
 serialport = "4.10"
