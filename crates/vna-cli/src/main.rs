@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use clap::{Args, Parser, Subcommand};
-use litevna::calibration::{CalKit, Calibration, CalibrationSet, Standard};
+use litevna::calibration::{CalKit, Calibration, CalibrationSet, OpenModel, Standard};
 use litevna::discovery;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel, DataMode};
@@ -83,6 +83,17 @@ enum Cmd {
         /// Free text stored in the file (e.g. "N kit, 50 cm cable").
         #[arg(long)]
         note: Option<String>,
+        #[command(flatten)]
+        kit: KitArgs,
+        /// For `fit`: lowest frequency used (default 300M).
+        #[arg(long)]
+        f_min: Option<String>,
+        /// For `fit`: write the fitted correction into the file's kit.
+        #[arg(long)]
+        apply: bool,
+        /// For `fit`: store the asymmetry as open offset delay instead of capacitance.
+        #[arg(long)]
+        as_delay: bool,
     },
     /// Grab the device screen as PNG.
     Screenshot {
@@ -150,6 +161,68 @@ struct MeasureArgs {
     keep_settings: bool,
 }
 
+/// Kit definition for `cal kit`. Units chosen for humans: fF, pH, ps, Ω.
+#[derive(Args, Clone, Default)]
+struct KitArgs {
+    /// Open fringing capacitance C0 in fF.
+    #[arg(long)]
+    open_c: Option<f64>,
+    /// Open offset delay (one way) in ps.
+    #[arg(long)]
+    open_delay: Option<f64>,
+    /// Short inductance L0 in pH.
+    #[arg(long)]
+    short_l: Option<f64>,
+    /// Short offset delay (one way) in ps.
+    #[arg(long)]
+    short_delay: Option<f64>,
+    /// Load resistance in Ω.
+    #[arg(long)]
+    load_r: Option<f64>,
+    /// Through delay (one way) in ps.
+    #[arg(long)]
+    through_delay: Option<f64>,
+    /// Kit name.
+    #[arg(long)]
+    kit_name: Option<String>,
+}
+
+impl KitArgs {
+    fn is_empty(&self) -> bool {
+        self.open_c.is_none()
+            && self.open_delay.is_none()
+            && self.short_l.is_none()
+            && self.short_delay.is_none()
+            && self.load_r.is_none()
+            && self.through_delay.is_none()
+            && self.kit_name.is_none()
+    }
+
+    fn apply_to(&self, kit: &mut CalKit) {
+        if let Some(c) = self.open_c {
+            kit.set_open_c0(c * 1e-15);
+        }
+        if let Some(d) = self.open_delay {
+            kit.open.offset_delay_s = d * 1e-12;
+        }
+        if let Some(l) = self.short_l {
+            kit.set_short_l0(l * 1e-12);
+        }
+        if let Some(d) = self.short_delay {
+            kit.short.offset_delay_s = d * 1e-12;
+        }
+        if let Some(r) = self.load_r {
+            kit.load.termination = litevna::calibration::Termination::Load { resistance: r };
+        }
+        if let Some(d) = self.through_delay {
+            kit.through_delay_s = d * 1e-12;
+        }
+        if let Some(n) = &self.kit_name {
+            kit.name = n.clone();
+        }
+    }
+}
+
 struct Conn {
     port: Option<String>,
     trace: bool,
@@ -165,7 +238,7 @@ fn main() -> Result<()> {
         Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode } => {
             sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode)
         }
-        Cmd::Cal { what, file, grid, measure, note } => cal(&conn, &what, &file, grid, measure, note),
+        Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
         Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
         Cmd::Release => {
             open(&conn)?.exit_usb_mode()?;
@@ -426,13 +499,76 @@ fn save_cal(path: &Path, set: &CalibrationSet) -> Result<()> {
     fs::write(path, set.to_json()?).with_context(|| format!("writing {}", path.display()))
 }
 
-fn cal(conn: &Conn, what: &str, file: &Path, grid: GridArgs, m: MeasureArgs, note: Option<String>) -> Result<()> {
+#[allow(clippy::too_many_arguments)]
+fn cal(
+    conn: &Conn,
+    what: &str,
+    file: &Path,
+    grid: GridArgs,
+    m: MeasureArgs,
+    note: Option<String>,
+    kit: KitArgs,
+    f_min: Option<String>,
+    apply: bool,
+    as_delay: bool,
+) -> Result<()> {
     let existing = if file.exists() { Some(load_cal(file)?) } else { None };
 
     match what.to_ascii_lowercase().as_str() {
         "show" => {
             let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             return show_cal(&set);
+        }
+        "kit" => {
+            let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
+            if kit.is_empty() {
+                bail!("give kit parameters, e.g. --open-c 55 (fF) --short-l 0 --load-r 50");
+            }
+            kit.apply_to(&mut set.kit);
+            if set.kit.name == "ideal" {
+                set.kit.name = "custom".into();
+            }
+            save_cal(file, &set)?;
+            println!("kit updated in {}", file.display());
+            return show_cal(&set);
+        }
+        "fit" => {
+            let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
+            let f_min = parse_hz(f_min.as_deref().unwrap_or("300M"))?;
+            let model = if as_delay { OpenModel::Delay } else { OpenModel::Capacitance };
+            let fit = set.fit_open(f_min, model)?;
+            println!("open/short asymmetry fit from {} points ≥ {}:", fit.points_used, format_hz(f_min));
+            println!(
+                "  ripple RMS before {:.4}  after {:.4}  (≈ radians of phase asymmetry)",
+                fit.ripple_rms_before, fit.ripple_rms_after
+            );
+            println!(
+                "  as capacitance : {:+.1} fF   (kit open C0 {:.1} fF → {:.1} fF)",
+                fit.delta_c_farad * 1e15,
+                set.kit.open_c0() * 1e15,
+                (set.kit.open_c0() + fit.delta_c_farad) * 1e15
+            );
+            println!(
+                "  as offset delay: {:+.2} ps   (kit open delay {:.2} ps → {:.2} ps)",
+                fit.delta_delay_s * 1e12,
+                set.kit.open.offset_delay_s * 1e12,
+                (set.kit.open.offset_delay_s + fit.delta_delay_s) * 1e12
+            );
+            println!("  (short assumed as defined in the kit; the fit is exact for the {} model)", if as_delay { "delay" } else { "capacitance" });
+            if apply {
+                match model {
+                    OpenModel::Capacitance => set.kit.set_open_c0(set.kit.open_c0() + fit.delta_c_farad),
+                    OpenModel::Delay => set.kit.open.offset_delay_s += fit.delta_delay_s,
+                }
+                if set.kit.name == "ideal" {
+                    set.kit.name = "fitted".into();
+                }
+                save_cal(file, &set)?;
+                println!("applied to {}", file.display());
+            } else {
+                println!("(re-run with --apply [--as-delay] to store it in the kit)");
+            }
+            return Ok(());
         }
         "clear" => {
             if file.exists() {
@@ -444,7 +580,7 @@ fn cal(conn: &Conn, what: &str, file: &Path, grid: GridArgs, m: MeasureArgs, not
         _ => {}
     }
     let standard = Standard::parse(what).with_context(|| {
-        format!("unknown standard {what:?}; use open, short, load, through, isolation, show or clear")
+        format!("unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit or clear")
     })?;
 
     // Grid: from the existing file unless this is the first standard.
@@ -480,6 +616,7 @@ fn cal(conn: &Conn, what: &str, file: &Path, grid: GridArgs, m: MeasureArgs, not
     eprintln!("measuring standard {:?} — make sure it is connected to port 1{}", standard.name(), match standard {
         Standard::Through => " and port 2",
         Standard::Isolation => " (loads on both ports)",
+        Standard::LineOpen | Standard::LineShort => " via the line/cable, standard at the far end",
         _ => "",
     });
     let mut dev = open(conn)?;
@@ -496,10 +633,45 @@ fn cal(conn: &Conn, what: &str, file: &Path, grid: GridArgs, m: MeasureArgs, not
         db(sweep.s21[mid].norm())
     );
 
+    if let Some(warning) = plausibility_warning(standard, &sweep) {
+        eprintln!("WARNING: {warning}");
+    }
     set.set(standard, &sweep)?;
     save_cal(file, &set)?;
     println!("stored {} in {}", standard.name(), file.display());
     show_cal(&set)
+}
+
+/// Catch the classic mistakes (loose standard, wrong standard) before they
+/// poison a calibration: medians of the raw magnitude over the sweep.
+fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<String> {
+    let median = |v: Vec<f64>| -> f64 {
+        let mut v = v;
+        v.sort_by(|a, b| a.total_cmp(b));
+        v[v.len() / 2]
+    };
+    let s11_db = median(sweep.s11.iter().map(|s| db(s.norm())).collect());
+    let s21_db = median(sweep.s21.iter().map(|s| db(s.norm())).collect());
+    match standard {
+        Standard::Open | Standard::Short if s11_db < -3.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; an {} should reflect nearly everything (≈ 0 dB). Loose connector?",
+            standard.name()
+        )),
+        Standard::Load if s11_db > -10.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; a load should be well below -10 dB. Is the load connected?"
+        )),
+        Standard::Through if s21_db < -6.0 => Some(format!(
+            "median raw |S21| is {s21_db:.1} dB; a through should pass nearly everything. Cable connected to port 2?"
+        )),
+        Standard::Isolation if s21_db > -40.0 => Some(format!(
+            "median raw |S21| is {s21_db:.1} dB; isolation needs loads on both ports."
+        )),
+        Standard::LineOpen | Standard::LineShort if s11_db < -6.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; the far-end {} should still reflect most of the signal.",
+            if standard == Standard::LineOpen { "open" } else { "short" }
+        )),
+        _ => None,
+    }
 }
 
 fn show_cal(set: &CalibrationSet) -> Result<()> {
@@ -510,11 +682,20 @@ fn show_cal(set: &CalibrationSet) -> Result<()> {
         format_hz(*set.freqs_hz.last().unwrap()),
         format_hz(set.freqs_hz.get(1).copied().unwrap_or(0) - set.freqs_hz[0])
     );
-    println!("kit      : {}", set.kit.name);
+    println!(
+        "kit      : {}  (open C0 {:.1} fF, delay {:.1} ps; short L0 {:.1} pH, delay {:.1} ps; load {:.2} Ω; through delay {:.1} ps)",
+        set.kit.name,
+        set.kit.open_c0() * 1e15,
+        set.kit.open.offset_delay_s * 1e12,
+        set.kit.short_l0() * 1e12,
+        set.kit.short.offset_delay_s * 1e12,
+        set.kit.load_r(),
+        set.kit.through_delay_s * 1e12
+    );
     if let Some(n) = &set.note {
         println!("note     : {n}");
     }
-    let have: Vec<_> = Standard::ALL.iter().filter(|s| set.has(**s)).map(|s| s.name()).collect();
+    let have: Vec<_> = Standard::ALL.iter().chain(Standard::LINE.iter()).filter(|s| set.has(**s)).map(|s| s.name()).collect();
     let missing: Vec<_> = [Standard::Open, Standard::Short, Standard::Load].iter().filter(|s| !set.has(**s)).map(|s| s.name()).collect();
     println!("measured : {}", if have.is_empty() { "nothing yet".to_string() } else { have.join(", ") });
     match set.solve() {

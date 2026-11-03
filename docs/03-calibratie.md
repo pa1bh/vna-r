@@ -197,3 +197,108 @@ aangesloten:
 De iets grotere fasefout op het brede geïnterpoleerde raster komt doordat de fase van de Open
 tussen de calibratiepunten (stap 5 MHz) een paar graden draait en lineair wordt benaderd. Meer
 calibratiepunten verkleinen dat direct.
+
+## 8. Calibratie tot 6,3 GHz en de kit-fit
+
+### Waarom de ideale kit boven ~1 GHz niet meer volstaat
+
+Een Open is geen perfecte +1: aan het open einde zit randcapaciteit, en bij een N-female Open zit de
+pen bovendien teruggetrokken, wat neerkomt op een stukje extra lijn. Beide laten de echte Γ
+achterlopen: capaciteit met `2·arctan(ω·C·Z0)`, een offset-delay τ met `2·ω·τ`. Bij 6 GHz is dat al
+gauw 10° of meer. Calibreren met ideale definities dwingt zo'n Open tóch naar +1 en vertekent
+daarmee alle latere metingen.
+
+Het vervelende: **aan de poort zelf zie je die fout nooit.** Een opnieuw aangesloten Open komt per
+definitie op +1 uit, een Load op 0. Een SOL-calibratie legt de standaarden alleen *ten opzichte van
+elkaar* vast; de absolute definitie is een conventie.
+
+### Hoe je de asymmetrie tóch meet: Open en Short aan het eind van een kabel
+
+Noem de werkelijke achterstand van de Open φ en die van de Short ψ. Calibreer je met ideale
+definities, dan blijft er een bilineaire (Möbius-)vervorming over die aan de poort onzichtbaar is,
+maar op een lijn niet. Uitgeschreven voor kleine hoeken, met `ε = (φ − ψ)/2`:
+
+```
+|Γ'| open-aan-kabel   ≈ |Γ| · (1 − ε · sin u)
+|Γ'| short-aan-kabel  ≈ |Γ| · (1 + ε · sin u)        u = fase van de lijn (draait met f)
+```
+
+De rimpel is tegengesteld voor Open en Short, en de verhouding van de twee magnitudes elimineert
+de kabeldemping:
+
+```
+(1 − |Γ'open| / |Γ'short|) / (2·|Γ|) ≈ ε · sin u ,     ε ≈ ω · (C·Z0 − L/Z0)   of   ε ≈ ω · τ
+```
+
+Een kleinste-kwadratenfit van die grootheid tegen `ω·sin(arg Γ'open)` geeft `k = C·Z0 − L/Z0`
+(of `k = τ`). Alleen het *verschil* tussen Open en Short is meetbaar; de gebruikelijke conventie is
+de Short ideaal te noemen en alles aan de Open toe te schrijven. De library doet dit iteratief
+(toepassen, opnieuw oplossen, opnieuw fitten), zodat ook grote hoeken exact uitkomen. In een
+synthetische test met 60 fF komt de fit binnen 1 fF uit.
+
+In de CLI:
+
+```bash
+./target/release/vna-cli cal line-open  --file x.json    # kabel op poort 1, Open aan het verre eind
+```
+
+```bash
+./target/release/vna-cli cal line-short --file x.json    # zelfde kabel, Short aan het verre eind
+```
+
+```bash
+./target/release/vna-cli cal fit --file x.json [--as-delay] [--apply]
+```
+
+`--as-delay` slaat de asymmetrie op als offset-delay van de Open in plaats van als capaciteit; voor
+N-connectoren met teruggetrokken pen is dat het fysisch juiste model. `cal kit` zet kit-parameters
+met de hand (`--open-c` fF, `--open-delay` ps, `--short-l` pH, `--load-r` Ω, …).
+
+### Valkuil: een losse standaard
+
+Tijdens deze sessie leverde een niet goed aangedraaide Open een meting op van -4 tot -15 dB in
+plaats van ~0 dB. De solver vindt dan nog steeds een passende map (een opnieuw gemeten Load komt
+dus gewoon diep uit!), maar de fouttermen worden onfysisch: een bronmatch |e11| van +6 dB bestaat
+niet. Controleer daarom altijd `cal show`; de CLI waarschuwt nu ook direct wanneer een Open/Short
+mediaan onder -3 dB, een Load boven -10 dB of een Through onder -6 dB meet.
+
+### Gemeten op de LiteVNA 67 (3 november 2026)
+
+Raster 50 kHz – 6,3 GHz, 1001 punten, N-kit direct op poort 1; lijn = testkabel (eenweg-delay
+≈ 2,5 ns, ≈ 53 cm bij VF 0,70).
+
+Fouttermen met de (goede) Open-meting:
+
+| freq | \|e00\| | \|e11\| | \|e10e01\| |
+|---|---|---|---|
+| 1,26 GHz | -21,2 dB | -35,5 dB | +0,16 dB |
+| 2,52 GHz | -17,6 dB | -26,7 dB | 0,00 dB |
+| 3,78 GHz | -17,1 dB | -24,4 dB | -1,67 dB |
+| 5,04 GHz | -17,8 dB | -14,8 dB | -2,43 dB |
+| 6,30 GHz | -17,9 dB | -19,3 dB | -3,26 dB |
+
+Through gecalibreerd: S21 binnen ±0,04 dB tot 3 GHz, ±0,14 dB tot 6,3 GHz (de rest is de
+niet-gemodelleerde ingangsmatch van poort 2: -27 → -20 dB met kabel en verloop).
+
+**Kit-fit** uit line-open en line-short (953 punten ≥ 300 MHz): asymmetrie **+39,8 fF**
+(equivalent +1,99 ps offset-delay van de Open), onafhankelijk van de ondergrens van de fit
+(300 MHz of 1 GHz geeft 39,8 resp. 39,9 fF). Rimpel-RMS 0,037 → 0,013 rad; de rest is vermoedelijk
+de Load (een imperfecte Load geeft een rimpel met dezelfde periode) en ruis. Over 0–6,3 GHz zijn
+capaciteit en delay hier niet te onderscheiden (`ω·C·Z0` blijft < 0,08), dus is de conventie
+"C0 = 40 fF, Short ideaal" aangehouden.
+
+Onafhankelijke controle: de Short aan het kabeleinde, gecalibreerd met beide kits, piek-piek-rimpel
+van |S11| na aftrek van de dempingstrend:
+
+| band | ideale kit | gefitte kit (40 fF) |
+|---|---|---|
+| 0–1 GHz | 0,25 dB | 0,20 dB |
+| 1–2 GHz | 0,48 dB | 0,18 dB |
+| 2–3 GHz | 0,53 dB | 0,21 dB |
+| 3–4 GHz | 1,03 dB | 0,39 dB |
+| 4–5 GHz | 1,21 dB | 0,36 dB |
+| 5–6,3 GHz | 1,30 dB | 0,56 dB |
+
+Conclusie: tot ~1 GHz maakt de kit-definitie niets uit; daarboven halveert de gefitte Open de
+restfout of beter. Wat overblijft (0,2–0,5 dB) vraagt om een betere Load-definitie of een echte
+referentie (airline).

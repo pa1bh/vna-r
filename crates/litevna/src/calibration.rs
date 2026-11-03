@@ -34,10 +34,17 @@ pub enum Standard {
     Load,
     Through,
     Isolation,
+    /// Open standard at the far end of a line (cable/adapter), for kit fitting.
+    LineOpen,
+    /// Short standard at the far end of the same line.
+    LineShort,
 }
 
 impl Standard {
+    /// The calibration standards proper.
     pub const ALL: [Standard; 5] = [Standard::Open, Standard::Short, Standard::Load, Standard::Through, Standard::Isolation];
+    /// Auxiliary measurements used by [`CalibrationSet::fit_open_capacitance`].
+    pub const LINE: [Standard; 2] = [Standard::LineOpen, Standard::LineShort];
 
     pub fn parse(text: &str) -> Option<Self> {
         Some(match text.to_ascii_lowercase().as_str() {
@@ -46,6 +53,8 @@ impl Standard {
             "load" | "l" => Standard::Load,
             "through" | "thru" | "t" => Standard::Through,
             "isolation" | "isol" | "i" => Standard::Isolation,
+            "line-open" | "line_open" | "lineopen" => Standard::LineOpen,
+            "line-short" | "line_short" | "lineshort" => Standard::LineShort,
             _ => return None,
         })
     }
@@ -57,6 +66,8 @@ impl Standard {
             Standard::Load => "load",
             Standard::Through => "through",
             Standard::Isolation => "isolation",
+            Standard::LineOpen => "line-open",
+            Standard::LineShort => "line-short",
         }
     }
 }
@@ -144,6 +155,43 @@ impl CalKit {
         }
     }
 
+    /// Constant fringing capacitance of the open (the `c[0]` term), in farad.
+    pub fn open_c0(&self) -> f64 {
+        match &self.open.termination {
+            Termination::Open { c } => c[0],
+            _ => 0.0,
+        }
+    }
+
+    /// Set the open's constant fringing capacitance (farad), keeping higher-order terms.
+    pub fn set_open_c0(&mut self, c0: f64) {
+        self.open.termination = match &self.open.termination {
+            Termination::Open { c } => Termination::Open { c: [c0, c[1], c[2], c[3]] },
+            _ => Termination::Open { c: [c0, 0.0, 0.0, 0.0] },
+        };
+    }
+
+    pub fn short_l0(&self) -> f64 {
+        match &self.short.termination {
+            Termination::Short { l } => l[0],
+            _ => 0.0,
+        }
+    }
+
+    pub fn set_short_l0(&mut self, l0: f64) {
+        self.short.termination = match &self.short.termination {
+            Termination::Short { l } => Termination::Short { l: [l0, l[1], l[2], l[3]] },
+            _ => Termination::Short { l: [l0, 0.0, 0.0, 0.0] },
+        };
+    }
+
+    pub fn load_r(&self) -> f64 {
+        match &self.load.termination {
+            Termination::Load { resistance } => *resistance,
+            _ => Z0,
+        }
+    }
+
     /// Actual S21 of the through at `f_hz` (lossless delay line).
     pub fn through_s21(&self, f_hz: f64) -> C64 {
         C64::from_polar(1.0, -2.0 * PI * f_hz * self.through_delay_s)
@@ -169,11 +217,26 @@ pub struct CalibrationSet {
     pub load: Option<StandardMeasurement>,
     pub through: Option<StandardMeasurement>,
     pub isolation: Option<StandardMeasurement>,
+    #[serde(default)]
+    pub line_open: Option<StandardMeasurement>,
+    #[serde(default)]
+    pub line_short: Option<StandardMeasurement>,
 }
 
 impl CalibrationSet {
     pub fn new(freqs_hz: Vec<u64>, kit: CalKit) -> Self {
-        CalibrationSet { freqs_hz, kit, note: None, open: None, short: None, load: None, through: None, isolation: None }
+        CalibrationSet {
+            freqs_hz,
+            kit,
+            note: None,
+            open: None,
+            short: None,
+            load: None,
+            through: None,
+            isolation: None,
+            line_open: None,
+            line_short: None,
+        }
     }
 
     fn slot(&mut self, standard: Standard) -> &mut Option<StandardMeasurement> {
@@ -183,6 +246,8 @@ impl CalibrationSet {
             Standard::Load => &mut self.load,
             Standard::Through => &mut self.through,
             Standard::Isolation => &mut self.isolation,
+            Standard::LineOpen => &mut self.line_open,
+            Standard::LineShort => &mut self.line_short,
         }
     }
 
@@ -193,6 +258,8 @@ impl CalibrationSet {
             Standard::Load => self.load.as_ref(),
             Standard::Through => self.through.as_ref(),
             Standard::Isolation => self.isolation.as_ref(),
+            Standard::LineOpen => self.line_open.as_ref(),
+            Standard::LineShort => self.line_short.as_ref(),
         }
     }
 
@@ -318,6 +385,8 @@ impl CalibrationSet {
             load: self.load.as_ref().map(resample),
             through: self.through.as_ref().map(resample),
             isolation: self.isolation.as_ref().map(resample),
+            line_open: self.line_open.as_ref().map(resample),
+            line_short: self.line_short.as_ref().map(resample),
         })
     }
 
@@ -364,6 +433,127 @@ fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> {
             ys[i - 1] * (1.0 - w) + ys[i] * w
         })
         .collect()
+}
+
+/// How to express the open/short asymmetry found by [`CalibrationSet::fit_open`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenModel {
+    /// Fringing capacitance `c[0]` of the open (NanoVNA convention).
+    Capacitance,
+    /// One-way offset delay of the open (recessed pin, e.g. N female).
+    Delay,
+}
+
+/// Result of [`CalibrationSet::fit_open_capacitance`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OpenFit {
+    /// Capacitance to **add** to the kit's open `c[0]` (farad). Negative means
+    /// the short is "more inductive" than the open is capacitive.
+    pub delta_c_farad: f64,
+    /// The same asymmetry expressed as extra one-way offset delay of the open
+    /// (seconds): `ε = ω·τ` instead of `ε ≈ ω·C·Z0`. Physically more apt for
+    /// connectors whose open pin sits recessed (N female). Only one of the two
+    /// should be applied.
+    pub delta_delay_s: f64,
+    pub points_used: usize,
+    /// RMS of the open/short magnitude asymmetry before and after the fit
+    /// (dimensionless, ≈ radians of phase asymmetry).
+    pub ripple_rms_before: f64,
+    pub ripple_rms_after: f64,
+}
+
+impl CalibrationSet {
+    /// Estimate the open standard's fringing capacitance from the line-open
+    /// and line-short measurements, relative to the kit currently in this set.
+    ///
+    /// Theory: a one-port calibration can only fix the standards *relative* to
+    /// each other. If the real open lags by φ (capacitance) and the real short
+    /// by ψ (inductance), calibrating with ideal definitions leaves a residual
+    /// bilinear distortion that is invisible at the port but shows up on a
+    /// line: the corrected magnitude of an open-ended line ripples as
+    /// `1 − ε·sin(u)` with the line phase `u`, a short-ended line as
+    /// `1 + ε·sin(u)`, where `ε = (φ − ψ)/2 ≈ ω·(C·Z0 − L/Z0)`. The ratio of
+    /// the two cancels cable loss, so `(1 − |Γo|/|Γs|)/2 ≈ ε·sin(u)` and a
+    /// least-squares fit of that against `ω·sin(arg Γo)` yields
+    /// `k = C·Z0 − L/Z0`. Attributing everything to the open (the usual
+    /// convention, L = 0) gives `C = k / Z0`.
+    ///
+    /// Only points at or above `f_min_hz` are used; below ~300 MHz the ripple
+    /// drowns in noise.
+    pub fn fit_open_capacitance(&self, f_min_hz: u64) -> Result<OpenFit> {
+        self.fit_open(f_min_hz, OpenModel::Capacitance)
+    }
+
+    /// Like [`Self::fit_open_capacitance`], iterating in the chosen model so the
+    /// returned correction is exact for that model (the other field is the
+    /// small-angle equivalent).
+    pub fn fit_open(&self, f_min_hz: u64, model: OpenModel) -> Result<OpenFit> {
+        if self.line_open.is_none() || self.line_short.is_none() {
+            return Err(Error::Calibration("need line-open and line-short measurements".into()));
+        }
+        // The first-order estimate is ~2 % low at large asymmetry; iterating
+        // (apply, re-solve, re-fit) converges on the exact value in a few steps.
+        let mut work = self.clone();
+        let mut total_k = 0.0;
+        let mut first: Option<(f64, usize)> = None;
+        let mut last_rms = 0.0;
+        for _ in 0..10 {
+            let (k, n, rms_before, rms_after) = work.fit_step(f_min_hz)?;
+            if first.is_none() {
+                first = Some((rms_before, n));
+            }
+            last_rms = rms_after;
+            total_k += k;
+            match model {
+                OpenModel::Capacitance => work.kit.set_open_c0(work.kit.open_c0() + k / Z0),
+                OpenModel::Delay => work.kit.open.offset_delay_s += k,
+            }
+            if k.abs() < 1e-15 {
+                break;
+            }
+        }
+        let (rms_before, n) = first.unwrap_or((0.0, 0));
+        Ok(OpenFit {
+            delta_c_farad: total_k / Z0,
+            delta_delay_s: total_k,
+            points_used: n,
+            ripple_rms_before: rms_before,
+            ripple_rms_after: last_rms,
+        })
+    }
+
+    /// One least-squares pass: returns `(k, points, rms_before, rms_after)`.
+    fn fit_step(&self, f_min_hz: u64) -> Result<(f64, usize, f64, f64)> {
+        let (lo, ls) = (self.line_open.as_ref().unwrap(), self.line_short.as_ref().unwrap());
+        let cal = self.solve()?;
+        let (mut sxy, mut sxx, mut syy, mut n) = (0.0f64, 0.0f64, 0.0f64, 0usize);
+        let mut samples: Vec<(f64, f64)> = Vec::new();
+        for (i, &f) in self.freqs_hz.iter().enumerate() {
+            if f < f_min_hz {
+                continue;
+            }
+            let go = cal.terms[i].correct_s11(lo.s11[i]);
+            let gs = cal.terms[i].correct_s11(ls.s11[i]);
+            let r = (go.norm() + gs.norm()) / 2.0; // line loss, ripple cancels to first order
+            if r < 0.05 {
+                continue;
+            }
+            // Ripple amplitude scales with |Γ| of the lossy line: normalise it out.
+            let y = (1.0 - go.norm() / gs.norm()) / (2.0 * r);
+            let x = 2.0 * PI * f as f64 * go.arg().sin();
+            sxy += x * y;
+            sxx += x * x;
+            syy += y * y;
+            n += 1;
+            samples.push((x, y));
+        }
+        if n < 10 || sxx <= 0.0 {
+            return Err(Error::Calibration(format!("not enough usable points above {f_min_hz} Hz ({n})")));
+        }
+        let k = sxy / sxx;
+        let after: f64 = samples.iter().map(|(x, y)| (y - k * x).powi(2)).sum::<f64>() / n as f64;
+        Ok((k, n, (syy / n as f64).sqrt(), after.sqrt()))
+    }
 }
 
 /// Solve `e00 + (Γa·Γm)·e11 − Γa·Δ = Γm` for three standards (Cramer's rule).
@@ -500,7 +690,7 @@ mod tests {
                 Standard::Short => (kit.short.gamma(f), C64::new(0.0, 0.0)),
                 Standard::Load => (kit.load.gamma(f), C64::new(0.0, 0.0)),
                 Standard::Through => (C64::new(0.0, 0.0), kit.through_s21(f)),
-                Standard::Isolation => (kit.load.gamma(f), C64::new(0.0, 0.0)),
+                Standard::Isolation | Standard::LineOpen | Standard::LineShort => (kit.load.gamma(f), C64::new(0.0, 0.0)),
             };
             let (m11, m21) = measure(&terms_at(i), a11, a21);
             s11.push(m11);
@@ -599,7 +789,7 @@ mod tests {
                     Standard::Short => (kit.short.gamma(fh), C64::new(0.0, 0.0)),
                     Standard::Load => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
                     Standard::Through => (C64::new(0.0, 0.0), kit.through_s21(fh)),
-                    Standard::Isolation => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Isolation | Standard::LineOpen | Standard::LineShort => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
                 };
                 let (m11, m21) = measure(&terms_at_freq(fh), a11, a21);
                 s11.push(m11);
@@ -654,6 +844,55 @@ mod tests {
         }
         let err = bad.interpolate(&[150_000_000]).unwrap_err().to_string();
         assert!(err.contains("too coarse"), "{err}");
+    }
+
+    #[test]
+    fn open_capacitance_fit_recovers_kit_asymmetry() {
+        // Real kit: open with 60 fF, short ideal. Calibrated as if ideal.
+        let mut real = CalKit::ideal();
+        real.set_open_c0(60e-15);
+        let freqs: Vec<u64> = (0..1001).map(|i| 50_000 + i * 6_300_000).collect(); // 50 kHz .. 6.3 GHz
+        let one = C64::new(0.0, 0.0);
+        let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
+        // port standards (real kit) measured through the synthetic instrument
+        for std in [Standard::Open, Standard::Short, Standard::Load] {
+            let (mut s11, mut s21) = (Vec::new(), Vec::new());
+            for &f in &freqs {
+                let fh = f as f64;
+                let a = match std {
+                    Standard::Open => real.open.gamma(fh),
+                    Standard::Short => real.short.gamma(fh),
+                    _ => real.load.gamma(fh),
+                };
+                let (m11, m21) = measure(&terms_at_freq(fh), a, one);
+                s11.push(m11);
+                s21.push(m21);
+            }
+            set.set(std, &sweep_from(&freqs, s11, s21)).unwrap();
+        }
+        // the same standards at the end of a 2.5 ns lossy line
+        let tau = 2.5e-9;
+        for (std, term) in [(Standard::LineOpen, &real.open), (Standard::LineShort, &real.short)] {
+            let (mut s11, mut s21) = (Vec::new(), Vec::new());
+            for &f in &freqs {
+                let fh = f as f64;
+                let loss = 10f64.powf(-0.5 * (fh / 1e9).sqrt() / 20.0); // 0.5 dB·√GHz round trip
+                let a = term.gamma(fh) * C64::from_polar(loss, -2.0 * 2.0 * PI * fh * tau);
+                let (m11, m21) = measure(&terms_at_freq(fh), a, one);
+                s11.push(m11);
+                s21.push(m21);
+            }
+            set.set(std, &sweep_from(&freqs, s11, s21)).unwrap();
+        }
+        let fit = set.fit_open_capacitance(500_000_000).unwrap();
+        let c_ff = fit.delta_c_farad * 1e15;
+        assert!((c_ff - 60.0).abs() < 1.0, "fitted {c_ff} fF, expected ~60 fF; {fit:?}");
+        assert!(fit.ripple_rms_after < fit.ripple_rms_before / 5.0, "{fit:?}");
+
+        // Apply and refit: the asymmetry should be gone.
+        set.kit.set_open_c0(set.kit.open_c0() + fit.delta_c_farad);
+        let again = set.fit_open_capacitance(500_000_000).unwrap();
+        assert!(again.delta_c_farad.abs() * 1e15 < 1.0, "residual {} fF", again.delta_c_farad * 1e15);
     }
 
     #[test]
