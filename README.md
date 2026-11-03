@@ -10,9 +10,9 @@ het protocolonderzoek.
 
 | Crate | Wat |
 |---|---|
-| `crates/litevna` | Library: protocol (opcodes, registers, FIFO-records), device-API, poortdetectie, Touchstone-export. Geen UI. |
+| `crates/litevna` | Library: protocol (opcodes, registers, FIFO-records), device-API, poortdetectie, SOLT-calibratie met kit-fit en interpolatie, TDR, Touchstone-export. Geen UI. |
 | `crates/vna-cli` | Commandline-POC bovenop de library. |
-| `crates/vna-gui` | Desktop-GUI (egui/eframe): live Smith-chart, logmag, SWR, fase, marker, calibratie, export. |
+| `crates/vna-gui` | Desktop-GUI (egui/eframe): live Smith-chart, logmag, SWR, fase, TDR-weergave, marker, calibratie, export. |
 
 ## Gebruik
 
@@ -36,6 +36,10 @@ cargo build --release
 ./target/release/vna-cli screenshot --out scherm.png
 ```
 
+```bash
+./target/release/vna-cli tdr --cal cal/n-6g3.cal.json --vf 0.70 --max-distance 3   # reflecties op afstand
+```
+
 Handig bij problemen: `--trace` toont elke verzonden/ontvangen byte, `peek F0` leest een register.
 Na een sweep geeft de CLI het scherm terug aan het apparaat; met `release` kun je dat ook los doen.
 
@@ -49,6 +53,10 @@ Kies de poort (★ = LiteVNA), **Connect**, **Run**. Links de sweep-instellingen
 meet open/short/load (en optioneel through/isolation) op het huidige raster, zet **apply** aan en sla
 de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`. Klik in een grafiek
 of op de Smith-chart voor een marker met frequentie, S11, impedantie, SWR en S21.
+
+### TDR
+
+Zie [docs/04-tdr.md](docs/04-tdr.md). In de GUI: kies **TDR** in het linkerpaneel.
 
 ### Calibratie
 

@@ -8,6 +8,7 @@ use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
 use litevna::calibration::{CalKit, Calibration, CalibrationSet, Standard, Z0};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
+use litevna::timedomain::{tdr, TdrConfig, TdrResult, Window};
 use litevna::touchstone::{db, swr, write_s2p};
 use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
 use num_complex::Complex64;
@@ -18,7 +19,7 @@ use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
 const S11_COLOR: Color32 = Color32::from_rgb(255, 204, 0);
 const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
 const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
-const POINT_CHOICES: [u16; 7] = [51, 101, 201, 401, 801, 1601, 3201];
+const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 
 enum Connection {
     Disconnected,
@@ -84,6 +85,20 @@ pub struct App {
     error: Option<String>,
     screenshot: Option<(egui::TextureHandle, Screenshot)>,
     show_screenshot: bool,
+
+    view: View,
+    tdr_vf: f64,
+    tdr_window: Window,
+    tdr_max_m: f64,
+    tdr_marker: Option<usize>,
+    /// (sweep number, vf, window) the cached result belongs to.
+    tdr_cache: Option<(u64, f64, Window, TdrResult)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum View {
+    Frequency,
+    Tdr,
 }
 
 impl App {
@@ -112,6 +127,12 @@ impl App {
             error: None,
             screenshot: None,
             show_screenshot: false,
+            view: View::Frequency,
+            tdr_vf: 0.70,
+            tdr_window: Window::Hann,
+            tdr_max_m: 2.0,
+            tdr_marker: None,
+            tdr_cache: None,
         };
         app.refresh_ports();
         app
@@ -361,6 +382,52 @@ impl App {
             ui.checkbox(&mut self.show_s21, RichText::new("S21").color(S21_COLOR));
 
             ui.add_space(12.0);
+            ui.heading("Time domain (TDR)");
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.view, View::Frequency, "Frequency");
+                ui.selectable_value(&mut self.view, View::Tdr, "TDR");
+            });
+            egui::Grid::new("tdr-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+                ui.label("Velocity factor");
+                ui.add(egui::DragValue::new(&mut self.tdr_vf).range(0.3..=1.0).speed(0.005).fixed_decimals(3));
+                ui.end_row();
+                ui.label("Window");
+                egui::ComboBox::from_id_salt("tdr-window").selected_text(self.tdr_window.name()).show_ui(ui, |ui| {
+                    for w in [Window::Rectangular, Window::Hann, Window::Blackman] {
+                        ui.selectable_value(&mut self.tdr_window, w, w.name());
+                    }
+                });
+                ui.end_row();
+                ui.label("Max distance");
+                ui.add(egui::DragValue::new(&mut self.tdr_max_m).range(0.1..=1000.0).speed(0.05).suffix(" m"));
+                ui.end_row();
+            });
+            if let Some((_, _, _, t)) = &self.tdr_cache {
+                let (res_m, range_m) = (t.resolution_m(), t.max_distance_m());
+                ui.small(format!("resolution {:.3} m, alias-free range {:.1} m", res_m, range_m));
+                // Resolution is 1/span: a narrow HF sweep smears a cable into one blob.
+                if res_m > self.tdr_max_m / 10.0 {
+                    let needed_span = litevna::timedomain::C0 * self.tdr_vf / (2.0 * self.tdr_max_m / 20.0);
+                    let stop = needed_span.min(6.3e9);
+                    ui.colored_label(
+                        Color32::from_rgb(230, 150, 80),
+                        format!(
+                            "Span too small for {:.1} m: pulses are {:.2} m wide. Sweep to ≥ {} for detail.",
+                            self.tdr_max_m,
+                            res_m,
+                            format_hz(stop as u64)
+                        ),
+                    );
+                    if ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
+                        self.start = "50k".into();
+                        self.stop = format_hz(stop as u64).replace(' ', "");
+                        self.points = 1001;
+                        self.start_sweep(self.running);
+                    }
+                }
+            }
+
+            ui.add_space(12.0);
             ui.heading("Export");
             if ui.add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)")).clicked() {
                 self.save_s2p();
@@ -488,6 +555,10 @@ impl App {
     // ----- plots -----------------------------------------------------------
 
     fn central(&mut self, ui: &mut egui::Ui) {
+        if self.view == View::Tdr {
+            self.central_tdr(ui);
+            return;
+        }
         self.marker_readout(ui);
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
@@ -591,6 +662,103 @@ impl App {
             // nearest frequency index
             let best = mhz.iter().enumerate().map(|(i, f)| (i, (f - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
             self.marker = best.map(|(i, _)| i);
+        }
+    }
+
+    fn tdr_result(&mut self) -> Option<&TdrResult> {
+        let sweep = self.shown.as_ref()?;
+        let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.sweep_count && *vf == self.tdr_vf && *w == self.tdr_window);
+        if !fresh {
+            let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
+            match tdr(&sweep.freqs_hz, &sweep.s11, &cfg) {
+                Ok(t) => self.tdr_cache = Some((self.sweep_count, self.tdr_vf, self.tdr_window, t)),
+                Err(e) => {
+                    self.error = Some(format!("TDR: {e}"));
+                    self.tdr_cache = None;
+                }
+            }
+        }
+        self.tdr_cache.as_ref().map(|(_, _, _, t)| t)
+    }
+
+    fn central_tdr(&mut self, ui: &mut egui::Ui) {
+        let Some(t) = self.tdr_result().cloned() else {
+            ui.centered_and_justified(|ui| ui.label("Connect and press Run; TDR is computed from S11"));
+            return;
+        };
+        // readout
+        ui.horizontal(|ui| {
+            match self.tdr_marker {
+                Some(i) if i < t.distance_m.len() => {
+                    ui.label(RichText::new(format!("M  {:.3} m  {:.2} ns", t.distance_m[i], t.time_s[i] * 1e9)).strong().color(MARKER_COLOR));
+                    ui.separator();
+                    ui.label(RichText::new(format!("|Γ| {:.1} dB", db(t.impulse_mag[i]))).color(S11_COLOR));
+                    ui.label(format!("Z {:.1} Ω", t.impedance_ohm[i]));
+                    if ui.small_button("clear").clicked() {
+                        self.tdr_marker = None;
+                    }
+                }
+                _ => {
+                    ui.small("Click in a plot to place a marker. Distances are one-way, using the velocity factor.");
+                }
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let tag = if self.cal.apply && self.cal.solved.is_some() {
+                    RichText::new("CAL").color(Color32::from_rgb(120, 200, 120))
+                } else {
+                    RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
+                };
+                ui.label(tag.strong());
+            });
+        });
+
+        let avail = ui.available_size();
+        let h = ((avail.y - 10.0) / 2.0).max(150.0);
+        let limit = self.tdr_max_m.min(t.max_distance_m());
+        let n = t.distance_m.iter().position(|d| *d > limit).unwrap_or(t.distance_m.len());
+        let dist = &t.distance_m[..n];
+        let marker_x = self.tdr_marker.and_then(|i| dist.get(i).copied());
+        let mut clicked_x: Option<f64> = None;
+
+        let r = Plot::new("tdr-impulse")
+            .height(h)
+            .x_axis_label("m")
+            .y_axis_label("|Γ| dB")
+            .include_y(0.0)
+            .include_y(-60.0)
+            .include_x(0.0)
+            .include_x(limit)
+            .show(ui, |pui| {
+                pui.line(Line::new("impulse", series(dist, t.impulse_mag[..n].iter().map(|m| db(*m).max(-100.0)))).color(S11_COLOR));
+                if let Some(x) = marker_x {
+                    pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                }
+                (pui.response().clicked(), pui.pointer_coordinate())
+            });
+        if let (true, Some(p)) = r.inner {
+            clicked_x = Some(p.x);
+        }
+        let r = Plot::new("tdr-z")
+            .height(h)
+            .x_axis_label("m")
+            .y_axis_label("Ω")
+            .include_y(0.0)
+            .include_y(100.0)
+            .include_x(0.0)
+            .include_x(limit)
+            .show(ui, |pui| {
+                pui.line(Line::new("Z", series(dist, t.impedance_ohm[..n].iter().map(|z| z.min(500.0)))).color(S21_COLOR));
+                if let Some(x) = marker_x {
+                    pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                }
+                (pui.response().clicked(), pui.pointer_coordinate())
+            });
+        if let (true, Some(p)) = r.inner {
+            clicked_x = Some(p.x);
+        }
+        if let Some(x) = clicked_x {
+            let best = dist.iter().enumerate().map(|(i, d)| (i, (d - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
+            self.tdr_marker = best.map(|(i, _)| i);
         }
     }
 

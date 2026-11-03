@@ -10,6 +10,7 @@ use litevna::calibration::{CalKit, Calibration, CalibrationSet, OpenModel, Stand
 use litevna::discovery;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel, DataMode};
+use litevna::timedomain::{tdr as compute_tdr, TdrConfig, Window};
 use litevna::touchstone::{db, swr, write_csv, write_s2p};
 use litevna::{LiteVna, SweepConfig, SweepResult};
 
@@ -94,6 +95,35 @@ enum Cmd {
         /// For `fit`: store the asymmetry as open offset delay instead of capacitance.
         #[arg(long)]
         as_delay: bool,
+    },
+    /// Time-domain reflectometry: where along the line are the reflections?
+    ///
+    /// Sweeps (ideally with --cal), inverse-transforms S11 and lists the
+    /// strongest reflections with distance, |Γ| and the impedance behind them.
+    /// Resolution ≈ 1/span, range ≈ 1/step: sweep wide for detail, fine for reach.
+    Tdr {
+        #[command(flatten)]
+        grid: GridArgs,
+        #[command(flatten)]
+        measure: MeasureArgs,
+        /// Calibration file (strongly recommended: raw S11 above 1 GHz is dominated by the bridge).
+        #[arg(long)]
+        cal: Option<PathBuf>,
+        /// Velocity factor of the cable (0.66 RG-58, 0.70 RG-316, 0.83 foam).
+        #[arg(long, default_value_t = 0.70)]
+        vf: f64,
+        /// Window: rectangular, hann, blackman.
+        #[arg(long, default_value = "hann")]
+        window: String,
+        /// Number of reflections to list.
+        #[arg(long, default_value_t = 5)]
+        peaks: usize,
+        /// Only consider reflections up to this distance in metres (default: alias-free range).
+        #[arg(long)]
+        max_distance: Option<f64>,
+        /// Write distance/time/impulse/step/impedance as CSV.
+        #[arg(long)]
+        csv: Option<PathBuf>,
     },
     /// Grab the device screen as PNG.
     Screenshot {
@@ -239,6 +269,9 @@ fn main() -> Result<()> {
             sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode)
         }
         Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
+        Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv } => {
+            tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv)
+        }
         Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
         Cmd::Release => {
             open(&conn)?.exit_usb_mode()?;
@@ -386,20 +419,21 @@ fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<Swee
     Ok(result)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn sweep(
-    conn: &Conn,
-    grid: GridArgs,
-    m: MeasureArgs,
-    cal_file: Option<PathBuf>,
-    s2p: Option<PathBuf>,
-    csv: Option<PathBuf>,
-    rows: usize,
-    keep_usb_mode: bool,
-) -> Result<()> {
+/// What one measurement run produced.
+struct Acquired {
+    cfg: SweepConfig,
+    raw: SweepResult,
+    /// Calibrated when a calibration was given, otherwise the raw sweep.
+    result: SweepResult,
+    calibrated: bool,
+}
+
+/// Resolve the grid (from args or the calibration file), sweep once and apply
+/// the calibration. Shared by `sweep` and `tdr`.
+fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path>, keep_usb_mode: bool) -> Result<Acquired> {
     // With a calibration file the grid defaults to the calibrated one; an
     // explicit --start/--stop/--points inside that span is interpolated.
-    let (cfg, calibration): (SweepConfig, Option<Calibration>) = match &cal_file {
+    let (cfg, calibration): (SweepConfig, Option<Calibration>) = match cal_file {
         Some(path) => {
             let set = load_cal(path)?;
             let cfg = grid.config(Some(&set.freqs_hz))?;
@@ -424,17 +458,31 @@ fn sweep(
     };
 
     let mut dev = open(conn)?;
-    let raw = measure(&mut dev, &cfg, &m)?;
+    let raw = measure(&mut dev, &cfg, m)?;
     if keep_usb_mode {
         dev.release_on_drop = false;
     } else {
         dev.exit_usb_mode()?;
     }
-
     let result = match &calibration {
         Some(cal) => cal.apply(&raw)?,
         None => raw.clone(),
     };
+    Ok(Acquired { cfg, raw, calibrated: calibration.is_some(), result })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sweep(
+    conn: &Conn,
+    grid: GridArgs,
+    m: MeasureArgs,
+    cal_file: Option<PathBuf>,
+    s2p: Option<PathBuf>,
+    csv: Option<PathBuf>,
+    rows: usize,
+    keep_usb_mode: bool,
+) -> Result<()> {
+    let Acquired { cfg, raw, result, calibrated } = acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?;
 
     print_table(&result, rows);
     if let Some(p) = raw.points.iter().flatten().next() {
@@ -449,10 +497,10 @@ fn sweep(
         let comment = format!(
             "LiteVNA sweep, {} points, {}",
             cfg.points,
-            match (&cal_file, cfg.calibrated) {
-                (Some(c), _) => format!("host calibration {}", c.display()),
-                (None, true) => "device calibrated".to_string(),
-                (None, false) => "uncalibrated raw".to_string(),
+            match (calibrated, &cal_file, cfg.calibrated) {
+                (true, Some(c), _) => format!("host calibration {}", c.display()),
+                (_, _, true) => "device calibrated".to_string(),
+                _ => "uncalibrated raw".to_string(),
             }
         );
         write_s2p(f, &result, Some(&comment))?;
@@ -466,6 +514,67 @@ fn sweep(
             write_csv(f, &result)?;
             eprintln!("wrote {}", path.display());
         }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tdr_cmd(
+    conn: &Conn,
+    grid: GridArgs,
+    m: MeasureArgs,
+    cal_file: Option<PathBuf>,
+    vf: f64,
+    window: &str,
+    n_peaks: usize,
+    max_distance: Option<f64>,
+    csv: Option<PathBuf>,
+) -> Result<()> {
+    let window = Window::parse(window).with_context(|| format!("unknown window {window:?}"))?;
+    if cal_file.is_none() {
+        eprintln!("note: no --cal given; raw S11 includes the bridge's own reflections");
+    }
+    let Acquired { result, .. } = acquire(conn, &grid, &m, cal_file.as_deref(), false)?;
+    let cfg = TdrConfig { window, velocity_factor: vf, fft_size: 0 };
+    let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
+
+    let limit_m = max_distance.unwrap_or(t.max_distance_m());
+    println!(
+        "TDR: resolution ≈ {:.3} m ({:.0} ps), alias-free range {:.1} m ({:.0} ns), VF {:.2}, {} window",
+        t.resolution_m(),
+        t.resolution_s * 1e12,
+        t.max_distance_m(),
+        t.max_time_s * 1e9,
+        vf,
+        window.name()
+    );
+    let dt = t.time_s[1] - t.time_s[0];
+    let min_sep = ((t.resolution_s / dt).ceil() as usize).max(2);
+    let peaks: Vec<_> = t.peaks(n_peaks * 4, min_sep).into_iter().filter(|(i, _)| t.distance_m[*i] <= limit_m).take(n_peaks).collect();
+    println!("{:>4} {:>10} {:>10} {:>9} {:>10}", "#", "distance", "time", "|Γ| dB", "Z behind");
+    for (k, (i, mag)) in peaks.iter().enumerate() {
+        // impedance a little beyond the edge, where the step has settled
+        let j = (i + min_sep).min(t.impedance_ohm.len() - 1);
+        println!(
+            "{:>4} {:>8.3} m {:>8.2} ns {:>9.1} {:>8.1} Ω",
+            k + 1,
+            t.distance_m[*i],
+            t.time_s[*i] * 1e9,
+            db(*mag),
+            t.impedance_ohm[j]
+        );
+    }
+    if let Some(path) = &csv {
+        let mut f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
+        use std::io::Write;
+        writeln!(f, "distance_m,time_ns,impulse_db,step,z_ohm")?;
+        for i in 0..t.time_s.len() {
+            if t.distance_m[i] > limit_m {
+                break;
+            }
+            writeln!(f, "{:.5},{:.4},{:.2},{:.5},{:.2}", t.distance_m[i], t.time_s[i] * 1e9, db(t.impulse_mag[i]), t.step[i], t.impedance_ohm[i])?;
+        }
+        eprintln!("wrote {}", path.display());
     }
     Ok(())
 }

@@ -11,6 +11,7 @@
 //!   typed API (device info, sweeps, screenshots, ...).
 //! * [`discovery`] — find candidate USB serial ports.
 //! * [`calibration`] — SOL(T) error-term calibration applied on the host.
+//! * [`timedomain`] — TDR: impulse/step response and impedance along a line from S11.
 //! * [`touchstone`] — export sweeps as Touchstone `.s2p` files.
 //! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
 
@@ -20,6 +21,7 @@ pub mod discovery;
 pub mod error;
 pub mod freq;
 pub mod protocol;
+pub mod timedomain;
 pub mod touchstone;
 
 pub use calibration::{CalKit, Calibration, CalibrationSet, Standard};
