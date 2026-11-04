@@ -24,6 +24,32 @@ het referentievlak daar.
 De bandbreedte lees je af met twee markers op de punten waar SWR 2,0 kruist; de regel
 M2−M1 geeft het verschil.
 
+![Een OCF-draadantenne voor HF, 3–30 MHz met HF-calibratie: SWR, |Z| en de Smith-chart](../images/gui-ocf-antenne.webp)
+
+Zo ziet dat eruit bij een off-center gevoede draadantenne (OCF) voor HF, gemeten door de
+voedingslijn vanuit de shack, 3 tot 30 MHz met 1001 punten en de HF-calibratie van
+hoofdstuk 4. De vier markers staan in de SWR-dalen: 3,51 MHz (SWR 1,28), 6,78 MHz
+(1,45), 14,07 MHz (1,09) en 17,15 MHz (1,41); verder naar rechts liggen nog dalen rond 21
+en 28 MHz. Dat de resonanties in veelvouden van de laagste liggen is precies het idee van
+een OCF: door het voedingspunt uit het midden te leggen, is de impedantie daar op alle
+even harmonischen bruikbaar, en de balun brengt die naar 50 Ω. Op 40 m zit hij iets te
+laag (6,78 in plaats van 7,1 MHz, X negatief: op de band is hij daar nog net te lang);
+op 20 m staat hij precies goed.
+
+Tussen de banden is de antenne in antiresonantie: de **|Z|**-grafiek schiet daar naar
+200 tot 300 Ω en SWR naar 5 tot 7. In de **Smith-chart** is elke band één lus; de lussen
+zijn klein en liggen rond het middelpunt omdat de antenne op die frequenties goed is
+aangepast, en de curve draait zoveel rondjes omdat de lange voedingslijn de fase met de
+frequentie meedraait.
+
+Twee kanttekeningen bij zo'n meting. Omdat het referentievlak in de shack ligt, is de
+**R + jX** die je afleest wat de zender ziet, niet wat de antenne zelf doet: de coax
+transformeert de impedantie mee. Voor afregelen op SWR maakt dat niet uit (SWR verandert
+op een verliesarme lijn nauwelijks langs de lijn), voor de impedantie van de antenne
+zelf calibreer je aan het antenne-eind of gebruik je de gate. En de S21-kolommen in de
+markertabel staan op −95 dB omdat er niets aan poort 2 hangt: dat is de ruisvloer, geen
+meting.
+
 ## Kabel: lengte, verkortingsfactor, verlies
 
 **Lengte.** TDR met open of short aan het eind, piek aanklikken, afstand aflezen. De
