@@ -276,6 +276,8 @@ pub struct App {
     diff_ref: Option<usize>,
     /// Name of the Touchstone file currently shown as the trace (no device data).
     file_trace: Option<String>,
+    /// Last file operation (saved/opened), shown under **Files**.
+    file_message: Option<String>,
     /// (sweep number, vf, window) the cached result belongs to.
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
@@ -345,6 +347,7 @@ impl App {
             references: Vec::new(),
             diff_ref: None,
             file_trace: None,
+            file_message: None,
             tdr_cache: None,
         };
         app.refresh_ports();
@@ -1130,6 +1133,9 @@ impl App {
             if let Some(name) = &self.file_trace {
                 ui.small(format!("showing file: {name}"));
             }
+            if let Some(m) = &self.file_message {
+                ui.small(m);
+            }
 
             ui.add_space(12.0);
             if let Some(name) = &self.file_trace {
@@ -1538,6 +1544,11 @@ impl App {
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         match read_touchstone_file(&path) {
             Ok(sweep) => {
+                self.file_message = Some(format!(
+                    "opened {} as {}",
+                    path.display(),
+                    if as_reference { "reference" } else { "trace" }
+                ));
                 if as_reference {
                     self.references.push(Reference {
                         name,
@@ -1593,7 +1604,7 @@ impl App {
             gated
         );
         match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
-            Ok(()) => self.cal.message = Some(format!("wrote {}", path.display())),
+            Ok(()) => self.file_message = Some(format!("wrote {}", path.display())),
             Err(e) => self.error = Some(format!("saving s2p: {e}")),
         }
     }
