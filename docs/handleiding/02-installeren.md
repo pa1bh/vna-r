@@ -50,10 +50,12 @@ Haal daarna de USB-stekker even los en weer vast. Een alternatief is jezelf in d
 
 ### NixOS
 
-De repository heeft een `flake.nix`. Zonder iets te installeren:
+De repository heeft een `flake.nix`. Flakes staan op een standaard-NixOS uit; zet in
+`configuration.nix` `nix.settings.experimental-features = [ "nix-command" "flakes" ];`
+of geef het per aanroep mee. Zonder iets te installeren:
 
 ```bash
-nix run github:pa1bh/vna-r
+nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
 (`#vna-cli` erachter voor de commandoregel.) Om zelf te bouwen en te ontwikkelen geeft
