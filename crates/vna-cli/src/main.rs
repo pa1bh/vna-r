@@ -139,6 +139,9 @@ enum Cmd {
         /// Write distance/time/impulse/step/impedance as CSV.
         #[arg(long)]
         csv: Option<PathBuf>,
+        /// Read S11 from a Touchstone file (.s1p/.s2p) instead of sweeping.
+        #[arg(long, value_name = "FILE", conflicts_with = "cal")]
+        from: Option<PathBuf>,
     },
     /// Grab the device screen as PNG.
     Screenshot {
@@ -284,8 +287,8 @@ fn main() -> Result<()> {
             sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf, segment)
         }
         Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
-        Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv } => {
-            tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv)
+        Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv, from } => {
+            tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv, from)
         }
         Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
         Cmd::Release => {
@@ -641,12 +644,22 @@ fn tdr_cmd(
     n_peaks: usize,
     max_distance: Option<f64>,
     csv: Option<PathBuf>,
+    from: Option<PathBuf>,
 ) -> Result<()> {
     let window = Window::parse(window).with_context(|| format!("unknown window {window:?}"))?;
-    if cal_file.is_none() {
-        eprintln!("note: no --cal given; raw S11 includes the bridge's own reflections");
-    }
-    let Acquired { result, .. } = acquire(conn, &grid, &m, cal_file.as_deref(), false)?;
+    let result = match from {
+        Some(path) => {
+            let r = litevna::touchstone::read_touchstone_file(&path).with_context(|| format!("reading {}", path.display()))?;
+            eprintln!("read {}: {} points {} → {}", path.display(), r.freqs_hz.len(), format_hz(r.freqs_hz[0]), format_hz(*r.freqs_hz.last().unwrap()));
+            r
+        }
+        None => {
+            if cal_file.is_none() {
+                eprintln!("note: no --cal given; raw S11 includes the bridge's own reflections");
+            }
+            acquire(conn, &grid, &m, cal_file.as_deref(), false)?.result
+        }
+    };
     let cfg = TdrConfig { window, velocity_factor: vf, fft_size: 0 };
     let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
 

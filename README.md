@@ -62,9 +62,14 @@ een HF-calibratie naast 50 MHz–6,3 GHz met de brede. Zo ontloop je de interpol
 calibratie aan de onderkant. TDR en gate gebruiken het breedste segment. CLI:
 `vna-cli sweep --segment 100k:50M:1001@cal/n-hf.cal.json --segment 50M:6.3G:1001@cal/n-6g3.cal.json`.
 
+Bestanden: onder **Files** opent **Open as trace…** een .s1p/.s2p-bestand in plaats van het apparaat (label
+FILE; alle weergaven, markers en TDR werken erop, de volgende sweep vervangt het) en **Open as reference…**
+laadt het als referentie. Formaten RI/MA/DB, eenheden Hz–GHz, ook bestanden van de LiteVNA zelf. CLI:
+`vna-cli tdr --from meting.s2p`.
+
 Referenties: **Hold** in de markerbalk zet de huidige trace vast (maximaal vier, elk met naam en eigen
 kleur, aan/uit onder **Traces**); de knop **Δ** bij een referentie tekent live min referentie in dB en
-graden in de log mag- en fase-grafieken. Referenties worden niet bewaard; exporteer ze als s2p.
+graden in de log mag- en fase-grafieken. Referenties worden niet bewaard; exporteer ze als s2p en open ze later als referentie.
 
 Middelen: **Sweep avg** N middelt de laatste N sweeps complex in software (teller k/N, reset bij een
 ander raster), naast de *Average* van het apparaat zelf. Complex middelen drukt ruis op lage niveaus

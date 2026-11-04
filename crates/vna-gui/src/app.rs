@@ -10,7 +10,7 @@ use litevna::calibration::{plausibility_warning, CalKit, Calibration, Calibratio
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
-use litevna::touchstone::{db, swr, write_s2p};
+use litevna::touchstone::{db, read_touchstone_file, swr, write_s2p};
 use litevna::traces::{self, impedance, Param, TraceKind};
 use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
 use num_complex::Complex64;
@@ -263,6 +263,8 @@ pub struct App {
     references: Vec<Reference>,
     /// Reference the difference trace is taken against.
     diff_ref: Option<usize>,
+    /// Name of the Touchstone file currently shown as the trace (no device data).
+    file_trace: Option<String>,
     /// (sweep number, vf, window) the cached result belongs to.
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
@@ -327,6 +329,7 @@ impl App {
             avg_buf: VecDeque::new(),
             references: Vec::new(),
             diff_ref: None,
+            file_trace: None,
             tdr_cache: None,
         };
         app.refresh_ports();
@@ -547,7 +550,9 @@ impl App {
 
     /// CAL / CAL* / RAW tag.
     fn cal_tag(&self) -> RichText {
-        if self.is_calibrated() {
+        if self.file_trace.is_some() {
+            RichText::new("FILE").color(Color32::from_rgb(120, 170, 220))
+        } else if self.is_calibrated() {
             RichText::new("CAL").color(Color32::from_rgb(120, 200, 120))
         } else if self.is_partially_calibrated() {
             RichText::new("CAL*").color(Color32::from_rgb(230, 150, 80))
@@ -578,6 +583,7 @@ impl App {
                     Purpose::Display => {
                         self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() { self.sent_plan_cals.clone() } else { vec![None; cfgs.len()] };
                         self.last_plan = cfgs;
+                        self.file_trace = None;
                         self.sweep_count += 1;
                         let result = self.push_average(result);
                         let corrected = self.corrected(&result);
@@ -702,7 +708,7 @@ impl App {
     }
 
     fn corrected(&mut self, raw: &SweepResult) -> SweepResult {
-        if !self.cal.apply {
+        if !self.cal.apply || self.file_trace.is_some() {
             return raw.clone();
         }
         let ranges = SweepResult::segment_ranges(&self.last_plan);
@@ -1014,13 +1020,28 @@ impl App {
             }
 
             ui.add_space(12.0);
-            ui.heading("Export");
+            ui.heading("Files");
             if ui.add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)")).clicked() {
                 self.save_s2p();
             }
+            ui.horizontal(|ui| {
+                if ui.button("Open as trace…").on_hover_text("show an .s1p/.s2p file instead of the device; the next sweep replaces it").clicked() {
+                    self.open_touchstone(false);
+                }
+                if ui.add_enabled(self.references.len() < MAX_REFS, egui::Button::new("Open as reference…")).clicked() {
+                    self.open_touchstone(true);
+                }
+            });
+            if let Some(name) = &self.file_trace {
+                ui.small(format!("showing file: {name}"));
+            }
 
             ui.add_space(12.0);
-            if let (Some(raw), false) = (&self.raw, self.last_plan.is_empty()) {
+            if let Some(name) = &self.file_trace {
+                if let Some(raw) = &self.raw {
+                    ui.small(format!("file {name}: {} → {} in {} points", format_hz(raw.freqs_hz[0]), format_hz(*raw.freqs_hz.last().unwrap()), raw.freqs_hz.len()));
+                }
+            } else if let (Some(raw), false) = (&self.raw, self.last_plan.is_empty()) {
                 let segs = if self.last_plan.len() > 1 { format!(" in {} segments", self.last_plan.len()) } else { String::new() };
                 ui.small(format!(
                     "last sweep: {} → {} in {} points{}, {} ms, sweep #{}{}",
@@ -1358,6 +1379,30 @@ impl App {
                 self.cal.message = Some("saved".into());
             }
             Err(e) => self.error = Some(format!("saving calibration: {e}")),
+        }
+    }
+
+    fn open_touchstone(&mut self, as_reference: bool) {
+        let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s1p", "s2p"]).pick_file() else { return };
+        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        match read_touchstone_file(&path) {
+            Ok(sweep) => {
+                if as_reference {
+                    self.references.push(Reference { name, sweep, visible: true });
+                } else {
+                    if self.running {
+                        self.stop_sweep();
+                    }
+                    self.last_plan.clear();
+                    self.last_plan_cals.clear();
+                    self.avg_buf.clear();
+                    self.file_trace = Some(name);
+                    self.raw = Some(sweep.clone());
+                    self.set_shown(sweep);
+                    self.markers = [None; MARKERS];
+                }
+            }
+            Err(e) => self.error = Some(format!("opening {}: {e}", path.display())),
         }
     }
 
