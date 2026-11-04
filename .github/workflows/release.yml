@@ -1,0 +1,70 @@
+name: Release
+
+# Pushing a tag such as v0.2.0 builds vna-cli and vna-gui on Ubuntu and macOS
+# and attaches tarballs to a GitHub release. These are plain dynamically linked
+# binaries: on Linux they need libudev and GTK 3 from the distribution (not for
+# NixOS; use the flake there).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-linux
+          - os: macos-latest
+            target: aarch64-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --workspace --release
+
+      - name: Package
+        run: |
+          name=vna-r-${GITHUB_REF_NAME}-${{ matrix.target }}
+          mkdir -p "$name"
+          cp target/release/vna-cli target/release/vna-gui README.md "$name"/
+          cp -r docs/handleiding "$name"/handleiding
+          if [ "${{ runner.os }}" = "Linux" ]; then cp linux/99-litevna.rules "$name"/; fi
+          tar czf "$name.tar.gz" "$name"
+          shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            vna-r-*.tar.gz
+            vna-r-*.sha256
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

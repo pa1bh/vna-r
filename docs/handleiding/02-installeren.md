@@ -48,6 +48,36 @@ sudo cp linux/99-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --relo
 Haal daarna de USB-stekker even los en weer vast. Een alternatief is jezelf in de groep
 `dialout` (Debian/Ubuntu) of `uucp` (Arch) zetten en opnieuw inloggen.
 
+### NixOS
+
+De repository heeft een `flake.nix`. Zonder iets te installeren:
+
+```bash
+nix run github:pa1bh/vna-r
+```
+
+(`#vna-cli` erachter voor de commandoregel.) Om zelf te bouwen en te ontwikkelen geeft
+`nix develop` een shell met Rust, pkg-config, udev, GTK en de grafische bibliotheken die
+de GUI tijdens het draaien laadt; daarin werkt `cargo run --release -p vna-gui` gewoon.
+Het pakket bevat de udev-regel, dus in de systeemconfiguratie volstaat
+
+```nix
+services.udev.packages = [ vna-r ];
+```
+
+met `vna-r` het pakket uit de flake, of simpeler `users.users.<naam>.extraGroups = [ "dialout" ];`.
+De flake is in CI gebouwd op x86_64-linux; op een laptop met Wayland of X11 is de GUI
+nog niet gedraaid, meldingen zijn welkom.
+
+## Kant-en-klare binaries
+
+Bij elke tag `v*` bouwt GitHub Actions tarballs voor x86_64-Linux en Apple Silicon en
+hangt die aan een release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, de
+handleiding en (op Linux) de udev-regel. Het zijn gewone dynamisch gelinkte binaries:
+op Linux moeten `libudev` en GTK 3 van de distributie aanwezig zijn, en op NixOS werken
+ze niet (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
+publiceert; bouw dan zelf uit de bron.
+
 ## Aansluiten
 
 Zet het apparaat aan en verbind het met een USB-kabel die data doet; sommige laadkabels

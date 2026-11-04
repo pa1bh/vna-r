@@ -1,0 +1,89 @@
+{
+  description = "vna-r: LiteVNA / NanoVNA-F tooling (library, CLI, egui GUI)";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs = { self, nixpkgs }:
+    let
+      systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
+      forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+    in
+    {
+      packages = forAll (pkgs:
+        let
+          inherit (pkgs) lib stdenv;
+          # What the GUI dlopens at run time on Linux: winit (X11 / Wayland),
+          # wgpu (Vulkan, with GL as fallback) and the file dialogs (GTK 3).
+          runtimeLibs = lib.optionals stdenv.isLinux (with pkgs; [
+            libxkbcommon
+            wayland
+            libGL
+            vulkan-loader
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+          ]);
+          vna-r = pkgs.rustPlatform.buildRustPackage {
+            pname = "vna-r";
+            version = "0.1.0";
+            # Only the git-tracked files, so a local target/ or cal/ never ends up in the store.
+            src = self;
+            cargoLock.lockFile = ./Cargo.lock;
+
+            nativeBuildInputs = [ pkgs.pkg-config ]
+              ++ lib.optionals stdenv.isLinux [ pkgs.wrapGAppsHook3 ];
+            buildInputs = lib.optionals stdenv.isLinux (with pkgs; [ udev gtk3 ]);
+
+            # The tests need no hardware.
+            doCheck = true;
+
+            # Ship the udev rule so `services.udev.packages = [ vna-r ]` works on NixOS.
+            postInstall = lib.optionalString stdenv.isLinux ''
+              install -Dm644 linux/99-litevna.rules $out/lib/udev/rules.d/99-litevna.rules
+            '';
+            # Let the GTK wrapper also add the graphics libraries to the GUI's search path.
+            preFixup = lib.optionalString stdenv.isLinux ''
+              gappsWrapperArgs+=(--prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibs})
+            '';
+
+            meta = with lib; {
+              description = "Drive a LiteVNA or NanoVNA-F from the desktop: sweeps, SOL(T) calibration, TDR, gating";
+              homepage = "https://github.com/pa1bh/vna-r";
+              license = licenses.mit;
+              platforms = platforms.unix;
+              mainProgram = "vna-gui";
+            };
+          };
+        in
+        {
+          default = vna-r;
+          inherit vna-r;
+        });
+
+      apps = forAll (pkgs:
+        let pkg = self.packages.${pkgs.stdenv.hostPlatform.system}.default; in
+        {
+          default = { type = "app"; program = "${pkg}/bin/vna-gui"; };
+          vna-gui = { type = "app"; program = "${pkg}/bin/vna-gui"; };
+          vna-cli = { type = "app"; program = "${pkg}/bin/vna-cli"; };
+        });
+
+      devShells = forAll (pkgs:
+        let
+          inherit (pkgs) lib stdenv;
+          runtimeLibs = lib.optionals stdenv.isLinux (with pkgs; [
+            libxkbcommon wayland libGL vulkan-loader
+            xorg.libX11 xorg.libXcursor xorg.libXi xorg.libXrandr
+          ]);
+        in
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [ rustc cargo rustfmt clippy rust-analyzer pkg-config ]
+              ++ lib.optionals stdenv.isLinux [ pkgs.udev pkgs.gtk3 ];
+            # `cargo run -p vna-gui` finds the graphics libraries through this.
+            LD_LIBRARY_PATH = lib.optionalString stdenv.isLinux (lib.makeLibraryPath runtimeLibs);
+          };
+        });
+    };
+}

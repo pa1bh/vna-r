@@ -131,6 +131,10 @@ Twee protocollen achter één `Vna`-handle, gekozen op USB-id:
   Toegang tot de poort zonder root: kopieer [linux/99-litevna.rules](linux/99-litevna.rules) naar
   `/etc/udev/rules.d/` en herlaad udev (instructies in het bestand), of zet jezelf in de groep
   `dialout`.
+- **NixOS**: `nix run github:pa1bh/vna-r` (of `nix develop` en dan `cargo run`); de flake levert het pakket
+  met udev-regel (`services.udev.packages = [ vna-r ];`).
+- **Releases**: een tag `v*` laat [release.yml](.github/workflows/release.yml) tarballs voor x86_64-Linux en
+  Apple Silicon aan een GitHub-release hangen. Daartussen publiceert de CI niets.
 - **CI**: [.github/workflows/ci.yml](.github/workflows/ci.yml) bouwt en test op Ubuntu en macOS bij elke
   push; de GUI is op Linux gebouwd en getest in een Debian-container, maar nog niet op een echte
   Linux-desktop gedraaid.
