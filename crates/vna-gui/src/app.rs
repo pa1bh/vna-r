@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
-use litevna::calibration::{CalKit, Calibration, CalibrationSet, Standard, Z0};
+use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard, Z0};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{tdr, TdrConfig, TdrResult, Window};
@@ -47,6 +47,8 @@ struct Settings {
     tdr_window: String,
     tdr_max_m: f64,
     marker_freqs: [Option<u64>; MARKERS],
+    fit_f_min: String,
+    fit_as_delay: bool,
 }
 
 impl Default for Settings {
@@ -66,6 +68,8 @@ impl Default for Settings {
             tdr_window: "hann".into(),
             tdr_max_m: 2.0,
             marker_freqs: [None; MARKERS],
+            fit_f_min: "300M".into(),
+            fit_as_delay: false,
         }
     }
 }
@@ -85,6 +89,19 @@ struct CalState {
     apply: bool,
     pending: Option<Standard>,
     message: Option<String>,
+    /// Plausibility warning about the last stored standard.
+    warning: Option<String>,
+    /// Lowest frequency used by the kit fit (text, parsed with parse_hz).
+    fit_f_min: String,
+    fit_as_delay: bool,
+    /// Last fit result, not yet applied to the kit.
+    fit: Option<(OpenFit, OpenModel)>,
+}
+
+impl CalState {
+    fn fit_model(&self) -> OpenModel {
+        if self.fit_as_delay { OpenModel::Delay } else { OpenModel::Capacitance }
+    }
 }
 
 impl CalState {
@@ -215,6 +232,8 @@ impl App {
         self.tdr_window = Window::parse(&s.tdr_window).unwrap_or(Window::Hann);
         self.tdr_max_m = s.tdr_max_m;
         self.pending_marker_freqs = Some(s.marker_freqs);
+        self.cal.fit_f_min = s.fit_f_min;
+        self.cal.fit_as_delay = s.fit_as_delay;
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -246,6 +265,8 @@ impl App {
             tdr_window: self.tdr_window.name().into(),
             tdr_max_m: self.tdr_max_m,
             marker_freqs,
+            fit_f_min: self.cal.fit_f_min.clone(),
+            fit_as_delay: self.cal.fit_as_delay,
         }
     }
 
@@ -352,6 +373,8 @@ impl App {
     }
 
     fn store_standard(&mut self, std: Standard, sweep: &SweepResult) {
+        self.cal.warning = plausibility_warning(std, sweep);
+        self.cal.fit = None;
         let needs_new = match &self.cal.set {
             Some(set) => set.freqs_hz != sweep.freqs_hz,
             None => true,
@@ -491,6 +514,9 @@ impl App {
             ui.add_space(12.0);
             ui.heading("Calibration");
             self.calibration_panel(ui);
+            egui::CollapsingHeader::new("Kit fit (line open / line short)").default_open(false).show(ui, |ui| {
+                self.kit_fit_panel(ui);
+            });
 
             ui.add_space(12.0);
             ui.heading("Traces");
@@ -573,8 +599,14 @@ impl App {
                     format_hz(set.freqs_hz[0]),
                     format_hz(*set.freqs_hz.last().unwrap())
                 ));
-                let have: Vec<_> = Standard::ALL.iter().filter(|s| set.has(**s)).map(|s| s.name()).collect();
+                let have: Vec<_> = Standard::ALL.iter().chain(Standard::LINE.iter()).filter(|s| set.has(**s)).map(|s| s.name()).collect();
                 ui.label(format!("measured: {}", if have.is_empty() { "—".to_string() } else { have.join(", ") }));
+                ui.label(format!(
+                    "kit: {} (open C0 {:.1} fF, delay {:.2} ps)",
+                    set.kit.name,
+                    set.kit.open_c0() * 1e15,
+                    set.kit.open.offset_delay_s * 1e12
+                ));
                 let status = match set.solve() {
                     Ok(c) => format!("ready for S11{}", if c.has_through() { " + S21" } else { "" }),
                     Err(_) => "incomplete (need open, short, load)".to_string(),
@@ -591,19 +623,11 @@ impl App {
         if let Some(m) = &self.cal.message {
             ui.small(RichText::new(m).color(Color32::from_rgb(200, 200, 120)));
         }
+        if let Some(w) = &self.cal.warning {
+            ui.small(RichText::new(format!("⚠ {w}")).color(Color32::from_rgb(255, 150, 80)));
+        }
 
-        ui.horizontal_wrapped(|ui| {
-            for std in Standard::ALL {
-                let pending = self.cal.pending == Some(std);
-                let label = if pending { format!("{}…", std.name()) } else { std.name().to_string() };
-                if ui.add_enabled(connected && self.cal.pending.is_none(), egui::Button::new(label)).clicked() {
-                    if let Some(cfg) = self.current_config() {
-                        self.cal.pending = Some(std);
-                        self.send(Cmd::Sweep { cfg, purpose: Purpose::Standard(std), continuous: false });
-                    }
-                }
-            }
-        });
+        self.standard_buttons(ui, &Standard::ALL, connected);
         ui.horizontal(|ui| {
             let changed = ui.checkbox(&mut self.cal.apply, "apply").changed();
             if changed {
@@ -618,12 +642,125 @@ impl App {
                 self.save_cal();
             }
             if ui.add_enabled(self.cal.set.is_some(), egui::Button::new("Clear")).clicked() {
-                self.cal = CalState { apply: self.cal.apply, ..Default::default() };
+                self.cal = CalState {
+                    apply: self.cal.apply,
+                    fit_f_min: self.cal.fit_f_min.clone(),
+                    fit_as_delay: self.cal.fit_as_delay,
+                    ..Default::default()
+                };
                 if let Some(raw) = self.raw.clone() {
                     self.shown = Some(raw);
                 }
             }
         });
+    }
+
+    fn standard_buttons(&mut self, ui: &mut egui::Ui, standards: &[Standard], connected: bool) {
+        ui.horizontal_wrapped(|ui| {
+            for &std in standards {
+                let pending = self.cal.pending == Some(std);
+                let label = if pending { format!("{}…", std.name()) } else { std.name().to_string() };
+                if ui.add_enabled(connected && self.cal.pending.is_none(), egui::Button::new(label)).clicked() {
+                    if let Some(cfg) = self.current_config() {
+                        self.cal.pending = Some(std);
+                        self.send(Cmd::Sweep { cfg, purpose: Purpose::Standard(std), continuous: false });
+                    }
+                }
+            }
+        });
+    }
+
+    /// Kit fit from line-open / line-short measurements (see docs/03-calibratie.md §8).
+    fn kit_fit_panel(&mut self, ui: &mut egui::Ui) {
+        let connected = self.connected();
+        let have_lines = self.cal.set.as_ref().map_or(false, |s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
+        let solvable = self.cal.set.as_ref().map_or(false, |s| s.solve().is_ok());
+        ui.small("With open, short and load done: put a cable (≥ 50 cm) on port 1 and measure it with an open and a short at the far end. The ripple difference gives the open/short asymmetry of the kit.");
+        self.standard_buttons(ui, &Standard::LINE, connected);
+        ui.horizontal(|ui| {
+            ui.label("from");
+            ui.add(egui::TextEdit::singleline(&mut self.cal.fit_f_min).desired_width(60.0));
+            ui.label("as");
+            egui::ComboBox::from_id_salt("fit_model")
+                .selected_text(if self.cal.fit_as_delay { "delay" } else { "capacitance" })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.cal.fit_as_delay, false, "capacitance");
+                    ui.selectable_value(&mut self.cal.fit_as_delay, true, "delay");
+                });
+        });
+        ui.horizontal(|ui| {
+            if ui.add_enabled(have_lines && solvable, egui::Button::new("Fit")).clicked() {
+                self.run_kit_fit();
+            }
+            if ui.add_enabled(self.cal.fit.is_some(), egui::Button::new("Apply to kit")).clicked() {
+                self.apply_kit_fit();
+            }
+            let not_ideal = self.cal.set.as_ref().map_or(false, |s| s.kit != CalKit::ideal());
+            if ui.add_enabled(not_ideal, egui::Button::new("Reset kit")).clicked() {
+                if let Some(set) = &mut self.cal.set {
+                    set.kit = CalKit::ideal();
+                }
+                self.cal.fit = None;
+                self.cal.solved = None;
+                self.cal.message = Some("kit reset to ideal".into());
+                if let Some(raw) = self.raw.clone() {
+                    self.shown = Some(self.corrected(&raw));
+                }
+            }
+        });
+        if let Some((fit, model)) = self.cal.fit {
+            let kit = &self.cal.set.as_ref().unwrap().kit;
+            let line = match model {
+                OpenModel::Capacitance => format!(
+                    "ΔC {:+.1} fF → open C0 {:.1} fF",
+                    fit.delta_c_farad * 1e15,
+                    (kit.open_c0() + fit.delta_c_farad) * 1e15
+                ),
+                OpenModel::Delay => format!(
+                    "Δτ {:+.2} ps → open delay {:.2} ps",
+                    fit.delta_delay_s * 1e12,
+                    (kit.open.offset_delay_s + fit.delta_delay_s) * 1e12
+                ),
+            };
+            ui.label(line);
+            ui.small(format!(
+                "{} points, ripple RMS {:.4} → {:.4} (short assumed as in the kit)",
+                fit.points_used, fit.ripple_rms_before, fit.ripple_rms_after
+            ));
+        }
+    }
+
+    fn run_kit_fit(&mut self) {
+        let f_min = match parse_hz(&self.cal.fit_f_min) {
+            Ok(f) => f,
+            Err(e) => {
+                self.cal.message = Some(format!("fit: {e}"));
+                return;
+            }
+        };
+        let model = self.cal.fit_model();
+        let Some(set) = &self.cal.set else { return };
+        match set.fit_open(f_min, model) {
+            Ok(fit) => {
+                self.cal.fit = Some((fit, model));
+                self.cal.message = None;
+            }
+            Err(e) => {
+                self.cal.fit = None;
+                self.cal.message = Some(format!("fit: {e}"));
+            }
+        }
+    }
+
+    fn apply_kit_fit(&mut self) {
+        let Some((fit, model)) = self.cal.fit.take() else { return };
+        let Some(set) = &mut self.cal.set else { return };
+        set.apply_open_fit(&fit, model);
+        self.cal.solved = None;
+        self.cal.message = Some(format!("kit updated: open C0 {:.1} fF, delay {:.2} ps — save to keep it", set.kit.open_c0() * 1e15, set.kit.open.offset_delay_s * 1e12));
+        if let Some(raw) = self.raw.clone() {
+            self.shown = Some(self.corrected(&raw));
+        }
     }
 
     fn load_cal(&mut self) {
@@ -637,6 +774,8 @@ impl App {
                 self.cal.set = Some(set);
                 self.cal.file = Some(path.to_path_buf());
                 self.cal.solved = None;
+                self.cal.fit = None;
+                self.cal.warning = None;
                 self.cal.message = Some("loaded".into());
                 if let Some(raw) = self.raw.clone() {
                     self.shown = Some(self.corrected(&raw));

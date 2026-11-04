@@ -302,3 +302,12 @@ van |S11| na aftrek van de dempingstrend:
 Conclusie: tot ~1 GHz maakt de kit-definitie niets uit; daarboven halveert de gefitte Open de
 restfout of beter. Wat overblijft (0,2–0,5 dB) vraagt om een betere Load-definitie of een echte
 referentie (airline).
+
+### In de GUI
+
+Sinds 2026-11-04 zit de fit ook in `vna-gui`: calibratiepaneel → **Kit fit (line open / line short)**.
+Knoppen `line open`/`line short` meten de kabel, **Fit** roept `CalibrationSet::fit_open` aan met de
+ingevulde ondergrens en het gekozen model, **Apply to kit** schrijft het resultaat via
+`CalibrationSet::apply_open_fit` in de kit (naam "ideal" wordt "fitted"), **Reset kit** zet de kit terug
+op ideaal. De plausibiliteitscontrole van de CLI (`plausibility_warning`) staat nu in de library en
+verschijnt in de GUI als oranje regel onder het calibratiepaneel.

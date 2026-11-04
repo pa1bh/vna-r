@@ -556,6 +556,58 @@ impl CalibrationSet {
     }
 }
 
+impl CalibrationSet {
+    /// Store the asymmetry found by [`Self::fit_open`] in this set's kit, in
+    /// the model the fit was made for. A kit still called "ideal" is renamed
+    /// "fitted".
+    pub fn apply_open_fit(&mut self, fit: &OpenFit, model: OpenModel) {
+        match model {
+            OpenModel::Capacitance => self.kit.set_open_c0(self.kit.open_c0() + fit.delta_c_farad),
+            OpenModel::Delay => self.kit.open.offset_delay_s += fit.delta_delay_s,
+        }
+        if self.kit.name == "ideal" {
+            self.kit.name = "fitted".into();
+        }
+    }
+}
+
+/// Sanity check of a raw standard measurement before it is stored: a loose
+/// open or a forgotten load produces a calibration that still "solves" but
+/// gives nonsense. Returns a human-readable warning, or `None` if the
+/// measurement looks like the standard it claims to be.
+pub fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<String> {
+    let median = |mut v: Vec<f64>| -> f64 {
+        v.sort_by(|a, b| a.total_cmp(b));
+        v[v.len() / 2]
+    };
+    if sweep.s11.is_empty() {
+        return None;
+    }
+    let db = crate::touchstone::db;
+    let s11_db = median(sweep.s11.iter().map(|s| db(s.norm())).collect());
+    let s21_db = median(sweep.s21.iter().map(|s| db(s.norm())).collect());
+    match standard {
+        Standard::Open | Standard::Short if s11_db < -3.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; an {} should reflect nearly everything (≈ 0 dB). Loose connector?",
+            standard.name()
+        )),
+        Standard::Load if s11_db > -10.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; a load should be well below -10 dB. Is the load connected?"
+        )),
+        Standard::Through if s21_db < -6.0 => Some(format!(
+            "median raw |S21| is {s21_db:.1} dB; a through should pass nearly everything. Cable connected to port 2?"
+        )),
+        Standard::Isolation if s21_db > -40.0 => Some(format!(
+            "median raw |S21| is {s21_db:.1} dB; isolation needs loads on both ports."
+        )),
+        Standard::LineOpen | Standard::LineShort if s11_db < -6.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; the far-end {} should still reflect most of the signal.",
+            if standard == Standard::LineOpen { "open" } else { "short" }
+        )),
+        _ => None,
+    }
+}
+
 /// Solve `e00 + (Γa·Γm)·e11 − Γa·Δ = Γm` for three standards (Cramer's rule).
 fn solve_one_port(standards: &[(C64, C64); 3]) -> Option<(C64, C64, C64)> {
     let one = C64::new(1.0, 0.0);

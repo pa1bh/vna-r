@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
 use clap::{Args, Parser, Subcommand};
-use litevna::calibration::{CalKit, Calibration, CalibrationSet, OpenModel, Standard};
+use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenModel, Standard};
 use litevna::discovery;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel, DataMode};
@@ -665,13 +665,7 @@ fn cal(
             );
             println!("  (short assumed as defined in the kit; the fit is exact for the {} model)", if as_delay { "delay" } else { "capacitance" });
             if apply {
-                match model {
-                    OpenModel::Capacitance => set.kit.set_open_c0(set.kit.open_c0() + fit.delta_c_farad),
-                    OpenModel::Delay => set.kit.open.offset_delay_s += fit.delta_delay_s,
-                }
-                if set.kit.name == "ideal" {
-                    set.kit.name = "fitted".into();
-                }
+                set.apply_open_fit(&fit, model);
                 save_cal(file, &set)?;
                 println!("applied to {}", file.display());
             } else {
@@ -753,36 +747,6 @@ fn cal(
 
 /// Catch the classic mistakes (loose standard, wrong standard) before they
 /// poison a calibration: medians of the raw magnitude over the sweep.
-fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<String> {
-    let median = |v: Vec<f64>| -> f64 {
-        let mut v = v;
-        v.sort_by(|a, b| a.total_cmp(b));
-        v[v.len() / 2]
-    };
-    let s11_db = median(sweep.s11.iter().map(|s| db(s.norm())).collect());
-    let s21_db = median(sweep.s21.iter().map(|s| db(s.norm())).collect());
-    match standard {
-        Standard::Open | Standard::Short if s11_db < -3.0 => Some(format!(
-            "median raw |S11| is {s11_db:.1} dB; an {} should reflect nearly everything (≈ 0 dB). Loose connector?",
-            standard.name()
-        )),
-        Standard::Load if s11_db > -10.0 => Some(format!(
-            "median raw |S11| is {s11_db:.1} dB; a load should be well below -10 dB. Is the load connected?"
-        )),
-        Standard::Through if s21_db < -6.0 => Some(format!(
-            "median raw |S21| is {s21_db:.1} dB; a through should pass nearly everything. Cable connected to port 2?"
-        )),
-        Standard::Isolation if s21_db > -40.0 => Some(format!(
-            "median raw |S21| is {s21_db:.1} dB; isolation needs loads on both ports."
-        )),
-        Standard::LineOpen | Standard::LineShort if s11_db < -6.0 => Some(format!(
-            "median raw |S11| is {s11_db:.1} dB; the far-end {} should still reflect most of the signal.",
-            if standard == Standard::LineOpen { "open" } else { "short" }
-        )),
-        _ => None,
-    }
-}
-
 fn show_cal(set: &CalibrationSet) -> Result<()> {
     println!(
         "grid     : {} points, {} → {} (step {})",

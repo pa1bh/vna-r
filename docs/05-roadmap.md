@@ -11,7 +11,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 
 | # | Stap | Grootte | Status |
 |---|------|---------|--------|
-| 1 | Kit-fit in de GUI | S | open |
+| 1 | Kit-fit in de GUI | S | gedaan 2026-11-04 |
 | 2 | Meer weergaven: R/X, fase, groepsvertraging | M | open |
 | 3 | Gated TDR (time gating) | M | open |
 | 4 | Load-definitie fitten | M | open |

@@ -51,7 +51,10 @@ cargo run --release -p vna-gui
 
 Kies de poort (★ = LiteVNA), **Connect**, **Run**. Links de sweep-instellingen en het calibratiepaneel:
 meet open/short/load (en optioneel through/isolation) op het huidige raster, zet **apply** aan en sla
-de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`.
+de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`. Voor calibraties
+boven ~1 GHz: onder **Kit fit** meet je een kabel met open en short aan het verre eind, **Fit** schat
+de open/short-asymmetrie van de kit (als capaciteit of offset delay) en **Apply to kit** zet die in de
+calibratie; een onwaarschijnlijke standaardmeting (losse open, vergeten load) geeft een waarschuwing.
 
 Markers: vier stuks (M1–M4). Kies de actieve bovenin, klik in een grafiek of op de Smith-chart om hem te
 plaatsen, pijltjestoetsen verschuiven hem per punt (shift: ×10). De tabel toont frequentie, S11, Z, SWR
