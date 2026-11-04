@@ -78,7 +78,8 @@ ze, of haal ze weg. De knop **Δ** bij een referentie tekent live min referentie
 grafiek, in de eenheid van die grafiek: dB, graden, SWR, ohm of nanoseconden. Zo zie je
 direct wat een aanpassing aan een antenne doet. Let op dat een verschil in dB groot
 wordt waar beide traces diep in een dal zitten (twee kleine getallen); kijk daar naar
-het verschil in SWR of |Z|. Referenties verdwijnen bij het afsluiten; bewaar ze als Touchstone en open
+het verschil in SWR of |Z|. Hoofdstuk 9 laat zo een vergelijking van twee apparaten
+op dezelfde antenne zien. Referenties verdwijnen bij het afsluiten; bewaar ze als Touchstone en open
 ze later weer als referentie.
 
 ## Schermafbeelding van het apparaat

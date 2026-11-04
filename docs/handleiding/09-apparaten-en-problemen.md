@@ -87,6 +87,25 @@ controleren:
    draaiend.
 3. **Herhaalbaarheid**: los- en vastdraaien verandert minder dan 0,05 dB.
 
+De sterkste controle is een tweede, onafhankelijke meetketen. Hieronder dezelfde
+OCF-draadantenne (hoofdstuk 6) gemeten met twee verschillende apparaten: live in geel de
+LiteVNA 67, gecalibreerd met een N-kit op de N-poort, en als grijze referentie de
+NanoVNA-F 4.3 met een SMA-kit, opgeslagen als Touchstone en teruggelezen met **Open as
+reference…**. Ander apparaat, ander protocol, andere kit, andere adapter naar de
+antennekabel. De rode stippellijn is **Δ**, live min referentie, in de eenheid van elke
+grafiek.
+
+![LiteVNA 67 (geel) en NanoVNA-F (grijs) op dezelfde OCF-antenne, met Δ in SWR en ohm](../images/gui-vergelijking-litevna-nanovna-f.webp)
+
+Δ SWR blijft over de hele band binnen 0,1 tot 0,2 van nul en Δ |Z| binnen enkele ohm,
+ook op de antiresonanties waar |Γ| ≈ 0,74 is; in de dalen geven de markers 1,38 tegen
+1,42, 1,36 tegen 1,34 en 1,07 tegen 1,09. Dat is de overeenkomst die je van twee
+hobbykits met ideale definities mag verwachten, en het zegt dat beide calibraties
+deugen. Let op de Δ-trace in de log mag-grafiek: die schiet rond 24,9 MHz omhoog omdat
+beide traces daar diep in een dal zitten en het verschil van twee kleine getallen in dB
+groot wordt; Δ SWR en Δ |Z| laten op dezelfde plek niets zien. Vergelijk dus in de
+eenheid die bij de vraag hoort.
+
 Als een meting verrast, kijk dan eerst **RAW** (apply uit). Ruw hoort een open of short
 op 0 dB te staan (op een NanoVNA-F op ongeveer −3,4 dB: zijn brug schaalt anders, de
 calibratie rekent dat weg) en een load tussen −10 en −30 dB; staat een "load" ruw op
