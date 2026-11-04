@@ -23,6 +23,7 @@ pub mod freq;
 pub mod protocol;
 pub mod timedomain;
 pub mod touchstone;
+pub mod traces;
 
 pub use calibration::{CalKit, Calibration, CalibrationSet, Standard};
 pub use device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};

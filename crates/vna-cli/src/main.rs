@@ -452,6 +452,9 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
                 if cal.has_through() { ", with through" } else { ", S21 uncorrected" },
                 if interpolated { format!(", interpolated to {} points", freqs.len()) } else { String::new() }
             );
+            if let Some(w) = set.coarse_low_end_warning(&freqs) {
+                eprintln!("WARNING: {w}");
+            }
             (cfg, Some(cal))
         }
         None => (grid.config(None)?, None),

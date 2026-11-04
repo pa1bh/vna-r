@@ -198,6 +198,22 @@ De iets grotere fasefout op het brede geïnterpoleerde raster komt doordat de fa
 tussen de calibratiepunten (stap 5 MHz) een paar graden draait en lineair wordt benaderd. Meer
 calibratiepunten verkleinen dat direct.
 
+### Valkuil: de onderkant van een brede calibratie (4 november 2026)
+
+Gemeten: load aan het eind van de testkabel, sweep 100 kHz–50 MHz, gecorrigeerd met de
+6,3 GHz-calibratie (1001 punten, stap 6,3 MHz). Resultaat: R zakt naar 14 Ω rond 1 MHz, SWR
+piekt op 3,8, en vanaf precies 6,3 MHz is alles vlak op 51 Ω. Met een calibratie op het
+HF-raster zelf (`cal/n-hf.cal.json`, 100 kHz–50 MHz, 1001 punten) is de load vanaf 100 kHz vlak.
+
+Oorzaak: tussen het eerste (50 kHz) en tweede (6,35 MHz) calibratiepunt worden de fouttermen
+lineair geïnterpoleerd, terwijl de brug en de koppelcondensatoren van de LiteVNA juist daar
+sterk van frequentie afhangen. De fasesprong-regel van §7 vangt dit niet, want de open draait
+op deze frequenties nauwelijks. Daarom is er een tweede controle:
+`CalibrationSet::coarse_low_end_warning` waarschuwt wanneer de sweep punten heeft tussen de
+eerste twee calibratiepunten en het tweede meer dan 2× zo hoog ligt als het eerste. De GUI
+toont dat oranje onder het calibratiepaneel, de CLI als `WARNING`. Structureel lost stap 6 van
+de roadmap (multi-segment sweeps met calibratie per segment) het op.
+
 ## 8. Calibratie tot 6,3 GHz en de kit-fit
 
 ### Waarom de ideale kit boven ~1 GHz niet meer volstaat

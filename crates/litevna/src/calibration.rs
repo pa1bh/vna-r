@@ -343,6 +343,8 @@ impl CalibrationSet {
 /// Largest phase step (radians) between adjacent points that linear
 /// interpolation in re/im can still follow without ambiguity.
 pub const MAX_INTERPOLATION_PHASE_STEP: f64 = PI / 2.0;
+/// See [`CalibrationSet::coarse_low_end_warning`].
+pub const COARSE_LOW_END_RATIO: f64 = 2.0;
 
 impl CalibrationSet {
     /// Resample every stored standard onto `freqs_hz` by linear interpolation
@@ -388,6 +390,33 @@ impl CalibrationSet {
             line_open: self.line_open.as_ref().map(resample),
             line_short: self.line_short.as_ref().map(resample),
         })
+    }
+
+    /// Warn when `freqs_hz` has points below this set's second grid point
+    /// while that point lies more than [`COARSE_LOW_END_RATIO`] times above
+    /// the first. The VNA's error terms change quickly at the low end
+    /// (coupling capacitors, bridge), so a linear interpolation across such
+    /// a wide relative gap distorts everything below the second point. A
+    /// 50 kHz–6.3 GHz calibration in 1001 points, for example, has its second
+    /// point at 6.35 MHz and is useless for an HF sweep. Returns `None` when
+    /// the grids are equal or the gap is fine.
+    pub fn coarse_low_end_warning(&self, freqs_hz: &[u64]) -> Option<String> {
+        if self.freqs_hz.len() < 2 || freqs_hz == self.freqs_hz.as_slice() {
+            return None;
+        }
+        let (f0, f1) = (self.freqs_hz[0], self.freqs_hz[1]);
+        let below = freqs_hz.iter().filter(|&&f| f > f0 && f < f1).count();
+        if below == 0 || (f1 as f64) <= COARSE_LOW_END_RATIO * (f0 as f64) {
+            return None;
+        }
+        Some(format!(
+            "{} sweep points lie between the first two calibration points ({} and {}); the error terms are \
+             interpolated over that gap and results below {} are unreliable. Calibrate on this grid instead.",
+            below,
+            crate::freq::format_hz(f0),
+            crate::freq::format_hz(f1),
+            crate::freq::format_hz(f1)
+        ))
     }
 
     /// `solve()`, interpolating first when `freqs_hz` differs from this set's grid.
@@ -700,6 +729,24 @@ impl Calibration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coarse_low_end_is_flagged() {
+        let wide: Vec<u64> = (0..1001).map(|i| 50_000 + i * 6_300_000).collect();
+        let set = CalibrationSet::new(wide, CalKit::ideal());
+        let hf: Vec<u64> = (0..1001).map(|i| 100_000 + i * 49_900).collect();
+        assert!(set.coarse_low_end_warning(&hf).is_some());
+        let uhf: Vec<u64> = (0..101).map(|i| 400_000_000 + i * 1_000_000).collect();
+        assert!(set.coarse_low_end_warning(&uhf).is_none());
+        assert!(set.coarse_low_end_warning(&set.freqs_hz.clone()).is_none());
+        // 1 MHz..1 GHz in 201 points: second point 6 MHz, ratio 6 → flagged for an HF sweep too
+        let g1: Vec<u64> = (0..201).map(|i| 1_000_000 + i * 4_995_000).collect();
+        let set1 = CalibrationSet::new(g1, CalKit::ideal());
+        assert!(set1.coarse_low_end_warning(&hf[20..]).is_some());
+        // a dense HF calibration is fine
+        let dense: Vec<u64> = (0..1001).map(|i| 100_000 + i * 49_900).collect();
+        assert!(CalibrationSet::new(dense, CalKit::ideal()).coarse_low_end_warning(&hf[1..500]).is_none());
+    }
     use std::time::Duration;
 
     fn sweep_from(freqs: &[u64], s11: Vec<C64>, s21: Vec<C64>) -> SweepResult {

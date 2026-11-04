@@ -56,6 +56,10 @@ boven ~1 GHz: onder **Kit fit** meet je een kabel met open en short aan het verr
 de open/short-asymmetrie van de kit (als capaciteit of offset delay) en **Apply to kit** zet die in de
 calibratie; een onwaarschijnlijke standaardmeting (losse open, vergeten load) geeft een waarschuwing.
 
+Weergaven: de Smith-chart staat vast; de drie andere grafieken kiezen in hun kop wat ze tonen: log mag,
+lin mag, fase, SWR, R + jX, |Z| of groepsvertraging (−dφ/dω over ±N punten, N instelbaar onder
+**Traces**). De rekenkant zit in `litevna::traces`.
+
 Markers: vier stuks (M1–M4). Kies de actieve bovenin, klik in een grafiek of op de Smith-chart om hem te
 plaatsen, pijltjestoetsen verschuiven hem per punt (shift: ×10). De tabel toont frequentie, S11, Z, SWR
 en S21 per marker en het verschil tussen de eerste twee; knoppen springen naar min SWR, max S21, min S21.

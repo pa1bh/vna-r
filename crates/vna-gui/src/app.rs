@@ -5,11 +5,12 @@ use std::time::Duration;
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
-use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard, Z0};
+use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{tdr, TdrConfig, TdrResult, Window};
 use litevna::touchstone::{db, swr, write_s2p};
+use litevna::traces::{self, impedance, Param, TraceKind};
 use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
@@ -49,6 +50,9 @@ struct Settings {
     marker_freqs: [Option<u64>; MARKERS],
     fit_f_min: String,
     fit_as_delay: bool,
+    /// Trace kind per plot (ids from TraceKind::id), top-right, bottom-left, bottom-right.
+    plot_kinds: [String; 3],
+    gd_aperture: usize,
 }
 
 impl Default for Settings {
@@ -70,6 +74,8 @@ impl Default for Settings {
             marker_freqs: [None; MARKERS],
             fit_f_min: "300M".into(),
             fit_as_delay: false,
+            plot_kinds: ["logmag".into(), "swr".into(), "phase".into()],
+            gd_aperture: 2,
         }
     }
 }
@@ -91,6 +97,8 @@ struct CalState {
     message: Option<String>,
     /// Plausibility warning about the last stored standard.
     warning: Option<String>,
+    /// Warning about interpolating this calibration onto the current sweep grid.
+    grid_warning: Option<String>,
     /// Lowest frequency used by the kit fit (text, parsed with parse_hz).
     fit_f_min: String,
     fit_as_delay: bool,
@@ -113,9 +121,11 @@ impl CalState {
                 Ok(cal) => {
                     self.solved = Some((freqs.to_vec(), cal));
                     self.message = None;
+                    self.grid_warning = set.coarse_low_end_warning(freqs);
                 }
                 Err(e) => {
                     self.solved = None;
+                    self.grid_warning = None;
                     self.message = Some(e.to_string());
                     return None;
                 }
@@ -150,6 +160,9 @@ pub struct App {
     pending_marker_freqs: Option<[Option<u64>; MARKERS]>,
     show_s11: bool,
     show_s21: bool,
+    plot_kinds: [TraceKind; 3],
+    /// Half-width (points) of the group-delay difference.
+    gd_aperture: usize,
 
     error: Option<String>,
     screenshot: Option<(egui::TextureHandle, Screenshot)>,
@@ -195,6 +208,8 @@ impl App {
             pending_marker_freqs: None,
             show_s11: true,
             show_s21: true,
+            plot_kinds: [TraceKind::LogMag, TraceKind::Swr, TraceKind::Phase],
+            gd_aperture: 2,
             error: None,
             screenshot: None,
             show_screenshot: false,
@@ -234,6 +249,12 @@ impl App {
         self.pending_marker_freqs = Some(s.marker_freqs);
         self.cal.fit_f_min = s.fit_f_min;
         self.cal.fit_as_delay = s.fit_as_delay;
+        for (k, id) in s.plot_kinds.iter().enumerate() {
+            if let Some(kind) = TraceKind::parse(id) {
+                self.plot_kinds[k] = kind;
+            }
+        }
+        self.gd_aperture = s.gd_aperture.clamp(1, 50);
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -267,6 +288,8 @@ impl App {
             marker_freqs,
             fit_f_min: self.cal.fit_f_min.clone(),
             fit_as_delay: self.cal.fit_as_delay,
+            plot_kinds: [self.plot_kinds[0].id().into(), self.plot_kinds[1].id().into(), self.plot_kinds[2].id().into()],
+            gd_aperture: self.gd_aperture,
         }
     }
 
@@ -522,6 +545,11 @@ impl App {
             ui.heading("Traces");
             ui.checkbox(&mut self.show_s11, RichText::new("S11").color(S11_COLOR));
             ui.checkbox(&mut self.show_s21, RichText::new("S21").color(S21_COLOR));
+            ui.horizontal(|ui| {
+                ui.label("group delay aperture");
+                ui.add(egui::DragValue::new(&mut self.gd_aperture).range(1..=50).suffix(" pts"));
+            });
+            ui.small("Pick what each plot shows in its header. Group delay = −dφ/dω over ±aperture points.");
 
             ui.add_space(12.0);
             ui.heading("Time domain (TDR)");
@@ -625,6 +653,11 @@ impl App {
         }
         if let Some(w) = &self.cal.warning {
             ui.small(RichText::new(format!("⚠ {w}")).color(Color32::from_rgb(255, 150, 80)));
+        }
+        if self.cal.apply && self.cal.solved.is_some() {
+            if let Some(w) = &self.cal.grid_warning {
+                ui.small(RichText::new(format!("⚠ {w}")).color(Color32::from_rgb(255, 150, 80)));
+            }
         }
 
         self.standard_buttons(ui, &Standard::ALL, connected);
@@ -868,68 +901,15 @@ impl App {
                     }
                 }
             }
-            // Log magnitude
-            let r = Plot::new("logmag")
-                .height(h)
-                .legend(Legend::default())
-                .x_axis_label("MHz")
-                .y_axis_label("dB")
-                .include_y(0.0)
-                .include_y(-40.0)
-                .show(&mut cols[1], |pui| {
-                    if self.show_s11 {
-                        pui.line(Line::new("S11", series(&mhz, sweep.s11.iter().map(|s| db(s.norm())))).color(S11_COLOR));
-                    }
-                    if self.show_s21 {
-                        pui.line(Line::new("S21", series(&mhz, sweep.s21.iter().map(|s| db(s.norm())))).color(S21_COLOR));
-                    }
-                    for (k, (x, c)) in marker_lines.iter().enumerate() {
-                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
-                    }
-                    (pui.response().clicked(), pui.pointer_coordinate())
-                });
-            if let (true, Some(p)) = r.inner {
-                clicked_x = Some(p.x);
+            if let Some(x) = self.kind_plot(&mut cols[1], 0, h, &mhz, &sweep, &marker_lines) {
+                clicked_x = Some(x);
             }
         });
         ui.columns(2, |cols| {
-            let r = Plot::new("swr")
-                .height(h)
-                .x_axis_label("MHz")
-                .y_axis_label("SWR")
-                .include_y(1.0)
-                .include_y(3.0)
-                .show(&mut cols[0], |pui| {
-                    pui.line(Line::new("SWR", series(&mhz, sweep.s11.iter().map(|s| swr(s.norm()).min(20.0)))).color(S11_COLOR));
-                    for (k, (x, c)) in marker_lines.iter().enumerate() {
-                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
-                    }
-                    (pui.response().clicked(), pui.pointer_coordinate())
-                });
-            if let (true, Some(p)) = r.inner {
-                clicked_x = Some(p.x);
-            }
-            let r = Plot::new("phase")
-                .height(h)
-                .legend(Legend::default())
-                .x_axis_label("MHz")
-                .y_axis_label("°")
-                .include_y(-180.0)
-                .include_y(180.0)
-                .show(&mut cols[1], |pui| {
-                    if self.show_s11 {
-                        pui.line(Line::new("S11 °", series(&mhz, sweep.s11.iter().map(|s| s.arg().to_degrees()))).color(S11_COLOR));
-                    }
-                    if self.show_s21 {
-                        pui.line(Line::new("S21 °", series(&mhz, sweep.s21.iter().map(|s| s.arg().to_degrees()))).color(S21_COLOR));
-                    }
-                    for (k, (x, c)) in marker_lines.iter().enumerate() {
-                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
-                    }
-                    (pui.response().clicked(), pui.pointer_coordinate())
-                });
-            if let (true, Some(p)) = r.inner {
-                clicked_x = Some(p.x);
+            for (col, k) in [(0usize, 1usize), (1, 2)] {
+                if let Some(x) = self.kind_plot(&mut cols[col], k, h, &mhz, &sweep, &marker_lines) {
+                    clicked_x = Some(x);
+                }
             }
         });
 
@@ -937,6 +917,60 @@ impl App {
             // nearest frequency index
             let best = mhz.iter().enumerate().map(|(i, f)| (i, (f - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
             self.markers[self.active_marker] = best.map(|(i, _)| i);
+        }
+    }
+
+    /// One selectable plot: a header with the trace-kind combo box, then the
+    /// plot itself. Returns the clicked x (MHz) if the user clicked in it.
+    fn kind_plot(&mut self, ui: &mut egui::Ui, slot: usize, h: f32, mhz: &[f64], sweep: &SweepResult, marker_lines: &[(f64, Color32)]) -> Option<f64> {
+        let header_h = 22.0;
+        ui.horizontal(|ui| {
+            egui::ComboBox::from_id_salt(("plot_kind", slot))
+                .selected_text(self.plot_kinds[slot].name())
+                .show_ui(ui, |ui| {
+                    for k in TraceKind::ALL {
+                        ui.selectable_value(&mut self.plot_kinds[slot], k, k.name());
+                    }
+                });
+            if self.plot_kinds[slot] == TraceKind::GroupDelay {
+                ui.small(format!("aperture ±{} pts", self.gd_aperture));
+            }
+        });
+        let kind = self.plot_kinds[slot];
+        let (lo, hi) = kind.default_range();
+        let mut lines: Vec<(String, Vec<f64>, Color32, bool)> = Vec::new();
+        for (param, s, color, show) in [(Param::S11, &sweep.s11, S11_COLOR, self.show_s11), (Param::S21, &sweep.s21, S21_COLOR, self.show_s21)] {
+            if !show {
+                continue;
+            }
+            for (i, series) in traces::compute(kind, param, &sweep.freqs_hz, s, self.gd_aperture).into_iter().enumerate() {
+                // second series of a pair (X of R+jX) dashed
+                lines.push((series.label, series.values, color, i == 1));
+            }
+        }
+        let r = Plot::new(("plot", slot, kind.id()))
+            .height((h - header_h).max(100.0))
+            .legend(Legend::default())
+            .x_axis_label("MHz")
+            .y_axis_label(kind.unit())
+            .include_y(lo)
+            .include_y(hi)
+            .show(ui, |pui| {
+                for (label, values, color, dashed) in &lines {
+                    let mut line = Line::new(label.clone(), series(mhz, values.iter().copied())).color(*color);
+                    if *dashed {
+                        line = line.style(egui_plot::LineStyle::dashed_loose());
+                    }
+                    pui.line(line);
+                }
+                for (k, (x, c)) in marker_lines.iter().enumerate() {
+                    pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
+                }
+                (pui.response().clicked(), pui.pointer_coordinate())
+            });
+        match r.inner {
+            (true, Some(p)) => Some(p.x),
+            _ => None,
         }
     }
 
@@ -1191,13 +1225,3 @@ fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
     x.iter().zip(y).map(|(x, y)| [*x, y]).collect()
 }
 
-/// Z = Z0 · (1 + Γ) / (1 − Γ)
-fn impedance(gamma: Complex64) -> Complex64 {
-    let one = Complex64::new(1.0, 0.0);
-    let d = one - gamma;
-    if d.norm() < 1e-9 {
-        Complex64::new(f64::INFINITY, 0.0)
-    } else {
-        Z0 * (one + gamma) / d
-    }
-}
