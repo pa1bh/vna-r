@@ -68,8 +68,7 @@ services.udev.packages = [ vna-r ];
 ```
 
 met `vna-r` het pakket uit de flake, of simpeler `users.users.<naam>.extraGroups = [ "dialout" ];`.
-De flake is in CI gebouwd op x86_64-linux; op een laptop met Wayland of X11 is de GUI
-nog niet gedraaid, meldingen zijn welkom.
+De flake is in CI gebouwd op x86_64-linux en op een NixOS-laptop gedraaid, CLI en GUI.
 
 ## Kant-en-klare binaries
 

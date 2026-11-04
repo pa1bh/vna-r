@@ -869,7 +869,7 @@ impl App {
                             let label = match &p.usb {
                                 Some(u) => format!(
                                     "{} {} {}",
-                                    if p.looks_like_vna() { "★" } else { " " },
+                                    if p.looks_like_vna() { "*" } else { " " },
                                     p.path,
                                     u.product.clone().unwrap_or_default()
                                 ),
@@ -879,7 +879,7 @@ impl App {
                         }
                     });
                 if ui
-                    .button("⟳")
+                    .button("rescan")
                     .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
                     .clicked()
                 {
@@ -917,22 +917,22 @@ impl App {
             ui.separator();
             ui.add_enabled_ui(connected, |ui| {
                 if self.running {
-                    if ui.button("⏹ Stop").clicked() {
+                    if ui.button("Stop").clicked() {
                         self.stop_sweep();
                     }
-                } else if ui.button("▶ Run").clicked() {
+                } else if ui.button("Run").clicked() {
                     self.start_sweep(true);
                 }
                 if ui.add_enabled(!self.running, egui::Button::new("Single")).clicked() {
                     self.start_sweep(false);
                 }
-                if ui.button("📷 Screenshot").clicked() {
+                if ui.button("Screenshot").clicked() {
                     self.send(Cmd::Screenshot);
                 }
             });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(err) = self.error.clone() {
-                    if ui.small_button("✕").clicked() {
+                    if ui.small_button("×").clicked() {
                         self.error = None;
                     }
                     ui.colored_label(Color32::from_rgb(255, 110, 110), err);
@@ -1267,7 +1267,7 @@ impl App {
                             ui.selectable_value(&mut self.extra_segments[k].points, p, p.to_string());
                         }
                     });
-                    if ui.small_button("✕").on_hover_text("remove segment").clicked() {
+                    if ui.small_button("×").on_hover_text("remove segment").clicked() {
                         remove = Some(k);
                     }
                 });
@@ -1342,7 +1342,7 @@ impl App {
                 {
                     self.diff_ref = if is_diff { None } else { Some(k) };
                 }
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     remove = Some(k);
                 }
             });

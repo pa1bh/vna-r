@@ -35,9 +35,9 @@ herhaalbaarheid na los- en vastdraaien ±0,01 dB en ±0,1°.
 - **macOS**: geen stuurprogramma, poort `/dev/cu.usbmodem…`.
 - **Linux**: poort `/dev/ttyACM*`, udev-regel of groep `dialout` voor de rechten,
   bouwpakketten `pkg-config libudev-dev libgtk-3-dev`, op NixOS de flake (hoofdstuk 2).
-  De CLI is op een NixOS-laptop geverifieerd met de LiteVNA 67 op `/dev/ttyACM0`:
-  zelfde registers, 329 punten/s, geen verloren punten. De GUI is op Linux gebouwd maar
-  nog niet met een scherm gedraaid; meldingen zijn welkom.
+  CLI en GUI zijn op een NixOS-laptop geverifieerd met de LiteVNA 67 op `/dev/ttyACM0`:
+  zelfde registers, 329 punten/s, geen verloren punten, calibratie en markers als op de
+  Mac.
 - **Windows**: niet getest.
 
 ## Foutmeldingen
@@ -49,7 +49,7 @@ kies de poort in de GUI.
 
 **Connect doet niets.** De knop staat uit zolang er geen poort gekozen is, bijvoorbeeld
 omdat het apparaat pas na het starten van de GUI is aangesloten of van apparaat
-gewisseld is. De poortlijst wordt elke twee seconden ververst (en met ⟳ direct); kies de
+gewisseld is. De poortlijst wordt elke twee seconden ververst (en met **rescan** direct); kies de
 poort met de ster en klik opnieuw. Reageert de GUI helemaal niet op klikken terwijl de
 poort wel gekozen is, verplaats het venster dan naar een ander scherm: op een macOS-
 opstelling met twee schermen van verschillende schaal kwamen klikken op één van de twee
