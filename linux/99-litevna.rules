@@ -1,0 +1,9 @@
+# LiteVNA 64 / 67 and NanoVNA V2 (Cypress CDC-ACM, VID 04B4 PID 0008).
+# Lets ordinary users open the serial port without root.
+#
+#   sudo cp linux/99-litevna.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Then re-plug the device. On most distributions membership of the
+# "dialout" (Debian/Ubuntu) or "uucp" (Arch) group is an alternative.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="0008", MODE="0666", TAG+="uaccess"

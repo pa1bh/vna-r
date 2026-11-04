@@ -109,5 +109,18 @@ staat op de roadmap.
 
 ## Platform
 
-- macOS: werkt zonder driver, poort heet `/dev/cu.usbmodem…` (USB id `04B4:0008`).
-- Linux: `/dev/ttyACM*`; de `serialport`-crate heeft `libudev-dev` nodig om te bouwen.
+- **macOS** (Apple Silicon en Intel): werkt zonder driver, poort heet `/dev/cu.usbmodem…` (USB id
+  `04B4:0008`).
+- **Linux**: poort `/dev/ttyACM*`. Bouwen vraagt `pkg-config`, `libudev-dev` (serialport) en
+  `libgtk-3-dev` (bestandsdialogen), op Debian/Ubuntu:
+
+  ```bash
+  sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+  ```
+
+  Toegang tot de poort zonder root: kopieer [linux/99-litevna.rules](linux/99-litevna.rules) naar
+  `/etc/udev/rules.d/` en herlaad udev (instructies in het bestand), of zet jezelf in de groep
+  `dialout`.
+- **CI**: [.github/workflows/ci.yml](.github/workflows/ci.yml) bouwt en test op Ubuntu en macOS bij elke
+  push; de GUI is op Linux gebouwd en getest in een Debian-container, maar nog niet op een echte
+  Linux-desktop gedraaid.
