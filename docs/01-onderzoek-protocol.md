@@ -217,7 +217,36 @@ geen DUT). Antwoorden op de open vragen:
 - Of de 32-record-buffer ook op de LiteVNA 64 bestaat (vermoedelijk wel).
 - Gedrag bij `valuesPerFrequency > 1` (meerdere metingen per punt).
 
-## 8. Bronnen
+## 8. Gemeten op de LiteVNA 64 (4 november 2026)
+
+Roadmap-stap 9: dezelfde reeks als in §7, zonder codewijziging.
+
+| | LiteVNA 67 | LiteVNA 64 |
+|---|---|---|
+| USB | 04B4:0008, "ZeenKo.tech LiteVNA6", `/dev/cu.usbmodemv1_01` | 04B4:0008, "Black Sphere Technologies CDC-ACM Demo", sn DEMO, `/dev/cu.usbmodemDEMO1` |
+| F0..F4 | 02 01 02 02 02 | 02 01 02 02 02 |
+| firmwareregister | 2.2 | 2.2 |
+| sweep 1001 pt | ~340–600 pt/s | ~300 pt/s |
+| sweep 4001 pt | ok | ok, 13,2 s |
+| verouderde FIFO-records na clear | 32 | 0 |
+| checksums | 100 % | 100 % |
+| 0x40 teruglezen | altijd 1 | 2 (na schrijven van 4) |
+| screenshot | 1024×600 RGB565 BE | 480×320 RGB565 BE |
+
+Conclusies:
+
+- Over USB zijn de 64 en de 67 alleen aan de USB-productnaam en de schermgrootte te
+  onderscheiden; registers en protocol zijn identiek. De poortdetectie op VID/PID vindt beide.
+- De leeslus die doorgaat tot alle frequentie-indexen gevuld zijn, is op de 64 niet nodig
+  (geen verouderde records) maar werkt onveranderd.
+- De screenshot-code leest de afmetingen uit de header en had geen aanpassing nodig
+  (`docs/images/litevna64-screenshot-usb.png`).
+- Register 0x40 is op geen van beide betrouwbaar terug te lezen.
+- Calibratie en TDR op de 64 zijn niet gemeten: de kit-load was op dat moment stuk. Een ruwe
+  sweep van een klein antennetje gaf SWR < 2 tussen 1,65 en 3 GHz; ongecalibreerd is dat
+  tot op de richtingsfout (|Γ| ≈ 0,1) nauwkeurig, meer niet.
+
+## 9. Bronnen
 
 - Lokaal in `assets/`: officiële User Guide (identiek aan de nanovna.com-PDF), firmware-images v1.4.10,
   NanoVNA-App/QT/Saver binaries. Inventaris: `02-assets-inventaris.md`.

@@ -19,7 +19,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 6 | Multi-segment sweeps | M | gedaan 2026-11-04 |
 | 7 | Referentietraces opslaan en vergelijken | S | gedaan 2026-11-04 |
 | 8 | Touchstone inlezen | S | gedaan 2026-11-04 |
-| 9 | LiteVNA 64 verifiëren | S | open |
+| 9 | LiteVNA 64 verifiëren | S | gedaan 2026-11-04 (zonder cal: kit-load defect) |
 | 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | open |
 | 11 | Linux-build | S | open |
 | 12 | Gebruikersdocumentatie | L | open |

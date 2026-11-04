@@ -101,6 +101,12 @@ daarna `vna-cli sweep --cal x.json`. Een ander raster binnen het gecalibreerde b
 `vna-cli cal check --file x.json` laat zien wat de calibratie op een kabelmeting overlaat (ripple per band,
 near-end term, consistentie van de kit-fit).
 
+## Apparaten
+
+Geverifieerd op de LiteVNA 67 en de LiteVNA 64 (zie docs/01 §7 en §8): zelfde protocol en registers,
+verschillend scherm (1024×600 vs 480×320) en USB-naam. De LiteVNA-H1 (NanoVNA-H-firmware, tekstprotocol)
+staat op de roadmap.
+
 ## Platform
 
 - macOS: werkt zonder driver, poort heet `/dev/cu.usbmodem…` (USB id `04B4:0008`).
