@@ -4,7 +4,7 @@ Rust-gereedschap voor de **LiteVNA 67** (en andere LiteVNA / NanoVNA V2 apparate
 Hobbyproject van PA1BH.
 
 Status: proof of concept. Zie [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) voor
-het protocolonderzoek.
+het protocolonderzoek en [docs/05-roadmap.md](docs/05-roadmap.md) voor wat er nog komt.
 
 ## Opbouw
 
