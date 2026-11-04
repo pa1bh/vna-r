@@ -22,7 +22,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 9 | LiteVNA 64 verifiëren | S | gedaan 2026-11-04 (zonder cal: kit-load defect) |
 | 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | geparkeerd (later) |
 | 11 | Linux-build | S | gedaan 2026-11-04 (CI + container; geen Linux-desktop getest) |
-| 12 | Gebruikersdocumentatie | L | open |
+| 12 | Gebruikersdocumentatie | L | gedaan 2026-11-04 (docs/handleiding) |
 
 ---
 

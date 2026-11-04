@@ -3,7 +3,10 @@
 Rust-gereedschap voor de **LiteVNA 67** (en andere LiteVNA / NanoVNA V2 apparaten) op macOS en Linux.
 Hobbyproject van PA1BH.
 
-Status: proof of concept. Zie [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) voor
+**Handleiding:** [docs/handleiding](docs/handleiding/README.md): wat een VNA meet, installeren, de GUI,
+calibreren, TDR en gating, meetrecepten, bestanden, de CLI en problemen oplossen.
+
+Status: werkend op LiteVNA 64 en 67. Zie [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) voor
 het protocolonderzoek en [docs/05-roadmap.md](docs/05-roadmap.md) voor wat er nog komt.
 
 ## Opbouw

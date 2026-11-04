@@ -1,0 +1,75 @@
+# 6. Meetrecepten
+
+Alle recepten gaan uit van een calibratie op het referentievlak met apply aan
+(hoofdstuk 4). Waar een kabel tussen poort en meetobject zit, is de kabel onderdeel van
+de meting, tenzij je met de standaarden aan het eind van die kabel calibreert; dan ligt
+het referentievlak daar.
+
+## Antenne afregelen
+
+1. Sweep rond de band, ruim genoeg om de resonantie ook te zien als hij ernaast ligt:
+   voor 2 m bijvoorbeeld 130 tot 160 MHz, voor 20 m 13 tot 15 MHz. 201 tot 401 punten.
+2. Kies **SWR** in één grafiek en **R + jX** in een andere. Klik **min SWR**: de actieve
+   marker springt naar de resonantie en de tabel geeft frequentie, SWR en Z.
+3. Lees R + jX af op de gewenste frequentie. X negatief (capacitief) betekent dat de
+   antenne te kort is voor die frequentie, X positief (inductief) te lang. R zegt of de
+   aanpassing überhaupt haalbaar is: ver van 50 Ω helpt inkorten niet, dan is een
+   aanpassingsnetwerk nodig.
+4. Druk **Hold** voordat je knipt of schuift. De grijze referentie laat zien waar je
+   vandaan kwam; met **Δ** zie je het verschil in dB.
+5. Op een lange voedingslijn: zet een gate om het antenne-eind (hoofdstuk 5) om de
+   invloed van connectoren en de lijn zelf te scheiden van de antenne. Of calibreer met de
+   standaarden aan het eind van de voedingslijn.
+
+De bandbreedte lees je af met twee markers op de punten waar SWR 2,0 kruist; de regel
+M2−M1 geeft het verschil.
+
+## Kabel: lengte, verkortingsfactor, verlies
+
+**Lengte.** TDR met open of short aan het eind, piek aanklikken, afstand aflezen. De
+nauwkeurigheid is de resolutie (hoofdstuk 5): met 6,3 GHz span ruim onder 2 cm.
+
+**Verkortingsfactor.** Meet een stuk kabel van bekende lengte met de meetlat, en pas
+**Velocity factor** aan tot de TDR-piek op die lengte staat. Of uit de groepsvertraging:
+kabel van poort 1 naar poort 2, weergave **group delay** van S21; τ = L/(c·VF), dus
+VF = L/(c·τ). 53 cm kabel met 2,5 ns is VF 0,71.
+
+**Verlies.** Kabel van poort 1 naar poort 2, **log mag** van S21: de demping per
+frequentie, direct af te lezen. Zonder tweede poort: short aan het eind en S11 in dB
+delen door twee (heen en terug), met de kanttekening dat een short zelf niet perfect is.
+
+## Filter
+
+Kabel van poort 1 naar de ingang, uitgang naar poort 2, through-calibratie met beide
+kabels aan elkaar. **log mag** van S21 toont doorlaatband en stopband; **min S21** of
+**max S21** zetten de marker op het diepste of hoogste punt. Twee markers op de
+−3 dB-punten geven de bandbreedte. **group delay** laat zien hoe de looptijd aan de
+bandranden oploopt; een filter voor data of smalle digitale modes wil die zo vlak
+mogelijk.
+
+De dynamiek van de LiteVNA is ongeveer 90 dB op HF en 60 tot 70 dB boven 3 GHz; een
+stopband van −100 dB meet je dus niet. Middelen (Sweep avg 16 of meer) haalt nog zo'n
+10 dB extra uit de ruis.
+
+## Verzwakker en versterker
+
+Als een filter. Een verzwakker van 20 dB hoort vlak op −20 dB te liggen, met S11 ver
+onder −20 dB aan de ingang. Voor een versterker: de LiteVNA zendt ongeveer 0 dBm; zet
+een verzwakker tussen uitgang en poort 2 zodat er niet meer dan −10 dBm op poort 2 komt,
+en tel die demping bij S21 op. Nooit een versterker met meer dan een paar milliwatt
+uitgang rechtstreeks op poort 2.
+
+## Onbekend onderdeel aan één poort
+
+Spoel, condensator, trap, balun-ingang: S11 met **R + jX**. Een spoel geeft positieve X
+die met f oploopt (L = X/(2πf)), een condensator negatieve X die met f afneemt
+(C = −1/(2πfX)). Waar X door nul gaat, is de eigenresonantie. Meet dicht bij het
+referentievlak; elke centimeter kabel ertussen draait de fase en verschuift de uitkomst.
+Gating kan de aansluiting wegsnijden als die onvermijdelijk is.
+
+## Voor/na vergelijken
+
+**Hold** voor de ingreep, meten na de ingreep, **Δ** aan. Voor vergelijkingen over dagen:
+exporteer als Touchstone en open later als referentie (hoofdstuk 7). Let op dat
+referentie en live meting dezelfde calibratie en hetzelfde referentievlak hebben,
+anders vergelijk je ook de calibraties.
