@@ -7,7 +7,7 @@ use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::thread;
 
 use litevna::calibration::Standard;
-use litevna::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};
+use litevna::{Screenshot, SweepConfig, SweepResult, Vna, VnaInfo};
 
 /// Why a sweep was requested; decides what the UI does with the result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +28,7 @@ pub enum Cmd {
     },
     /// Stop continuous sweeping and hand the screen back to the device.
     Stop,
+    /// LiteVNA averaging register; ignored on devices without it.
     SetAverage(u8),
     Screenshot,
 }
@@ -36,7 +37,7 @@ pub enum Cmd {
 pub enum Event {
     Connected {
         port: String,
-        info: DeviceInfo,
+        info: VnaInfo,
         battery_mv: Option<u16>,
     },
     Disconnected,
@@ -66,7 +67,7 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
 }
 
 struct Worker {
-    dev: Option<LiteVna>,
+    dev: Option<Vna>,
     continuous: Option<(Vec<SweepConfig>, Purpose)>,
     events: Sender<Event>,
     ctx: egui::Context,
@@ -121,9 +122,8 @@ impl Worker {
             Cmd::Connect(port) => {
                 self.dev = None;
                 self.continuous = None;
-                match LiteVna::open(&port).and_then(|mut d| {
-                    d.indicate()?;
-                    let info = d.device_info()?;
+                match Vna::open(&port).and_then(|mut d| {
+                    let info = d.info()?;
                     let battery_mv = d.battery_millivolts().ok();
                     Ok((d, info, battery_mv))
                 }) {
@@ -153,13 +153,13 @@ impl Worker {
             Cmd::Stop => {
                 self.continuous = None;
                 if let Some(d) = &mut self.dev {
-                    if let Err(e) = d.exit_usb_mode() {
+                    if let Err(e) = d.release() {
                         self.fail("releasing device UI", e);
                     }
                 }
             }
             Cmd::SetAverage(avg) => {
-                if let Some(d) = &mut self.dev {
+                if let Some(d) = self.dev.as_mut().and_then(|d| d.as_lite_mut()) {
                     if let Err(e) = d.set_average(avg) {
                         self.fail("setting average", e);
                     }

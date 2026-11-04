@@ -642,8 +642,10 @@ pub fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<S
     let s11_db = median(sweep.s11.iter().map(|s| db(s.norm())).collect());
     let s21_db = median(sweep.s21.iter().map(|s| db(s.norm())).collect());
     match standard {
-        Standard::Open | Standard::Short if s11_db < -3.0 => Some(format!(
-            "median raw |S11| is {s11_db:.1} dB; an {} should reflect nearly everything (≈ 0 dB). Loose connector?",
+        // Raw full reflection is ≈ 0 dB on a LiteVNA but about -3.4 dB on a
+        // NanoVNA-F (its bridge scale); a loose connector is far below either.
+        Standard::Open | Standard::Short if s11_db < -8.0 => Some(format!(
+            "median raw |S11| is {s11_db:.1} dB; an {} should reflect most of the signal (0 dB on a LiteVNA, about -3 dB on a NanoVNA-F). Loose connector?",
             standard.name()
         )),
         Standard::Load if s11_db > -10.0 => Some(format!(

@@ -1,13 +1,15 @@
 # vna-r
 
-Rust-gereedschap voor de **LiteVNA 67** (en andere LiteVNA / NanoVNA V2 apparaten) op macOS en Linux.
+Rust-gereedschap voor de **LiteVNA 64/67** (en andere NanoVNA V2 apparaten) en de **NanoVNA-F** op macOS en Linux.
 Hobbyproject van PA1BH.
 
 **Handleiding:** [docs/handleiding](docs/handleiding/README.md): wat een VNA meet, installeren, de GUI,
 calibreren, TDR en gating, meetrecepten, bestanden, de CLI en problemen oplossen.
 
-Status: werkend op LiteVNA 64 en 67. Zie [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) voor
-het protocolonderzoek en [docs/05-roadmap.md](docs/05-roadmap.md) voor wat er nog komt.
+Status: werkend op LiteVNA 64 en 67 en op de NanoVNA-F 4.3. Zie
+[docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) en
+[docs/06-nanovna-shell-protocol.md](docs/06-nanovna-shell-protocol.md) voor het protocolonderzoek en
+[docs/05-roadmap.md](docs/05-roadmap.md) voor wat er nog komt.
 
 ## Opbouw
 
@@ -106,14 +108,19 @@ near-end term, consistentie van de kit-fit).
 
 ## Apparaten
 
-Geverifieerd op de LiteVNA 67 en de LiteVNA 64 (zie docs/01 §7 en §8): zelfde protocol en registers,
-verschillend scherm (1024×600 vs 480×320) en USB-naam. De LiteVNA-H1 (NanoVNA-H-firmware, tekstprotocol)
-staat op de roadmap.
+Twee protocollen achter één `Vna`-handle, gekozen op USB-id:
+
+- **LiteVNA 64 en 67** (binair registerprotocol, USB `04B4:0008`), geverifieerd op allebei (docs/01 §7 en
+  §8): zelfde protocol en registers, verschillend scherm (1024×600 vs 480×320) en USB-naam.
+- **NanoVNA-F 4.3** (tekst-shell, USB `0483:5740`, firmware 1.0.4), geverifieerd (docs/06): `scan_bin` met
+  ruwe data in stukken van 301 punten, ~115 punten/s, screenshot 800×480. Bereik 10 kHz–1,5 GHz. De
+  LiteVNA-specifieke registers (`peek`, `--average`, `--channel`, Average in de GUI) zijn er niet.
+- **NanoVNA-H / H4 / LiteVNA-H1**: zelfde shell-familie, niet getest; werkt als de firmware `scan_bin` kent.
 
 ## Platform
 
 - **macOS** (Apple Silicon en Intel): werkt zonder driver, poort heet `/dev/cu.usbmodem…` (USB id
-  `04B4:0008`).
+  `04B4:0008` voor de LiteVNA, `0483:5740` voor de NanoVNA-F/-H).
 - **Linux**: poort `/dev/ttyACM*`. Bouwen vraagt `pkg-config`, `libudev-dev` (serialport) en
   `libgtk-3-dev` (bestandsdialogen), op Debian/Ubuntu:
 

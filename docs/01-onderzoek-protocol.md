@@ -33,9 +33,9 @@ Kernpunten:
 | **LiteVNA** (hugen, Zeenko) | **closed source** | zelfde binaire protocol als V2, met extra registers | LiteVNA 62, 64, **67** |
 | NanoVNA-F (Sysjoint) | eigen | tekst-shell variant | F, F V2, F V3 |
 
-Je LiteVNA 64 en 67 zitten dus in dezelfde protocolfamilie; je NanoVNA-H1 (als dat een
-"v1"-type is) praat een compleet ander, tekstgebaseerd protocol. Dat is later goed als tweede
-backend te doen, maar voor de POC richten we ons op het binaire protocol.
+Je LiteVNA 64 en 67 zitten dus in dezelfde protocolfamilie; de NanoVNA-F en de NanoVNA-H1
+praten een compleet ander, tekstgebaseerd protocol. Dat is sinds 4 november 2026 de tweede
+backend (`shell.rs`), gemeten op de NanoVNA-F: zie `docs/06-nanovna-shell-protocol.md`.
 
 ## 3. Het protocol in detail
 

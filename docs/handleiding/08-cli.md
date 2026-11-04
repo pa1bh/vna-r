@@ -16,8 +16,9 @@ vna-cli list
 
 ## info
 
-Identiteitsregisters (variant, protocolversie, hardwarerevisie, firmware) en
-batterijspanning.
+Identiteit en batterijspanning: op een LiteVNA de identiteitsregisters (variant,
+protocolversie, hardwarerevisie, firmware), op een NanoVNA-F model, firmware, build,
+bereik en punten per scan.
 
 ```bash
 vna-cli info
@@ -25,7 +26,8 @@ vna-cli info
 
 ## peek
 
-Leest een register, voor wie het protocol wil verkennen (`docs/01`).
+Leest een register van een LiteVNA, voor wie het protocol wil verkennen (`docs/01`).
+Een NanoVNA-F heeft geen registers; die verken je met de probe uit `docs/06`.
 
 ```bash
 vna-cli peek F0
@@ -46,13 +48,16 @@ Eén sweep, afgedrukt als tabel en desgewenst geëxporteerd.
 | `--segment START:STOP:POINTS[@cal]` | meerdere segmenten in één trace, herhaalbaar; vervangt start/stop/points/cal |
 | `--s2p <bestand>`, `--csv <bestand>` | export; `--csv -` naar stdout |
 | `--rows <n>` | aantal tabelregels, 0 is alles |
-| `--average <1..80>` | bandbreedte van het apparaat (blijft staan) |
-| `--channel s11\|s21` | één kanaal meten |
+| `--average <1..80>` | bandbreedte van het apparaat (blijft staan); alleen LiteVNA |
+| `--channel s11\|s21` | één kanaal meten; alleen LiteVNA |
 | `--gate START:STOP`, `--gate-notch`, `--vf` | tijd-gate op S11 in meters enkele reis |
-| `--calibrated` | de on-device calibratie van de LiteVNA laten toepassen (mode 3) |
+| `--calibrated` | de calibratie van het apparaat zelf laten toepassen (LiteVNA mode 3, NanoVNA-F zonder maskerbit 8) |
 | `--fifo-all` | de LiteVNA-variant van READFIFO gebruiken |
-| `--keep-usb-mode` | het apparaat in USB-modus laten (scherm blijft bevroren) |
+| `--keep-usb-mode` | het apparaat niet vrijgeven na de meting (LiteVNA: scherm blijft bevroren; NanoVNA-F: eigen sweep niet teruggezet) |
 | `--keep-settings` | average en kanaal van het apparaat niet terugzetten |
+
+Op een NanoVNA-F gaan sweeps van meer dan 301 punten automatisch in stukken; reken op
+ongeveer 115 punten per seconde.
 
 Voorbeelden:
 
@@ -120,7 +125,8 @@ vna-cli tdr --cal cal/n-6g3.cal.json --start 50k --stop 6.3G --points 1001 --vf 
 
 ## screenshot
 
-Het LCD van het apparaat als PNG.
+Het LCD van het apparaat als PNG. `--swap-bytes` draait de byte-volgorde van de pixels
+om als de kleuren verkeerd zijn.
 
 ```bash
 vna-cli screenshot --out scherm.png
@@ -128,7 +134,8 @@ vna-cli screenshot --out scherm.png
 
 ## release
 
-Geeft het scherm terug aan het apparaat als het in USB MODE is blijven hangen.
+Geeft het scherm terug aan het apparaat: een LiteVNA die in USB MODE is blijven hangen
+verlaat die, een NanoVNA-F krijgt zijn eigen sweep terug en gaat weer sweepen.
 
 ```bash
 vna-cli release

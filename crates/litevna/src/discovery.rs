@@ -1,4 +1,4 @@
-//! Find serial ports that look like a LiteVNA / NanoVNA V2.
+//! Find serial ports that look like a VNA, and tell which protocol to expect.
 
 use serialport::{SerialPortType, UsbPortInfo};
 
@@ -6,6 +6,28 @@ use serialport::{SerialPortType, UsbPortInfo};
 /// (a Cypress CDC-ACM example id).
 pub const LITEVNA_VID: u16 = 0x04B4;
 pub const LITEVNA_PID: u16 = 0x0008;
+/// STMicroelectronics virtual COM port: NanoVNA-H, NanoVNA-F and many other
+/// STM32 boards. Identified further by the product string when present.
+pub const STM_VCP_VID: u16 = 0x0483;
+pub const STM_VCP_PID: u16 = 0x5740;
+
+/// Which protocol a port speaks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Kind {
+    /// Binary register protocol: LiteVNA 62/64/67, NanoVNA V2.
+    LiteVna,
+    /// Text shell: NanoVNA-H, NanoVNA-F, ...
+    NanoVnaShell,
+}
+
+impl Kind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::LiteVna => "LiteVNA",
+            Kind::NanoVnaShell => "NanoVNA",
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct PortCandidate {
@@ -14,9 +36,27 @@ pub struct PortCandidate {
 }
 
 impl PortCandidate {
-    /// `true` when the USB ids match the LiteVNA / NanoVNA V2 firmware.
+    /// The protocol to expect from the USB ids, if they say anything.
+    pub fn kind(&self) -> Option<Kind> {
+        let u = self.usb.as_ref()?;
+        if u.vid == LITEVNA_VID && u.pid == LITEVNA_PID {
+            return Some(Kind::LiteVna);
+        }
+        if u.vid == STM_VCP_VID && u.pid == STM_VCP_PID {
+            // Any STM32 VCP could be here; a NanoVNA names itself when it can.
+            let named = u.product.as_deref().map(|p| p.to_ascii_lowercase());
+            return match named {
+                Some(p) if p.contains("nanovna") || p.contains("vna") => Some(Kind::NanoVnaShell),
+                None => Some(Kind::NanoVnaShell),
+                Some(_) => None,
+            };
+        }
+        None
+    }
+
+    /// `true` when the USB ids match a known analyzer.
     pub fn looks_like_vna(&self) -> bool {
-        matches!(&self.usb, Some(u) if u.vid == LITEVNA_VID && u.pid == LITEVNA_PID)
+        self.kind().is_some()
     }
 }
 

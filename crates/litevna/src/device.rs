@@ -184,13 +184,21 @@ pub struct Screenshot {
     pub width: u16,
     pub height: u16,
     pub bits_per_pixel: u8,
+    /// Byte order of each 16-bit pixel as this device sends it: big-endian on
+    /// the LiteVNA, little-endian on the NanoVNA-F.
+    pub big_endian: bool,
     pub data: Vec<u8>,
 }
 
 impl Screenshot {
+    /// Convert to packed 8-bit RGB with the device's own byte order.
+    pub fn to_rgb888(&self) -> Vec<u8> {
+        self.to_rgb888_with(self.big_endian)
+    }
+
     /// Convert to packed 8-bit RGB. `big_endian` selects the byte order of
     /// each 16-bit pixel (NanoVNA-Saver treats the LiteVNA 64 as big-endian).
-    pub fn to_rgb888(&self, big_endian: bool) -> Vec<u8> {
+    pub fn to_rgb888_with(&self, big_endian: bool) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.data.len() / 2 * 3);
         for px in self.data.chunks_exact(2) {
             let v = if big_endian {
@@ -560,6 +568,7 @@ impl LiteVna {
             width,
             height,
             bits_per_pixel: bpp,
+            big_endian: true,
             data,
         })
     }

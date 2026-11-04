@@ -18,7 +18,7 @@ sweep**; tijdens Run herstart de sweep dan met de nieuwe instellingen. Frequenti
 als `50k`, `14.2M`, `1.3G` of `6,3G`. De LiteVNA meet 50 kHz tot 6,3 GHz; meer punten
 geeft fijner detail maar duurt langer (ongeveer 300 tot 600 punten per seconde).
 
-**Average** is de bandbreedte-instelling van het apparaat zelf (1 tot 80): hoger is
+**Average** (alleen LiteVNA) is de bandbreedte-instelling van het apparaat zelf (1 tot 80): hoger is
 rustiger maar trager, en de instelling blijft in het apparaat staan. **Sweep avg** is iets
 anders: het programma middelt de laatste N sweeps complex. Dat drukt ruis op lage niveaus
 zonder de magnitude te vertekenen, en een teller laat zien hoeveel sweeps al meetellen.

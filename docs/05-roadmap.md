@@ -20,7 +20,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 7 | Referentietraces opslaan en vergelijken | S | gedaan 2026-11-04 |
 | 8 | Touchstone inlezen | S | gedaan 2026-11-04 |
 | 9 | LiteVNA 64 verifiëren | S | gedaan 2026-11-04 (zonder cal: kit-load defect) |
-| 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | geparkeerd (later) |
+| 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | gedaan 2026-11-04 op de NanoVNA-F 4.3 (H1 niet getest), zie docs/06 |
 | 11 | Linux-build | S | gedaan 2026-11-04 (CI + container; geen Linux-desktop getest) |
 | 12 | Gebruikersdocumentatie | L | gedaan 2026-11-04 (docs/handleiding) |
 
@@ -183,6 +183,14 @@ zijn apparaatonafhankelijk en werken meteen.
 
 **Klaar als** `vna-cli info` en `sweep` op de H1 werken, en de GUI het apparaat
 automatisch kiest. Documentatie in `docs/06-nanovna-h-protocol.md`.
+
+**Resultaat (4 november 2026).** Gedaan met een NanoVNA-F 4.3 in plaats van de H1:
+`shell.rs` (`NanoVnaShell`, `scan_bin` met ruwe data, 301 punten per stuk, `capture`),
+`vna.rs` (`enum Vna` in plaats van een trait; CLI en GUI gaan erdoorheen), detectie op
+`0483:5740` plus productnaam. `info`, `sweep` (ook 1001 punten in stukken) en
+`screenshot` werken; de GUI toont model en bereik en zet Average uit. Metingen en
+formaat in `docs/06-nanovna-shell-protocol.md`. Niet getest: H1/H/H4 (zelfde familie,
+andere firmware) en calibratie met de SMA-kit.
 
 ## 11. Linux-build
 

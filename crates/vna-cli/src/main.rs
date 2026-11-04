@@ -1,4 +1,4 @@
-//! `vna-cli` — proof of concept for talking to a LiteVNA 67 from Rust.
+//! `vna-cli` — command line for the LiteVNA (binary protocol) and the NanoVNA-H/-F (text shell).
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter};
@@ -8,14 +8,15 @@ use anyhow::{bail, Context, Result};
 use clap::{Args, Parser, Subcommand};
 use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenModel, Standard};
 use litevna::discovery;
+use litevna::discovery::Kind;
 use litevna::freq::{format_hz, parse_hz};
-use litevna::protocol::{reg, Channel, DataMode};
+use litevna::protocol::{reg, Channel};
 use litevna::timedomain::{gate as compute_gate, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
 use litevna::touchstone::{db, swr, write_csv, write_s2p};
-use litevna::{LiteVna, SweepConfig, SweepResult};
+use litevna::{SweepConfig, SweepResult, Vna};
 
 #[derive(Parser)]
-#[command(name = "vna-cli", version, about = "LiteVNA 67 proof of concept (PA1BH)")]
+#[command(name = "vna-cli", version, about = "LiteVNA / NanoVNA command line (PA1BH)")]
 struct Cli {
     /// Serial port, e.g. /dev/cu.usbmodemXXXX. Auto-detected when omitted.
     #[arg(short, long, global = true)]
@@ -31,9 +32,9 @@ struct Cli {
 enum Cmd {
     /// List serial ports and mark the ones that look like a VNA.
     List,
-    /// Read identity registers and battery voltage.
+    /// Identity (registers or `info`) and battery voltage.
     Info,
-    /// Read any register by hand: `peek F0`, `peek --size 2 5C`.
+    /// Read any LiteVNA register by hand: `peek F0`, `peek --size 2 5C`.
     Peek {
         /// Register address in hex (e.g. F0).
         addr: String,
@@ -147,11 +148,12 @@ enum Cmd {
     Screenshot {
         #[arg(long, default_value = "screenshot.png")]
         out: PathBuf,
-        /// Interpret RGB565 pixels as little-endian instead of big-endian.
+        /// Swap the byte order of the RGB565 pixels (the driver already picks the
+        /// right one per device; use this if the colours come out wrong).
         #[arg(long)]
-        little_endian: bool,
+        swap_bytes: bool,
     },
-    /// Hand the screen back to the on-device UI (rawSamplesMode = 2).
+    /// Hand the screen back to the on-device UI (LiteVNA: leave USB mode; NanoVNA: restore its sweep and resume).
     Release,
 }
 
@@ -334,32 +336,40 @@ fn main() -> Result<()> {
             csv,
             from,
         } => tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv, from),
-        Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
+        Cmd::Screenshot { out, swap_bytes } => screenshot(&mut open(&conn)?, &out, swap_bytes),
         Cmd::Release => {
-            open(&conn)?.exit_usb_mode()?;
+            open(&conn)?.release()?;
             println!("device UI released");
             Ok(())
         }
     }
 }
 
-fn open(conn: &Conn) -> Result<LiteVna> {
+fn open(conn: &Conn) -> Result<Vna> {
     let path = match &conn.port {
         Some(p) => p.clone(),
         None => match discovery::find_vna_port()? {
             Some(p) => p,
             None => bail!(
-                "no LiteVNA found (USB {:04X}:{:04X}). Is it switched on and connected? Try `vna-cli list`.",
+                "no VNA found (LiteVNA USB {:04X}:{:04X}, NanoVNA-H/-F USB {:04X}:{:04X}). Is it switched on and connected? Try `vna-cli list`.",
                 discovery::LITEVNA_VID,
-                discovery::LITEVNA_PID
+                discovery::LITEVNA_PID,
+                discovery::STM_VCP_VID,
+                discovery::STM_VCP_PID
             ),
         },
     };
     eprintln!("opening {path}");
-    let mut dev = LiteVna::open(&path).with_context(|| format!("opening {path}"))?;
-    dev.trace = conn.trace;
-    dev.indicate().context("device did not answer INDICATE with '2'")?;
+    let mut dev = Vna::open(&path).with_context(|| format!("opening {path}"))?;
+    dev.set_trace(conn.trace);
     Ok(dev)
+}
+
+/// The LiteVNA behind a handle, or a clear error for commands that need its registers.
+fn lite<'a>(dev: &'a mut Vna, what: &str) -> Result<&'a mut litevna::LiteVna> {
+    let kind = dev.kind();
+    dev.as_lite_mut()
+        .ok_or_else(|| anyhow::anyhow!("{what} needs a LiteVNA (register protocol); this is a {}", kind.name()))
 }
 
 fn list() -> Result<()> {
@@ -369,7 +379,11 @@ fn list() -> Result<()> {
         return Ok(());
     }
     for p in ports {
-        let mark = if p.looks_like_vna() { "VNA " } else { "    " };
+        let mark = match p.kind() {
+            Some(Kind::LiteVna) => "LiteVNA ",
+            Some(Kind::NanoVnaShell) => "NanoVNA ",
+            None => "        ",
+        };
         match &p.usb {
             Some(u) => println!(
                 "{mark}{:<32} usb {:04X}:{:04X} {} {} {}",
@@ -386,8 +400,28 @@ fn list() -> Result<()> {
     Ok(())
 }
 
-fn info(dev: &mut LiteVna) -> Result<()> {
-    let i = dev.device_info()?;
+fn info(dev: &mut Vna) -> Result<()> {
+    let vi = dev.info()?;
+    let Some(i) = vi.lite else {
+        println!("device             : {} (NanoVNA text shell)", vi.model);
+        println!("firmware           : {}", vi.firmware);
+        if let Some(sh) = &vi.shell {
+            if !sh.build.is_empty() {
+                println!("build              : {}", sh.build);
+            }
+        }
+        println!(
+            "range              : {} – {}, {} points per scan",
+            format_hz(vi.limits.min_hz),
+            format_hz(vi.limits.max_hz),
+            vi.limits.max_points_per_scan.map(|n| n.to_string()).unwrap_or_default()
+        );
+        match dev.battery_millivolts() {
+            Ok(mv) => println!("battery            : {:.3} V", mv as f64 / 1000.0),
+            Err(e) => println!("battery            : not readable ({e})"),
+        }
+        return Ok(());
+    };
     println!(
         "device variant     : 0x{:02X}{}",
         i.variant,
@@ -408,7 +442,8 @@ fn info(dev: &mut LiteVna) -> Result<()> {
     Ok(())
 }
 
-fn peek(dev: &mut LiteVna, addr: &str, size: u8) -> Result<()> {
+fn peek(dev: &mut Vna, addr: &str, size: u8) -> Result<()> {
+    let dev = lite(dev, "peek")?;
     let a = u8::from_str_radix(addr.trim_start_matches("0x"), 16).context("address must be hex, e.g. F0")?;
     let value: u64 = match size {
         1 => dev.read_u8(a)? as u64,
@@ -421,20 +456,25 @@ fn peek(dev: &mut LiteVna, addr: &str, size: u8) -> Result<()> {
 }
 
 /// One sweep with the measurement options applied and device settings restored.
-fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepResult> {
+fn measure(dev: &mut Vna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepResult> {
     let mut cfg = *cfg;
     cfg.calibrated = m.calibrated;
 
     // These registers persist in the device, so remember what was there.
     let prev_average = match m.average {
         Some(avg) => {
-            let prev = dev.average()?;
-            dev.set_average(avg)?;
+            let d = lite(dev, "--average")?;
+            let prev = d.average()?;
+            d.set_average(avg)?;
             Some(prev)
         }
         None => None,
     };
-    let prev_channel = if m.channel.is_some() { Some(dev.channel()?) } else { None };
+    let prev_channel = if m.channel.is_some() {
+        Some(lite(dev, "--channel")?.channel()?)
+    } else {
+        None
+    };
     if let Some(ch) = &m.channel {
         let ch = match ch.to_ascii_lowercase().as_str() {
             "s11" => Channel::S11Only,
@@ -442,7 +482,7 @@ fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<Swee
             "both" => Channel::Both,
             other => bail!("unknown channel {other:?}, use s11, s21 or both"),
         };
-        dev.set_channel(ch)?;
+        lite(dev, "--channel")?.set_channel(ch)?;
     }
 
     eprintln!(
@@ -457,16 +497,25 @@ fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<Swee
 
     if !m.keep_settings {
         if let Some(prev) = prev_average {
-            dev.write_u8(reg::AVERAGE, prev)?;
+            lite(dev, "--average")?.write_u8(reg::AVERAGE, prev)?;
         }
         if let Some(prev) = prev_channel {
-            dev.write_u8(reg::CHANNEL_SELECT, prev)?;
+            lite(dev, "--channel")?.write_u8(reg::CHANNEL_SELECT, prev)?;
         }
     }
     let result = result?;
+    if dev.kind() != Kind::LiteVna {
+        eprintln!(
+            "got {} points in {:.0} ms ({:.0} pts/s)",
+            result.freqs_hz.len(),
+            result.elapsed.as_secs_f64() * 1000.0,
+            result.freqs_hz.len() as f64 / result.elapsed.as_secs_f64().max(1e-9)
+        );
+        return Ok(result);
+    }
     eprintln!(
         "got {} points in {:.0} ms ({:.0} pts/s), missing {}, duplicates (stale FIFO records) {}, checksum ok {} / bad {}",
-        result.points.len() - result.missing_points(),
+        result.freqs_hz.len() - result.missing_points(),
         result.elapsed.as_secs_f64() * 1000.0,
         cfg.points as f64 / result.elapsed.as_secs_f64().max(1e-9),
         result.missing_points(),
@@ -574,9 +623,9 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
         raws.push(raw);
     }
     if keep_usb_mode {
-        dev.release_on_drop = false;
+        dev.set_release_on_drop(false);
     } else {
-        dev.exit_usb_mode()?;
+        dev.release()?;
     }
     let calibrated = cals.iter().any(|c| c.is_some());
     Ok(Acquired {
@@ -624,9 +673,9 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
     let mut dev = open(conn)?;
     let raw = measure(&mut dev, &cfg, m)?;
     if keep_usb_mode {
-        dev.release_on_drop = false;
+        dev.set_release_on_drop(false);
     } else {
-        dev.exit_usb_mode()?;
+        dev.release()?;
     }
     let result = match &calibration {
         Some(cal) => cal.apply(&raw)?,
@@ -1012,7 +1061,7 @@ fn cal(
     );
     let mut dev = open(conn)?;
     let sweep = measure(&mut dev, &cfg, &m)?;
-    dev.exit_usb_mode()?;
+    dev.release()?;
 
     // Quick sanity numbers so a wrong standard is noticed immediately.
     let mid = sweep.freqs_hz.len() / 2;
@@ -1104,8 +1153,8 @@ fn show_cal(set: &CalibrationSet) -> Result<()> {
     Ok(())
 }
 
-fn screenshot(dev: &mut LiteVna, out: &Path, big_endian: bool) -> Result<()> {
-    eprintln!("requesting screenshot (register 0x{:02X}) …", reg::SCREENSHOT);
+fn screenshot(dev: &mut Vna, out: &Path, swap_bytes: bool) -> Result<()> {
+    eprintln!("requesting screenshot …");
     let shot = dev.screenshot()?;
     eprintln!(
         "{}x{} @ {} bpp, {} bytes",
@@ -1117,7 +1166,7 @@ fn screenshot(dev: &mut LiteVna, out: &Path, big_endian: bool) -> Result<()> {
     if shot.bits_per_pixel != 16 {
         bail!("only 16-bit RGB565 screenshots are supported, got {} bpp", shot.bits_per_pixel);
     }
-    let rgb = shot.to_rgb888(big_endian);
+    let rgb = shot.to_rgb888_with(shot.big_endian != swap_bytes);
     let file = BufWriter::new(File::create(out)?);
     let mut enc = png::Encoder::new(file, shot.width as u32, shot.height as u32);
     enc.set_color(png::ColorType::Rgb);
@@ -1126,6 +1175,6 @@ fn screenshot(dev: &mut LiteVna, out: &Path, big_endian: bool) -> Result<()> {
     w.write_image_data(&rgb)?;
     w.finish()?;
     println!("wrote {}", out.display());
-    dev.set_data_mode(DataMode::Normal)?;
+    dev.release()?;
     Ok(())
 }

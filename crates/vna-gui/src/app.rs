@@ -12,7 +12,7 @@ use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
 use litevna::touchstone::{db, read_touchstone_file, swr, write_s2p};
 use litevna::traces::{self, impedance, Param, TraceKind};
-use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
+use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
 
@@ -123,7 +123,7 @@ enum Connection {
     Connecting(String),
     Connected {
         port: String,
-        info: DeviceInfo,
+        info: VnaInfo,
         battery_mv: Option<u16>,
     },
 }
@@ -443,6 +443,13 @@ impl App {
         matches!(self.connection, Connection::Connected { .. })
     }
 
+    fn device_limits(&self) -> Option<Limits> {
+        match &self.connection {
+            Connection::Connected { info, .. } => Some(info.limits),
+            _ => None,
+        }
+    }
+
     fn send(&self, cmd: Cmd) {
         let _ = self.worker.tx.send(cmd);
     }
@@ -629,7 +636,7 @@ impl App {
                     }
                 },
                 Event::Screenshot(shot) => {
-                    let rgb = shot.to_rgb888(true);
+                    let rgb = shot.to_rgb888();
                     let image = egui::ColorImage::from_rgb([shot.width as usize, shot.height as usize], &rgb);
                     let tex = ctx.load_texture("screenshot", image, egui::TextureOptions::LINEAR);
                     self.screenshot = Some((tex, shot));
@@ -870,10 +877,8 @@ impl App {
                     }
                     ui.label(
                         RichText::new(format!(
-                            "LiteVNA  fw {}.{}  hw {}  {}",
-                            info.fw_major,
-                            info.fw_minor,
-                            info.hardware_revision,
+                            "{}  {}",
+                            info.summary(),
                             battery_mv.map(|mv| format!("{:.2} V", mv as f64 / 1000.0)).unwrap_or_default()
                         ))
                         .color(Color32::from_rgb(120, 200, 120)),
@@ -927,8 +932,14 @@ impl App {
                 ui.end_row();
                 ui.label("Average");
                 ui.horizontal(|ui| {
-                    ui.add(egui::DragValue::new(&mut self.average).range(1..=80));
-                    if ui.add_enabled(self.connected(), egui::Button::new("set")).on_hover_text("writes register 0x40; also changes the bandwidth in the device menu").clicked() {
+                    let has_avg = self.device_limits().is_none_or(|l| l.has_device_average);
+                    ui.add_enabled(has_avg, egui::DragValue::new(&mut self.average).range(1..=80));
+                    if ui
+                        .add_enabled(self.connected() && has_avg, egui::Button::new("set"))
+                        .on_hover_text("LiteVNA register 0x40; also changes the bandwidth in the device menu")
+                        .on_disabled_hover_text("only the LiteVNA has this register; a NanoVNA-H/-F sets its bandwidth on the device")
+                        .clicked()
+                    {
                         self.send(Cmd::SetAverage(self.average));
                     }
                 });
@@ -958,6 +969,16 @@ impl App {
                 self.start_sweep(self.running);
             }
             ui.small("Frequencies: 50k, 14.2M, 1.3G. Applying while running restarts the sweep.");
+            if let Some(l) = self.device_limits() {
+                let below = parse_hz(&self.start).is_ok_and(|f| f < l.min_hz);
+                let above = parse_hz(&self.stop).is_ok_and(|f| f > l.max_hz);
+                let range = format!("Device range {} – {}", format_hz(l.min_hz), format_hz(l.max_hz));
+                if below || above {
+                    ui.colored_label(Color32::from_rgb(230, 150, 80), format!("{range}; the sweep goes outside it and that part is meaningless."));
+                } else {
+                    ui.small(range);
+                }
+            }
             self.segments_panel(ui);
 
             ui.add_space(12.0);
@@ -2078,7 +2099,7 @@ impl App {
         else {
             return;
         };
-        let rgb = shot.to_rgb888(true);
+        let rgb = shot.to_rgb888();
         let result = (|| -> anyhow::Result<()> {
             let file = std::io::BufWriter::new(std::fs::File::create(&path)?);
             let mut enc = png::Encoder::new(file, shot.width as u32, shot.height as u32);

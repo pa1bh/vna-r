@@ -31,10 +31,17 @@ voedingslijn vanuit de shack, 3 tot 30 MHz met 1001 punten en de HF-calibratie v
 hoofdstuk 4. De vier markers staan in de SWR-dalen: 3,51 MHz (SWR 1,28), 6,78 MHz
 (1,45), 14,07 MHz (1,09) en 17,15 MHz (1,41); verder naar rechts liggen nog dalen rond 21
 en 28 MHz. Dat de resonanties in veelvouden van de laagste liggen is precies het idee van
-een OCF: door het voedingspunt uit het midden te leggen, is de impedantie daar op alle
-even harmonischen bruikbaar, en de balun brengt die naar 50 Ω. Op 40 m zit hij iets te
+een OCF: door het voedingspunt uit het midden te leggen, is de impedantie daar op de
+meeste harmonischen bruikbaar, en de balun brengt die naar 50 Ω. Op 40 m zit hij iets te
 laag (6,78 in plaats van 7,1 MHz, X negatief: op de band is hij daar nog net te lang);
-op 20 m staat hij precies goed.
+op 20 m staat hij precies goed. Wat ontbreekt is 30 m: rond 10,3 MHz staat de SWR op 6,5.
+Dat is geen meetfout maar de antenne zelf. Op de derde harmonische van 3,5 MHz is de
+draad anderhalve golflengte lang en heeft de stroomverdeling knopen op precies een derde
+en twee derde van de lengte, dus op het voedingspunt van een OCF die op een derde gevoed
+wordt. Een stroomknoop betekent een zeer hoge impedantie, en de voedingslijn transformeert
+die naar de lage waarde (hier 8 Ω) die je in de shack ziet. Daarom dekt een klassieke
+OCF 80, 40, 20, 17, 12 en 10 m en niet 30 m; dezelfde meting met een tweede apparaat
+(NanoVNA-F, SMA-kit) gaf dezelfde dalen en hetzelfde gat.
 
 Tussen de banden is de antenne in antiresonantie: de **|Z|**-grafiek schiet daar naar
 200 tot 300 Ω en SWR naar 5 tot 7. In de **Smith-chart** is elke band één lus; de lussen

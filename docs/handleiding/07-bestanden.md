@@ -46,7 +46,9 @@ Touchstone** terwijl de betreffende meting live is, en later **Open as reference
 ## Schermafbeeldingen
 
 **Screenshot** in de GUI en `vna-cli screenshot --out naam.png` halen het LCD van het
-apparaat op als PNG: 1024×600 op de LiteVNA 67, 480×320 op de 64.
+apparaat op als PNG: 1024×600 op de LiteVNA 67, 480×320 op de 64, 800×480 op de
+NanoVNA-F. Komen de kleuren verkeerd uit (bij een ander apparaat), dan draait
+`--swap-bytes` de byte-volgorde van de pixels om.
 
 ## Instellingen van de GUI
 

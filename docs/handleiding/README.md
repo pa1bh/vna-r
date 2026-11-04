@@ -2,7 +2,7 @@
 
 Een vectornetwerkanalyzer (VNA) meet hoe een antenne, kabel, filter of ander
 RF-onderdeel zich gedraagt per frequentie. vna-r is een programma voor de macOS- en
-Linux-desktop dat een LiteVNA 64 of 67 via USB aanstuurt, de metingen zelf calibreert en
+Linux-desktop dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, de metingen zelf calibreert en
 ze toont, met markers, tijddomein (TDR), gating, referenties en export. Deze handleiding
 legt uit wat je meet, hoe je het programma bedient en waar de valkuilen zitten.
 
@@ -25,9 +25,10 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
    referenties, schermafbeeldingen.
 8. [Commandoregel: vna-cli](08-cli.md). Alle commando's en opties, met voorbeelden.
 9. [Apparaten, platform en problemen oplossen](09-apparaten-en-problemen.md). LiteVNA 64
-   versus 67, Linux-rechten, veelvoorkomende foutmeldingen, wat je kunt vertrouwen.
+   en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, wat
+   je kunt vertrouwen.
 
-Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/05` de onderzoeks- en
+Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/06` de onderzoeks- en
 ontwikkelnotities: het USB-protocol, het calibratiemodel met metingen, de TDR-wiskunde en
 de roadmap.
 

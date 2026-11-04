@@ -26,8 +26,8 @@ cargo run --release -p vna-cli -- info
 
 ### macOS
 
-Werkt zonder extra stuurprogramma's, op Apple Silicon en Intel. De LiteVNA verschijnt als
-`/dev/cu.usbmodem…`.
+Werkt zonder extra stuurprogramma's, op Apple Silicon en Intel. LiteVNA en NanoVNA-F
+verschijnen als `/dev/cu.usbmodem…`.
 
 ### Linux
 
@@ -50,23 +50,25 @@ Haal daarna de USB-stekker even los en weer vast. Een alternatief is jezelf in d
 
 ## Aansluiten
 
-Zet de LiteVNA aan en verbind hem met een USB-C-kabel die data doet; sommige laadkabels
+Zet het apparaat aan en verbind het met een USB-kabel die data doet; sommige laadkabels
 hebben geen datalijnen en dan verschijnt er geen poort. Controleer:
 
 ```bash
 cargo run --release -p vna-cli -- list
 ```
 
-De regel met `VNA` ervoor is de LiteVNA (USB-id `04B4:0008`). Op macOS heet de LiteVNA 67
-`/dev/cu.usbmodemv1_01` en de LiteVNA 64 `/dev/cu.usbmodemDEMO1`; de naam komt uit de
-firmware en zegt niets over het apparaat. Daarna:
+De regel die met `LiteVNA` of `NanoVNA` begint is het apparaat: een LiteVNA heeft USB-id
+`04B4:0008`, een NanoVNA-F of -H `0483:5740`. Op macOS heet de LiteVNA 67
+`/dev/cu.usbmodemv1_01`, de LiteVNA 64 `/dev/cu.usbmodemDEMO1` en de NanoVNA-F
+`/dev/cu.usbmodem` gevolgd door zijn serienummer; de naam komt uit de firmware en zegt
+niets over het apparaat. vna-r kiest het protocol zelf aan de hand van het USB-id. Daarna:
 
 ```bash
 cargo run --release -p vna-cli -- info
 ```
 
-Dat toont de identiteitsregisters, de firmwareversie en de batterijspanning. Als dit
-werkt, werkt alles.
+Dat toont het model, de firmwareversie en de batterijspanning (en bij een NanoVNA-F het
+bereik en het aantal punten per scan). Als dit werkt, werkt alles.
 
 ## Wat het scherm van het apparaat doet
 
@@ -80,6 +82,13 @@ Twee instellingen van het apparaat worden door vna-r aangeraakt en blijven daarn
 omdat ze niet betrouwbaar terug te lezen zijn: de *average* (bandbreedte) en het gemeten
 kanaal. Na een sessie kan het menu van de LiteVNA dus een andere bandbreedte tonen dan
 daarvoor; zet die desgewenst terug.
+
+Een **NanoVNA-F** kent geen USB MODE: zijn scherm blijft gewoon werken. Tijdens een
+meting van vna-r staat zijn eigen sweep tijdelijk op het raster van het laatste stuk dat
+vna-r gemeten heeft (maximaal 301 punten per stuk; langere sweeps gaan in stukken), en
+na **Disconnect**, het einde van een CLI-commando of `vna-cli release` zet vna-r de
+oorspronkelijke sweep terug. Zijn bandbreedte stel je op het apparaat zelf in; het vak
+**Average** in de GUI staat voor dit apparaat uit.
 
 ## Eén programma tegelijk
 
