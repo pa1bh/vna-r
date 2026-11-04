@@ -79,6 +79,8 @@ CLI: `vna-cli sweep --cal x.json --gate 0.9:1.2 --s2p uit.s2p`.
 
 Zie [docs/03-calibratie.md](docs/03-calibratie.md). Kort: `vna-cli cal open|short|load|through --file x.json`,
 daarna `vna-cli sweep --cal x.json`. Een ander raster binnen het gecalibreerde bereik wordt geïnterpoleerd.
+`vna-cli cal check --file x.json` laat zien wat de calibratie op een kabelmeting overlaat (ripple per band,
+near-end term, consistentie van de kit-fit).
 
 ## Platform
 

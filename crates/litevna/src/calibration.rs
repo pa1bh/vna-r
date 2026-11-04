@@ -637,6 +637,193 @@ pub fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<S
     }
 }
 
+// ---------------------------------------------------------------------------
+// Line diagnostics (roadmap step 4)
+// ---------------------------------------------------------------------------
+
+/// Statistics of the corrected line-open / line-short over one frequency band.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineBand {
+    pub f_lo_hz: f64,
+    pub f_hi_hz: f64,
+    /// RMS ripple of linear |Γ| around a quadratic trend, open- and short-ended line.
+    pub ripple_open: f64,
+    pub ripple_short: f64,
+    /// The same after a band-pass gate around the far-end reflection: what the
+    /// calibration leaves on the line itself (≈ 0 when the error terms are smooth).
+    pub gated_open: f64,
+    pub gated_short: f64,
+    /// Mean |X| of the near-end term in this band (linear).
+    pub near_end_mag: f64,
+}
+
+/// Result of [`CalibrationSet::check_lines`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct LineCheck {
+    pub bands: Vec<LineBand>,
+    /// Round-trip time of the far-end reflection found on the line-short (s).
+    pub far_end_s: f64,
+    /// Near-end term X(f) (gated around t = 0, averaged over open and short
+    /// lines) on the set's grid: the sum of residual directivity (a load
+    /// definition error) and any physical discontinuity within the gate
+    /// (the cable's own connector). The two are indistinguishable here.
+    pub near_end: Vec<C64>,
+    /// RMS difference between the open- and short-line near-end terms; the
+    /// model predicts the same X for both, so this is a consistency check.
+    pub near_end_open_short_rms: f64,
+    /// Open/short asymmetry re-fitted on the far-end-gated lines, as ΔC
+    /// (farad): ≈ 0 means the kit fit is consistent with the gated data.
+    pub gated_refit_delta_c_farad: f64,
+    /// Band-edge width the gates blur (Hz); bands are kept inside it.
+    pub edge_hz: f64,
+}
+
+/// RMS deviation of `|g|` from a quadratic trend over the points with `f_min ≤ f ≤ f_max`.
+fn ripple_quadratic(f: &[f64], g: &[C64], f_min: f64, f_max: f64) -> f64 {
+    let pts: Vec<(f64, f64)> = f
+        .iter()
+        .zip(g)
+        .filter(|(x, _)| **x >= f_min && **x <= f_max)
+        .map(|(x, c)| ((x - f_min) / (f_max - f_min), c.norm()))
+        .collect();
+    if pts.len() < 6 {
+        return 0.0;
+    }
+    let n = pts.len() as f64;
+    let (mut sx, mut sx2, mut sx3, mut sx4, mut sy, mut sxy, mut sx2y) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    for (x, y) in &pts {
+        sx += x;
+        sx2 += x * x;
+        sx3 += x * x * x;
+        sx4 += x * x * x * x;
+        sy += y;
+        sxy += x * y;
+        sx2y += x * x * y;
+    }
+    let m = [[n, sx, sx2], [sx, sx2, sx3], [sx2, sx3, sx4]];
+    let v = [sy, sxy, sx2y];
+    let det = |m: [[f64; 3]; 3]| {
+        m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+    };
+    let d = det(m);
+    if d.abs() < 1e-30 {
+        return 0.0;
+    }
+    let coef = |k: usize| {
+        let mut mm = m;
+        for (r, row) in mm.iter_mut().enumerate() {
+            row[k] = v[r];
+        }
+        det(mm) / d
+    };
+    let (a, b, c) = (coef(0), coef(1), coef(2));
+    let ss: f64 = pts.iter().map(|(x, y)| (y - a - b * x - c * x * x).powi(2)).sum();
+    (ss / n).sqrt()
+}
+
+impl CalibrationSet {
+    /// Diagnose what the calibration leaves on the line-open / line-short
+    /// measurements, using time gating (see docs/03-calibratie.md §9).
+    ///
+    /// * `bands`: ripple per `band_hz`-wide band, raw and with everything but
+    ///   the far-end reflection gated away;
+    /// * `near_end`: the term at t ≈ 0 of the corrected lines. A load
+    ///   definition error and the cable's input connector both land here and
+    ///   cannot be told apart from these measurements alone; flipping the
+    ///   cable changes the connector part but not the load part.
+    ///
+    /// Needs line-open and line-short on a uniform grid of ≥ 8 points.
+    pub fn check_lines(&self, band_hz: f64) -> Result<LineCheck> {
+        use crate::timedomain::{gate, tdr, Gate, GateKind, TdrConfig};
+        let (lo_m, ls_m) = match (&self.line_open, &self.line_short) {
+            (Some(o), Some(s)) => (o, s),
+            _ => return Err(Error::Calibration("need line-open and line-short measurements".into())),
+        };
+        let cal = self.solve()?;
+        let n = self.freqs_hz.len();
+        let f: Vec<f64> = self.freqs_hz.iter().map(|&x| x as f64).collect();
+        let correct = |m: &[C64]| -> Vec<C64> { (0..n).map(|i| cal.terms[i].correct_s11(m[i])).collect() };
+        let (lo, ls) = (correct(&lo_m.s11), correct(&ls_m.s11));
+
+        let cfg = TdrConfig::default();
+        let t = tdr(&self.freqs_hz, &ls, &cfg)?;
+        let dt = t.time_s[1] - t.time_s[0];
+        let min_sep = ((t.resolution_s / dt).ceil() as usize).max(2);
+        // Strongest reflection beyond one resolution from the plane = the far end.
+        let far_bin = t
+            .peaks(8, min_sep)
+            .into_iter()
+            .find(|(i, _)| t.time_s[*i] > 2.0 * t.resolution_s)
+            .map(|(i, _)| i)
+            .ok_or_else(|| Error::Calibration("no far-end reflection found on the line-short".into()))?;
+        let far_s = t.time_s[far_bin];
+        let res = t.resolution_s;
+        let near = Gate { start_s: -2.5 * res, stop_s: (far_s / 3.0).min(10.0 * res), kind: GateKind::BandPass };
+        let far = Gate { start_s: far_s - 8.0 * res, stop_s: far_s + 8.0 * res, kind: GateKind::BandPass };
+        let (xo, xs) = (gate(&self.freqs_hz, &lo, &cfg, &near)?, gate(&self.freqs_hz, &ls, &cfg, &near)?);
+        let (go, gs) = (gate(&self.freqs_hz, &lo, &cfg, &far)?, gate(&self.freqs_hz, &ls, &cfg, &far)?);
+        let edge_hz = xo.edge_hz.max(go.edge_hz);
+        let near_end: Vec<C64> = (0..n).map(|i| (xo.s11[i] + xs.s11[i]) / 2.0).collect();
+
+        // Stay clear of the gate blur and of the band edges where the window
+        // compensation is clamped (there the gated trace is not trustworthy).
+        let clamped = xo.clamped_points.max(go.clamped_points).min(n / 2 - 1);
+        let f_first = (f[0] + edge_hz).max(f[clamped]);
+        let f_last = (f[n - 1] - edge_hz).min(f[n - 1 - clamped]);
+        let mut bands = Vec::new();
+        let mut lo_f = (f_first / band_hz).ceil() * band_hz;
+        if lo_f - f_first > band_hz / 2.0 {
+            lo_f -= band_hz; // start half a band earlier if that still clears the edge
+            lo_f = lo_f.max(f_first);
+        }
+        while lo_f + band_hz / 2.0 < f_last {
+            let hi_f = (lo_f + band_hz).min(f_last);
+            let mag: Vec<f64> = f.iter().zip(&near_end).filter(|(x, _)| **x >= lo_f && **x <= hi_f).map(|(_, c)| c.norm()).collect();
+            let near_mag = if mag.is_empty() { 0.0 } else { mag.iter().sum::<f64>() / mag.len() as f64 };
+            bands.push(LineBand {
+                f_lo_hz: lo_f,
+                f_hi_hz: hi_f,
+                ripple_open: ripple_quadratic(&f, &lo, lo_f, hi_f),
+                ripple_short: ripple_quadratic(&f, &ls, lo_f, hi_f),
+                gated_open: ripple_quadratic(&f, &go.s11, lo_f, hi_f),
+                gated_short: ripple_quadratic(&f, &gs.s11, lo_f, hi_f),
+                near_end_mag: near_mag,
+            });
+            lo_f += band_hz;
+        }
+
+        let (mut d, mut c) = (0.0, 0usize);
+        for i in 0..n {
+            if f[i] >= f_first && f[i] <= f_last {
+                d += (xo.s11[i] - xs.s11[i]).norm_sqr();
+                c += 1;
+            }
+        }
+        let near_end_open_short_rms = if c > 0 { (d / c as f64).sqrt() } else { 0.0 };
+
+        // Asymmetry re-fit on the gated lines (same estimator as fit_step).
+        let (mut sxy, mut sxx) = (0.0, 0.0);
+        for i in 0..n {
+            if f[i] < f_first.max(300e6) || f[i] > f_last {
+                continue;
+            }
+            let (o, s_) = (go.s11[i], gs.s11[i]);
+            let r = (o.norm() + s_.norm()) / 2.0;
+            if r < 0.05 {
+                continue;
+            }
+            let y = (1.0 - o.norm() / s_.norm()) / (2.0 * r);
+            let x = 2.0 * PI * f[i] * o.arg().sin();
+            sxy += x * y;
+            sxx += x * x;
+        }
+        let k = if sxx > 0.0 { sxy / sxx } else { 0.0 };
+
+        Ok(LineCheck { bands, far_end_s: far_s, near_end, near_end_open_short_rms, gated_refit_delta_c_farad: k / Z0, edge_hz })
+    }
+}
+
 /// Solve `e00 + (Γa·Γm)·e11 − Γa·Δ = Γm` for three standards (Cramer's rule).
 fn solve_one_port(standards: &[(C64, C64); 3]) -> Option<(C64, C64, C64)> {
     let one = C64::new(1.0, 0.0);
@@ -729,6 +916,45 @@ impl Calibration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Synthetic 50 kHz–6.3 GHz set: perfect instrument, ideal standards, and
+    /// line measurements through a connector D = 0.03j in front of a lossy
+    /// 5 ns (round trip) line. check_lines must find the far end, the
+    /// connector as near-end term, ripple that the far-end gate removes, and
+    /// no asymmetry.
+    #[test]
+    fn check_lines_finds_connector_and_clean_far_end() {
+        let freqs: Vec<u64> = (0..1001).map(|i| 50_000 + i * 6_299_950).collect();
+        let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
+        let n = freqs.len();
+        let meas = |g: Vec<C64>| StandardMeasurement { s21: vec![C64::new(0.0, 0.0); n], s11: g };
+        set.open = Some(meas(vec![C64::new(1.0, 0.0); n]));
+        set.short = Some(meas(vec![C64::new(-1.0, 0.0); n]));
+        set.load = Some(meas(vec![C64::new(0.0, 0.0); n]));
+        let d = C64::new(0.0, 0.03);
+        let line = |sign: f64| -> Vec<C64> {
+            freqs
+                .iter()
+                .map(|&f| {
+                    let e = sign * 0.85 * C64::from_polar(1.0, -2.0 * PI * f as f64 * 5e-9);
+                    (d + e) / (C64::new(1.0, 0.0) + d * e)
+                })
+                .collect()
+        };
+        set.line_open = Some(meas(line(1.0)));
+        set.line_short = Some(meas(line(-1.0)));
+        let chk = set.check_lines(1e9).unwrap();
+        assert!((chk.far_end_s - 5e-9).abs() < 0.2e-9, "far end {}", chk.far_end_s);
+        assert!(chk.bands.len() >= 4);
+        for b in &chk.bands {
+            assert!((b.near_end_mag - 0.03).abs() < 0.002, "near end {}", b.near_end_mag);
+            // imaginary D on a 0.85 line: ripple ≈ 0.03·1.72/√2 = 0.036
+            assert!(b.ripple_short > 0.025 && b.ripple_short < 0.045, "ripple {}", b.ripple_short);
+            assert!(b.gated_short < 0.003 && b.gated_open < 0.003, "gated {} {}", b.gated_open, b.gated_short);
+        }
+        assert!(chk.near_end_open_short_rms < 0.002);
+        assert!(chk.gated_refit_delta_c_farad.abs() < 1e-15);
+    }
 
     #[test]
     fn coarse_low_end_is_flagged() {

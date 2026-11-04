@@ -82,7 +82,7 @@ enum Cmd {
     /// later ones reuse it. Needs open, short and load; through and isolation
     /// are optional. Use `cal show` to see what is in the file.
     Cal {
-        /// open | short | load | through | isolation | show | clear
+        /// open | short | load | through | isolation | line-open | line-short | show | kit | fit | check | clear
         what: String,
         /// Calibration file (JSON).
         #[arg(long, short)]
@@ -674,6 +674,38 @@ fn cal(
             println!("kit updated in {}", file.display());
             return show_cal(&set);
         }
+        "check" => {
+            let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
+            let chk = set.check_lines(1e9)?;
+            println!(
+                "line check: far end at {:.2} ns round trip ({:.3} m at VF 0.70); gates blur the outer {:.0} MHz of the band",
+                chk.far_end_s * 1e9,
+                chk.far_end_s * litevna::timedomain::C0 * 0.70 / 2.0,
+                chk.edge_hz / 1e6
+            );
+            println!("ripple = RMS of linear |Γ| around a smooth trend; 'gated' keeps only the far-end reflection");
+            println!("{:>13} {:>10} {:>10} {:>10} {:>10} {:>12}", "band GHz", "open", "short", "gated o", "gated s", "near-end dB");
+            for b in &chk.bands {
+                println!(
+                    "{:>6.2}-{:<6.2} {:>10.4} {:>10.4} {:>10.4} {:>10.4} {:>12.1}",
+                    b.f_lo_hz / 1e9,
+                    b.f_hi_hz / 1e9,
+                    b.ripple_open,
+                    b.ripple_short,
+                    b.gated_open,
+                    b.gated_short,
+                    db(b.near_end_mag)
+                );
+            }
+            println!(
+                "near-end term: open/short agree to {:.4} rms; asymmetry re-fit on the gated lines ΔC = {:+.2} fF",
+                chk.near_end_open_short_rms,
+                chk.gated_refit_delta_c_farad * 1e15
+            );
+            println!("The near-end term is residual directivity (load definition) plus the cable's input connector;");
+            println!("re-measure line-short with the cable flipped: if it changes, it is the connector, not the load.");
+            return Ok(());
+        }
         "fit" => {
             let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             let f_min = parse_hz(f_min.as_deref().unwrap_or("300M"))?;
@@ -716,7 +748,7 @@ fn cal(
         _ => {}
     }
     let standard = Standard::parse(what).with_context(|| {
-        format!("unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit or clear")
+        format!("unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit, check or clear")
     })?;
 
     // Grid: from the existing file unless this is the first standard.

@@ -327,3 +327,68 @@ ingevulde ondergrens en het gekozen model, **Apply to kit** schrijft het resulta
 `CalibrationSet::apply_open_fit` in de kit (naam "ideal" wordt "fitted"), **Reset kit** zet de kit terug
 op ideaal. De plausibiliteitscontrole van de CLI (`plausibility_warning`) staat nu in de library en
 verschijnt in de GUI als oranje regel onder het calibratiepaneel.
+
+## 9. Kan de load-definitie gefit worden? (4 november 2026)
+
+Roadmap-stap 4 vroeg of de resterende ripple boven 3 GHz (na de open-fit van §8) uit de
+load-definitie komt en of die te fitten is. Antwoord: niet met alleen kabelmetingen, en de
+rest-ripple is grotendeels fysiek. De redenering en de getallen:
+
+**Wat een load-fout doet.** Noem de echte reflectie van de load ε (wij definiëren hem als 0). De
+solver legt die in e00 én e11: e00' = ε, e11' = −ε. Voor een DUT met Γ wordt de gecorrigeerde
+waarde Γc ≈ Γ − ε(1 − Γ²). Op een kabel met open of short (|Γ| ≈ r) geeft dat
+|Γc| ≈ r + Re(ε)(1 − r²)cos θ + Im(ε)(1 + r²)sin θ, met θ de lijnfase. Twee gevolgen:
+
+- Het reële deel van ε (load-weerstand ≠ 50 Ω) is op een volle reflectie vrijwel onzichtbaar
+  (factor 1 − r² ≈ 0,2).
+- Het imaginaire deel (serie-inductie van de load) geeft precies hetzelfde sin θ-patroon,
+  antisymmetrisch tussen open en short, als de open/short-asymmetrie van §8. De ratio-fit van
+  §8 kan de twee niet onderscheiden: een deel van de "open C0 = 39,8 fF" kan dus load-inductie
+  zijn. Voor de correctie op de kabel maakt dat niet uit; voor een DUT direct op de poort wel,
+  maar dan in de orde van de term zelf (−30 dB).
+
+**Wat de near-end term laat zien.** Een additieve ε zit in het tijdsdomein op t = 0; een
+open/short-asymmetrie is multiplicatief en geeft daar niets. Met de gate uit docs/04 §6
+(−0,4 tot 1,5 ns) rond het referentievlak van de gecorrigeerde line-open en line-short:
+
+| band (GHz) | ripple open | ripple short | na far-end gate | near-end |X| |
+|---|---|---|---|---|
+| 1–2 | 0,0054 | 0,0054 | 0,0002 | −32,1 dB |
+| 2–3 | 0,0052 | 0,0053 | 0,0001 | −31,8 dB |
+| 3–4 | 0,0081 | 0,0081 | 0,0002 | −33,3 dB |
+| 4–5 | 0,0086 | 0,0089 | 0,0004 | −32,8 dB |
+| 5–5,7 | 0,0111 | 0,0115 | 0,0004 | −28,7 dB |
+
+(ripple = RMS van lineaire |Γ| rond een kwadratische trend; `vna-cli cal check`.)
+
+- Open en short geven dezelfde near-end term (verschil 0,0007 rms): consistent met een
+  additieve term, zoals het model voorspelt.
+- Die term draait met de frequentie als e^{−jωτ} met τ ≈ 0,09 ns (≈ 1 cm bij VF 0,7) en
+  groeit met f: een kleine discontinuïteit net voorbij het referentievlak, de connector-
+  overgang van de kabel, of de resistor van de load die ook ~1 cm achter zijn connector zit.
+  Beide liggen binnen één resolutiecel (0,16 ns) en zijn in de tijd niet te scheiden. Een
+  tweetermfit (vast + vertraagd) past wel, maar levert een onfysisch teken op: de twee termen
+  zijn te gecorreleerd.
+- De ripple die |X| ≈ 0,025 zou moeten geven (≈ 0,87·|X| ≈ 0,02 rms) is groter dan de gemeten
+  0,005–0,011: de open-fit van §8 heeft het sin θ-deel van X dat ∝ ω loopt al in de open-
+  capaciteit weggewerkt. Wat overblijft is het deel dat niet ∝ ω is (X draait) plus het kleine
+  cos θ-deel.
+- Met een band-pass gate om de verre reflectie is de lijn glad tot op 0,0002–0,0004 en komt de
+  asymmetrie-refit op +0,14 fF uit: de calibratie zelf laat op de kabel niets ruws achter, de
+  fouttermen zijn glad in frequentie. Alles wat ribbelt komt van reflecties op de kabel.
+
+**Conclusie.** Een load-fit is met deze metingen niet identificeerbaar: een load-fout, de
+kabelconnector en de open-asymmetrie zijn met één kabel niet uit elkaar te halen. De rest-
+ripple van 0,3–0,4 dB p-p boven 3 GHz is de ingangsconnector van de kabel (−32 tot −29 dB)
+plus de dubbele doorgang ervan, geen calibratiefout. Beter wordt het alleen met beter
+materiaal: een kit met gespecificeerde load, of een airline als onafhankelijke referentie.
+
+**Open experiment.** Of X in de kabel zit of in de load is wél te testen: meet line-short
+nog eens met de kabel omgedraaid (`cal line-short --file kopie.json`, daarna `cal check`).
+Verandert de near-end term, dan is het de connector; blijft hij gelijk, dan is het de load
+en kan hij als serie-L in de kit (nog niet geïmplementeerd; dan is ook §8 opnieuw te doen).
+
+**Poort-2 match.** Staat niet in het enhanced-response model en is met drie ontvangers niet
+te calibreren. Effect op S21: ≈ |e22|·|S22,DUT|; met e22 ≈ −20 dB en een DUT van −10 dB
+uitgangsaanpassing is dat 1 % (0,09 dB). Voor kabels, verzwakkers en doorlaatbanden van
+filters verwaarloosbaar, in stopbanden niet.
