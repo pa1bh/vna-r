@@ -8,9 +8,10 @@ hoofdgebied met vier grafieken.
 
 ## Verbinden en sweepen
 
-1. Kies de poort in de keuzelijst; de LiteVNA heeft een ster. De verversknop zoekt
-   opnieuw.
-2. **Connect**. De bovenbalk toont firmware, hardwarerevisie en batterijspanning.
+1. Kies de poort in de keuzelijst; een VNA heeft een ster en wordt vanzelf gekozen. De
+   lijst wordt elke twee seconden ververst zolang je niet verbonden bent, dus een
+   apparaat dat je later aansluit verschijnt vanzelf; ⟳ zoekt direct.
+2. **Connect**. De bovenbalk toont model, firmware en batterijspanning.
 3. **Run** start continu sweepen, **Single** doet er één. Run nogmaals stopt.
 
 Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met **Apply

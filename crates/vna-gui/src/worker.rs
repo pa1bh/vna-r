@@ -120,6 +120,7 @@ impl Worker {
     fn handle(&mut self, cmd: Cmd) {
         match cmd {
             Cmd::Connect(port) => {
+                eprintln!("[worker] connect {port}");
                 self.dev = None;
                 self.continuous = None;
                 match Vna::open(&port).and_then(|mut d| {

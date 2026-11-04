@@ -46,6 +46,14 @@ aan? Op Linux: rechten (zie boven). Op macOS verschijnen soms twee poorten
 (`cu.` en `tty.`); vna-r gebruikt `cu.`. Staan er twee VNA's aan, geef dan `--port` of
 kies de poort in de GUI.
 
+**Connect doet niets.** De knop staat uit zolang er geen poort gekozen is, bijvoorbeeld
+omdat het apparaat pas na het starten van de GUI is aangesloten of van apparaat
+gewisseld is. De poortlijst wordt elke twee seconden ververst (en met ⟳ direct); kies de
+poort met de ster en klik opnieuw. Reageert de GUI helemaal niet op klikken terwijl de
+poort wel gekozen is, verplaats het venster dan naar een ander scherm: op een macOS-
+opstelling met twee schermen van verschillende schaal kwamen klikken op één van de twee
+niet aan (een eigenaardigheid van het vensterframework, niet van vna-r).
+
 **"device did not answer INDICATE"**, **"no NanoVNA shell prompt"** of een timeout. Een
 ander programma heeft de poort (GUI verbonden terwijl je de CLI gebruikt, of
 NanoVNA-Saver open). Sluit dat eerst. Komt het incidenteel voor direct na het

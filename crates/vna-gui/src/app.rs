@@ -209,6 +209,9 @@ struct GateKey {
 pub struct App {
     worker: WorkerHandle,
     ports: Vec<PortCandidate>,
+    /// `ui.input().time` of the last port scan; while disconnected the list is
+    /// rescanned every few seconds so a device plugged in later shows up.
+    last_port_scan: f64,
     selected_port: Option<String>,
     connection: Connection,
 
@@ -291,6 +294,7 @@ impl App {
         let mut app = App {
             worker,
             ports: Vec::new(),
+            last_port_scan: f64::NEG_INFINITY,
             selected_port: None,
             connection: Connection::Disconnected,
             start: "1M".into(),
@@ -434,6 +438,12 @@ impl App {
 
     fn refresh_ports(&mut self) {
         self.ports = discovery::list_ports().unwrap_or_default();
+        // Forget a selection whose port is gone, then default to a VNA if there is one.
+        if let Some(sel) = &self.selected_port {
+            if !self.ports.iter().any(|p| &p.path == sel) {
+                self.selected_port = None;
+            }
+        }
         if self.selected_port.is_none() {
             self.selected_port = self.ports.iter().find(|p| p.looks_like_vna()).map(|p| p.path.clone());
         }
@@ -643,6 +653,7 @@ impl App {
                     self.show_screenshot = true;
                 }
                 Event::Error(msg) => {
+                    eprintln!("[gui] worker error: {msg}");
                     self.error = Some(msg);
                     self.running = false;
                     self.cal.pending = None;
@@ -831,10 +842,20 @@ impl App {
     // ----- panels ----------------------------------------------------------
 
     fn top_bar(&mut self, ui: &mut egui::Ui) {
+        const PORT_SCAN_INTERVAL: f64 = 2.0;
+        let connected = self.connected();
+        if !connected && !matches!(self.connection, Connection::Connecting(_)) {
+            let now = ui.input(|i| i.time);
+            if now - self.last_port_scan > PORT_SCAN_INTERVAL {
+                self.last_port_scan = now;
+                self.refresh_ports();
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_secs_f64(PORT_SCAN_INTERVAL));
+            }
+        }
         ui.horizontal(|ui| {
             ui.heading("vna-r");
             ui.separator();
-            let connected = self.connected();
             ui.add_enabled_ui(!connected, |ui| {
                 let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
                 egui::ComboBox::from_id_salt("port")
@@ -854,7 +875,11 @@ impl App {
                             ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
                         }
                     });
-                if ui.button("⟳").on_hover_text("rescan ports").clicked() {
+                if ui
+                    .button("⟳")
+                    .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
+                    .clicked()
+                {
                     self.refresh_ports();
                 }
             });
