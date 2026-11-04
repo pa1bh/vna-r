@@ -20,8 +20,8 @@ pub enum Purpose {
 pub enum Cmd {
     Connect(String),
     Disconnect,
-    /// One sweep, or start sweeping continuously with this config.
-    Sweep { cfg: SweepConfig, purpose: Purpose, continuous: bool },
+    /// One sweep over these segments (in order), or start sweeping them continuously.
+    Sweep { cfgs: Vec<SweepConfig>, purpose: Purpose, continuous: bool },
     /// Stop continuous sweeping and hand the screen back to the device.
     Stop,
     SetAverage(u8),
@@ -32,7 +32,8 @@ pub enum Cmd {
 pub enum Event {
     Connected { port: String, info: DeviceInfo, battery_mv: Option<u16> },
     Disconnected,
-    SweepDone { cfg: SweepConfig, result: SweepResult, purpose: Purpose },
+    /// `result` is the concatenation of the segments in `cfgs`.
+    SweepDone { cfgs: Vec<SweepConfig>, result: SweepResult, purpose: Purpose },
     Screenshot(Screenshot),
     Error(String),
 }
@@ -54,7 +55,7 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
 
 struct Worker {
     dev: Option<LiteVna>,
-    continuous: Option<(SweepConfig, Purpose)>,
+    continuous: Option<(Vec<SweepConfig>, Purpose)>,
     events: Sender<Event>,
     ctx: egui::Context,
 }
@@ -78,8 +79,8 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
         match cmd {
             Some(cmd) => w.handle(cmd),
             None => {
-                if let Some((cfg, purpose)) = w.continuous {
-                    w.sweep_once(cfg, purpose);
+                if let Some((cfgs, purpose)) = w.continuous.clone() {
+                    w.sweep_once(cfgs, purpose);
                 }
             }
         }
@@ -121,15 +122,15 @@ impl Worker {
                 self.dev = None;
                 self.emit(Event::Disconnected);
             }
-            Cmd::Sweep { cfg, purpose, continuous } => {
+            Cmd::Sweep { cfgs, purpose, continuous } => {
                 if self.dev.is_none() {
                     self.fail("sweep", "not connected");
                     return;
                 }
                 if continuous {
-                    self.continuous = Some((cfg, purpose));
+                    self.continuous = Some((cfgs, purpose));
                 } else {
-                    self.sweep_once(cfg, purpose);
+                    self.sweep_once(cfgs, purpose);
                 }
             }
             Cmd::Stop => {
@@ -160,23 +161,29 @@ impl Worker {
         }
     }
 
-    fn sweep_once(&mut self, cfg: SweepConfig, purpose: Purpose) {
+    fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose) {
         let Some(d) = &mut self.dev else {
             self.fail("sweep", "not connected");
             return;
         };
-        match d.sweep(&cfg, false) {
-            Ok(result) => self.emit(Event::SweepDone { cfg, result, purpose }),
-            Err(e) => {
-                let msg = e.to_string();
-                // A broken pipe means the cable went; forget the device.
-                if matches!(e, litevna::Error::Io(_) | litevna::Error::Serial(_)) {
-                    self.dev = None;
-                    self.continuous = None;
-                    self.emit(Event::Disconnected);
+        let mut parts = Vec::with_capacity(cfgs.len());
+        for cfg in &cfgs {
+            match d.sweep(cfg, false) {
+                Ok(r) => parts.push(r),
+                Err(e) => {
+                    let msg = e.to_string();
+                    // A broken pipe means the cable went; forget the device.
+                    if matches!(e, litevna::Error::Io(_) | litevna::Error::Serial(_)) {
+                        self.dev = None;
+                        self.continuous = None;
+                        self.emit(Event::Disconnected);
+                    }
+                    self.fail("sweep", msg);
+                    return;
                 }
-                self.fail("sweep", msg);
             }
         }
+        let result = if parts.len() == 1 { parts.pop().unwrap() } else { SweepResult::concat(&parts) };
+        self.emit(Event::SweepDone { cfgs, result, purpose });
     }
 }

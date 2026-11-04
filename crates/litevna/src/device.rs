@@ -101,6 +101,60 @@ impl SweepResult {
         self.points.iter().filter(|p| p.is_none()).count()
     }
 
+    /// Join the results of several segments into one sweep (multi-segment
+    /// sweeps: e.g. HF fine plus UHF coarse). Counts and times add up; the
+    /// caller keeps the segment boundaries if it needs them.
+    pub fn concat(parts: &[SweepResult]) -> SweepResult {
+        let mut out = SweepResult {
+            freqs_hz: Vec::new(),
+            s11: Vec::new(),
+            s21: Vec::new(),
+            points: Vec::new(),
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        };
+        for p in parts {
+            out.freqs_hz.extend_from_slice(&p.freqs_hz);
+            out.s11.extend_from_slice(&p.s11);
+            out.s21.extend_from_slice(&p.s21);
+            out.points.extend_from_slice(&p.points);
+            out.checksum_ok += p.checksum_ok;
+            out.checksum_bad += p.checksum_bad;
+            out.duplicates += p.duplicates;
+            out.elapsed += p.elapsed;
+        }
+        out
+    }
+
+    /// The points `range` of this sweep as a sweep of its own.
+    pub fn slice(&self, range: std::ops::Range<usize>) -> SweepResult {
+        SweepResult {
+            freqs_hz: self.freqs_hz[range.clone()].to_vec(),
+            s11: self.s11[range.clone()].to_vec(),
+            s21: self.s21[range.clone()].to_vec(),
+            points: self.points[range].to_vec(),
+            checksum_ok: self.checksum_ok,
+            checksum_bad: self.checksum_bad,
+            duplicates: self.duplicates,
+            elapsed: self.elapsed,
+        }
+    }
+
+    /// Point ranges of the segments that make up this sweep, given the
+    /// segment configs in sweep order.
+    pub fn segment_ranges(cfgs: &[SweepConfig]) -> Vec<std::ops::Range<usize>> {
+        let mut at = 0usize;
+        cfgs.iter()
+            .map(|c| {
+                let r = at..at + c.points as usize;
+                at += c.points as usize;
+                r
+            })
+            .collect()
+    }
+
     pub fn missing_indexes(&self) -> Vec<usize> {
         self.points.iter().enumerate().filter(|(_, p)| p.is_none()).map(|(i, _)| i).collect()
     }

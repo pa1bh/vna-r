@@ -214,6 +214,13 @@ eerste twee calibratiepunten en het tweede meer dan 2× zo hoog ligt als het eer
 toont dat oranje onder het calibratiepaneel, de CLI als `WARNING`. Structureel lost stap 6 van
 de roadmap (multi-segment sweeps met calibratie per segment) het op.
 
+### Oplossing: segmenten met eigen calibratie
+
+Sinds roadmap-stap 6 kan een sweep uit meerdere segmenten bestaan, elk met een eigen
+calibratiebestand (GUI: **Segments**; CLI: `--segment START:STOP:POINTS@cal.json`). Een HF-segment
+op zijn eigen dichte calibratie naast het brede segment op de 6,3 GHz-calibratie geeft één trace
+zonder de kunstmatige dip hierboven.
+
 ## 8. Calibratie tot 6,3 GHz en de kit-fit
 
 ### Waarom de ideale kit boven ~1 GHz niet meer volstaat

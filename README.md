@@ -56,6 +56,12 @@ boven ~1 GHz: onder **Kit fit** meet je een kabel met open en short aan het verr
 de open/short-asymmetrie van de kit (als capaciteit of offset delay) en **Apply to kit** zet die in de
 calibratie; een onwaarschijnlijke standaardmeting (losse open, vergeten load) geeft een waarschuwing.
 
+Segmenten: onder **Segments** voeg je extra bereiken toe die na het eerste geveegd en in één trace
+getoond worden, elk desgewenst met een eigen calibratiebestand, bijvoorbeeld 100 kHz–50 MHz fijn met
+een HF-calibratie naast 50 MHz–6,3 GHz met de brede. Zo ontloop je de interpolatie van een brede
+calibratie aan de onderkant. TDR en gate gebruiken het breedste segment. CLI:
+`vna-cli sweep --segment 100k:50M:1001@cal/n-hf.cal.json --segment 50M:6.3G:1001@cal/n-6g3.cal.json`.
+
 Middelen: **Sweep avg** N middelt de laatste N sweeps complex in software (teller k/N, reset bij een
 ander raster), naast de *Average* van het apparaat zelf. Complex middelen drukt ruis op lage niveaus
 zonder de magnitude te vertekenen, wat middelen in dB wel doet.

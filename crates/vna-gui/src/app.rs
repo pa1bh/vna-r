@@ -1,6 +1,6 @@
 //! Application state and all panels.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -63,6 +63,20 @@ struct Settings {
     gate_notch: bool,
     /// Number of sweeps averaged in software (1 = off).
     sweep_avg: usize,
+    /// Segments beyond the primary one (start/stop/points/calibration file).
+    extra_segments: Vec<SegmentSettings>,
+}
+
+/// One extra sweep segment. The primary segment is the Start/Stop/Points of
+/// the Sweep panel and uses the calibration panel; an extra segment may carry
+/// its own calibration file (e.g. a dense HF calibration next to a 6.3 GHz one).
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(default)]
+struct SegmentSettings {
+    start: String,
+    stop: String,
+    points: u16,
+    cal_file: Option<PathBuf>,
 }
 
 impl Default for Settings {
@@ -91,6 +105,7 @@ impl Default for Settings {
             gate_stop_m: 0.5,
             gate_notch: false,
             sweep_avg: 1,
+            extra_segments: Vec::new(),
         }
     }
 }
@@ -150,6 +165,14 @@ impl CalState {
     }
 }
 
+/// A calibration file bound to an extra segment.
+#[derive(Default)]
+struct SegCal {
+    set: Option<CalibrationSet>,
+    solved: Option<(Vec<u64>, Calibration)>,
+    error: Option<String>,
+}
+
 #[derive(Clone, Copy, PartialEq)]
 struct GateKey {
     shown_rev: u64,
@@ -175,7 +198,16 @@ pub struct App {
 
     raw: Option<SweepResult>,
     shown: Option<SweepResult>,
-    last_cfg: Option<SweepConfig>,
+    /// Segment configs of the last display sweep, in sweep order, and the
+    /// calibration file each used (None = the calibration panel).
+    last_plan: Vec<SweepConfig>,
+    last_plan_cals: Vec<Option<PathBuf>>,
+    sent_plan_cals: Vec<Option<PathBuf>>,
+    extra_segments: Vec<SegmentSettings>,
+    /// Per-segment calibration files, loaded on first use.
+    seg_cals: HashMap<PathBuf, SegCal>,
+    /// Which segments of the last correction actually got a calibration.
+    seg_calibrated: Vec<bool>,
     sweep_count: u64,
 
     cal: CalState,
@@ -241,7 +273,12 @@ impl App {
             running: false,
             raw: None,
             shown: None,
-            last_cfg: None,
+            last_plan: Vec::new(),
+            last_plan_cals: Vec::new(),
+            sent_plan_cals: Vec::new(),
+            extra_segments: Vec::new(),
+            seg_cals: HashMap::new(),
+            seg_calibrated: Vec::new(),
             sweep_count: 0,
             cal: CalState { apply: true, ..Default::default() },
             markers: [None; MARKERS],
@@ -312,6 +349,7 @@ impl App {
         self.gate_stop_m = s.gate_stop_m;
         self.gate_notch = s.gate_notch;
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
+        self.extra_segments = s.extra_segments;
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -352,6 +390,7 @@ impl App {
             gate_stop_m: self.gate_stop_m,
             gate_notch: self.gate_notch,
             sweep_avg: self.sweep_avg,
+            extra_segments: self.extra_segments.clone(),
         }
     }
 
@@ -386,10 +425,114 @@ impl App {
         }
     }
 
+    /// All segments (primary first, then extras), sorted by start, with the
+    /// calibration file each should use. Sets `sweep_error` on a bad entry.
+    fn segment_plan(&mut self) -> Option<Vec<(SweepConfig, Option<PathBuf>)>> {
+        let primary = self.current_config()?;
+        let mut plan = vec![(primary, None)];
+        for (k, seg) in self.extra_segments.iter().enumerate() {
+            let cfg = parse_hz(&seg.start)
+                .and_then(|a| parse_hz(&seg.stop).map(|b| (a, b)))
+                .and_then(|(a, b)| SweepConfig::linear(a, b, seg.points));
+            match cfg {
+                Ok(c) => plan.push((c, seg.cal_file.clone())),
+                Err(e) => {
+                    self.sweep_error = Some(format!("segment {}: {e}", k + 2));
+                    return None;
+                }
+            }
+        }
+        plan.sort_by_key(|(c, _)| c.start_hz);
+        for w in plan.windows(2) {
+            // Touching (stop == next start) is fine: one shared point, deduplicated on export.
+            if w[1].0.start_hz < w[0].0.stop_hz() {
+                self.sweep_error = Some(format!(
+                    "segments overlap: {}–{} and {}–{}",
+                    format_hz(w[0].0.start_hz),
+                    format_hz(w[0].0.stop_hz()),
+                    format_hz(w[1].0.start_hz),
+                    format_hz(w[1].0.stop_hz())
+                ));
+                return None;
+            }
+        }
+        self.sweep_error = None;
+        Some(plan)
+    }
+
     fn start_sweep(&mut self, continuous: bool) {
-        if let Some(cfg) = self.current_config() {
+        if let Some(plan) = self.segment_plan() {
             self.running = continuous;
-            self.send(Cmd::Sweep { cfg, purpose: Purpose::Display, continuous });
+            self.sent_plan_cals = plan.iter().map(|(_, c)| c.clone()).collect();
+            let cfgs = plan.into_iter().map(|(c, _)| c).collect();
+            self.send(Cmd::Sweep { cfgs, purpose: Purpose::Display, continuous });
+        }
+    }
+
+    /// Point range of the segment TDR and gating work on: the widest one
+    /// (TDR needs a uniform grid). The whole sweep when there is one segment.
+    fn tdr_range(&self) -> std::ops::Range<usize> {
+        let total = self.shown.as_ref().map_or(0, |s| s.freqs_hz.len());
+        let ranges = SweepResult::segment_ranges(&self.last_plan);
+        if ranges.len() <= 1 || ranges.last().map_or(0, |r| r.end) != total {
+            return 0..total;
+        }
+        ranges
+            .into_iter()
+            .zip(&self.last_plan)
+            .max_by_key(|(_, c)| c.stop_hz() - c.start_hz)
+            .map(|(r, _)| r)
+            .unwrap_or(0..total)
+    }
+
+    /// Correct one segment with its own calibration file (loaded on first use).
+    fn seg_correct(&mut self, path: &Path, part: &SweepResult) -> SweepResult {
+        let entry = self.seg_cals.entry(path.to_path_buf()).or_default();
+        if entry.set.is_none() && entry.error.is_none() {
+            match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
+                Ok(set) => entry.set = Some(set),
+                Err(e) => entry.error = Some(format!("{}: {e}", path.display())),
+            }
+        }
+        let Some(set) = &entry.set else { return part.clone() };
+        let fresh = matches!(&entry.solved, Some((g, _)) if g.as_slice() == part.freqs_hz.as_slice());
+        if !fresh {
+            match set.solve_for(&part.freqs_hz) {
+                Ok(cal) => {
+                    entry.solved = Some((part.freqs_hz.clone(), cal));
+                    entry.error = set.coarse_low_end_warning(&part.freqs_hz).map(|w| format!("{}: {w}", path.display()));
+                }
+                Err(e) => {
+                    entry.solved = None;
+                    entry.error = Some(format!("{}: {e}", path.display()));
+                    return part.clone();
+                }
+            }
+        }
+        match &entry.solved {
+            Some((_, cal)) => cal.apply(part).unwrap_or_else(|_| part.clone()),
+            None => part.clone(),
+        }
+    }
+
+    /// Is a calibration applied to everything shown?
+    fn is_calibrated(&self) -> bool {
+        self.cal.apply && !self.seg_calibrated.is_empty() && self.seg_calibrated.iter().all(|c| *c)
+    }
+
+    /// Calibration applied to some segments but not all.
+    fn is_partially_calibrated(&self) -> bool {
+        self.cal.apply && self.seg_calibrated.iter().any(|c| *c) && !self.seg_calibrated.iter().all(|c| *c)
+    }
+
+    /// CAL / CAL* / RAW tag.
+    fn cal_tag(&self) -> RichText {
+        if self.is_calibrated() {
+            RichText::new("CAL").color(Color32::from_rgb(120, 200, 120))
+        } else if self.is_partially_calibrated() {
+            RichText::new("CAL*").color(Color32::from_rgb(230, 150, 80))
+        } else {
+            RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
         }
     }
 
@@ -411,9 +554,10 @@ impl App {
                     self.connection = Connection::Disconnected;
                     self.running = false;
                 }
-                Event::SweepDone { cfg, result, purpose } => match purpose {
+                Event::SweepDone { cfgs, result, purpose } => match purpose {
                     Purpose::Display => {
-                        self.last_cfg = Some(cfg);
+                        self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() { self.sent_plan_cals.clone() } else { vec![None; cfgs.len()] };
+                        self.last_plan = cfgs;
                         self.sweep_count += 1;
                         let result = self.push_average(result);
                         let corrected = self.corrected(&result);
@@ -464,6 +608,7 @@ impl App {
         if !self.gate_on {
             return None;
         }
+        let range = self.tdr_range();
         let sweep = self.shown.as_ref()?;
         let key = GateKey { shown_rev: self.shown_rev, vf: self.tdr_vf, window: self.tdr_window, start_m: self.gate_start_m, stop_m: self.gate_stop_m, notch: self.gate_notch };
         if !matches!(&self.gated_cache, Some((k, _, _)) if *k == key) {
@@ -473,9 +618,12 @@ impl App {
                 stop_s: self.gate_time(self.gate_stop_m),
                 kind: if self.gate_notch { GateKind::Notch } else { GateKind::BandPass },
             };
-            match gate(&sweep.freqs_hz, &sweep.s11, &cfg, &g) {
+            match gate(&sweep.freqs_hz[range.clone()], &sweep.s11[range.clone()], &cfg, &g) {
                 Ok(r) => {
-                    self.gated_cache = Some((key, r.s11, r.edge_hz));
+                    // Splice the gated segment back into the full sweep.
+                    let mut full = sweep.s11.clone();
+                    full[range].copy_from_slice(&r.s11);
+                    self.gated_cache = Some((key, full, r.edge_hz));
                     self.gate_error = None;
                 }
                 Err(e) => {
@@ -537,10 +685,46 @@ impl App {
         if !self.cal.apply {
             return raw.clone();
         }
-        match self.cal.calibration_for(&raw.freqs_hz) {
-            Some(cal) => cal.apply(raw).unwrap_or_else(|_| raw.clone()),
-            None => raw.clone(),
+        let ranges = SweepResult::segment_ranges(&self.last_plan);
+        let segmented = ranges.len() > 1 && ranges.last().map_or(0, |r| r.end) == raw.freqs_hz.len() && self.last_plan_cals.len() == ranges.len();
+        if !segmented {
+            return match self.cal.calibration_for(&raw.freqs_hz) {
+                Some(cal) => {
+                    self.seg_calibrated = vec![true];
+                    cal.apply(raw).unwrap_or_else(|_| raw.clone())
+                }
+                None => {
+                    self.seg_calibrated = vec![false];
+                    raw.clone()
+                }
+            };
         }
+        let cals = self.last_plan_cals.clone();
+        let mut parts = Vec::with_capacity(ranges.len());
+        let mut flags = Vec::with_capacity(ranges.len());
+        for (range, cal_path) in ranges.into_iter().zip(cals) {
+            let part = raw.slice(range);
+            let done = match cal_path {
+                Some(p) => {
+                    let d = self.seg_correct(&p, &part);
+                    flags.push(self.seg_cals.get(&p).map_or(false, |c| c.solved.is_some()));
+                    d
+                }
+                None => match self.cal.calibration_for(&part.freqs_hz) {
+                    Some(cal) => {
+                        flags.push(true);
+                        cal.apply(&part).unwrap_or_else(|_| part.clone())
+                    }
+                    None => {
+                        flags.push(false);
+                        part.clone()
+                    }
+                },
+            };
+            parts.push(done);
+        }
+        self.seg_calibrated = flags;
+        SweepResult::concat(&parts)
     }
 
     fn store_standard(&mut self, std: Standard, sweep: &SweepResult) {
@@ -699,6 +883,7 @@ impl App {
                 self.start_sweep(self.running);
             }
             ui.small("Frequencies: 50k, 14.2M, 1.3G. Applying while running restarts the sweep.");
+            self.segments_panel(ui);
 
             ui.add_space(12.0);
             ui.heading("Calibration");
@@ -764,6 +949,14 @@ impl App {
             }
 
             ui.add_space(6.0);
+            if self.last_plan.len() > 1 {
+                let r = self.tdr_range();
+                if let Some(sw) = &self.shown {
+                    if r.end > r.start && r.end <= sw.freqs_hz.len() {
+                        ui.small(format!("TDR and gate use the widest segment: {} → {}", format_hz(sw.freqs_hz[r.start]), format_hz(sw.freqs_hz[r.end - 1])));
+                    }
+                }
+            }
             ui.checkbox(&mut self.gate_on, "Gate").on_hover_text("Time-gate S11: keep (band pass) or remove (notch) the reflections between start and stop. Applies to the frequency view and exports.");
             if self.gate_on {
                 egui::Grid::new("gate-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
@@ -806,12 +999,14 @@ impl App {
             }
 
             ui.add_space(12.0);
-            if let Some(cfg) = &self.last_cfg {
+            if let (Some(raw), false) = (&self.raw, self.last_plan.is_empty()) {
+                let segs = if self.last_plan.len() > 1 { format!(" in {} segments", self.last_plan.len()) } else { String::new() };
                 ui.small(format!(
-                    "last sweep: {} → {} in {} points, {} ms, sweep #{}{}",
-                    format_hz(cfg.start_hz),
-                    format_hz(cfg.stop_hz()),
-                    cfg.points,
+                    "last sweep: {} → {} in {} points{}, {} ms, sweep #{}{}",
+                    format_hz(raw.freqs_hz[0]),
+                    format_hz(*raw.freqs_hz.last().unwrap()),
+                    raw.freqs_hz.len(),
+                    segs,
                     self.raw.as_ref().map(|r| r.elapsed.as_millis()).unwrap_or(0),
                     self.sweep_count,
                     if self.sweep_avg > 1 { format!(", avg {}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg) } else { String::new() }
@@ -892,6 +1087,70 @@ impl App {
         });
     }
 
+    /// Extra segments with their own calibration files.
+    fn segments_panel(&mut self, ui: &mut egui::Ui) {
+        let open = !self.extra_segments.is_empty();
+        egui::CollapsingHeader::new(format!("Segments ({})", 1 + self.extra_segments.len())).default_open(open).show(ui, |ui| {
+            ui.small("Extra ranges swept after the primary one and shown in one trace, e.g. a dense HF segment with its own calibration next to a wide one. Segments may touch but not overlap.");
+            if self.cal.apply && self.seg_calibrated.len() == self.last_plan.len() && self.seg_calibrated.len() > 1 {
+                let raw: Vec<String> = self
+                    .last_plan
+                    .iter()
+                    .zip(&self.seg_calibrated)
+                    .filter(|(_, ok)| !**ok)
+                    .map(|(c, _)| format!("{} → {}", format_hz(c.start_hz), format_hz(c.stop_hz())))
+                    .collect();
+                if !raw.is_empty() {
+                    ui.small(RichText::new(format!("⚠ shown raw (no usable calibration): {}", raw.join(", "))).color(Color32::from_rgb(255, 150, 80)));
+                }
+            }
+            let mut remove: Option<usize> = None;
+            for k in 0..self.extra_segments.len() {
+                ui.horizontal(|ui| {
+                    ui.label(format!("{}.", k + 2));
+                    ui.add(egui::TextEdit::singleline(&mut self.extra_segments[k].start).desired_width(52.0));
+                    ui.label("→");
+                    ui.add(egui::TextEdit::singleline(&mut self.extra_segments[k].stop).desired_width(52.0));
+                    egui::ComboBox::from_id_salt(("seg-points", k)).selected_text(self.extra_segments[k].points.to_string()).width(60.0).show_ui(ui, |ui| {
+                        for p in POINT_CHOICES {
+                            ui.selectable_value(&mut self.extra_segments[k].points, p, p.to_string());
+                        }
+                    });
+                    if ui.small_button("✕").on_hover_text("remove segment").clicked() {
+                        remove = Some(k);
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.add_space(18.0);
+                    let name = self.extra_segments[k].cal_file.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
+                    let label = match &name {
+                        Some(n) => format!("cal: {n}"),
+                        None => "cal: panel (interpolated)".to_string(),
+                    };
+                    if ui.small_button(label).on_hover_text("calibration file for this segment; without one the calibration panel's set is interpolated").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() {
+                            self.seg_cals.remove(&path);
+                            self.extra_segments[k].cal_file = Some(path);
+                        }
+                    }
+                    if self.extra_segments[k].cal_file.is_some() && ui.small_button("none").clicked() {
+                        self.extra_segments[k].cal_file = None;
+                    }
+                });
+                if let Some(e) = self.extra_segments[k].cal_file.as_ref().and_then(|p| self.seg_cals.get(p)).and_then(|c| c.error.as_ref()) {
+                    ui.small(RichText::new(format!("⚠ {e}")).color(Color32::from_rgb(255, 150, 80)));
+                }
+            }
+            if let Some(k) = remove {
+                self.extra_segments.remove(k);
+            }
+            if ui.small_button("+ segment").clicked() {
+                let start = self.extra_segments.last().map(|s| s.stop.clone()).unwrap_or_else(|| self.stop.clone());
+                self.extra_segments.push(SegmentSettings { start, stop: "6.3G".into(), points: 1001, cal_file: None });
+            }
+        });
+    }
+
     fn standard_buttons(&mut self, ui: &mut egui::Ui, standards: &[Standard], connected: bool) {
         ui.horizontal_wrapped(|ui| {
             for &std in standards {
@@ -900,7 +1159,7 @@ impl App {
                 if ui.add_enabled(connected && self.cal.pending.is_none(), egui::Button::new(label)).clicked() {
                     if let Some(cfg) = self.current_config() {
                         self.cal.pending = Some(std);
-                        self.send(Cmd::Sweep { cfg, purpose: Purpose::Standard(std), continuous: false });
+                        self.send(Cmd::Sweep { cfgs: vec![cfg], purpose: Purpose::Standard(std), continuous: false });
                     }
                 }
             }
@@ -1048,7 +1307,7 @@ impl App {
         let comment = format!(
             "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),
-            if self.cal.apply && self.cal.solved.is_some() { "host calibrated" } else { "uncalibrated raw" },
+            if self.is_calibrated() { "host calibrated" } else if self.is_partially_calibrated() { "partly host calibrated (see segments)" } else { "uncalibrated raw" },
             gated
         );
         match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
@@ -1074,7 +1333,8 @@ impl App {
         // Grey lines where a gated trace stops being trustworthy.
         let edge_lines: Vec<f64> = match self.gated_cache.as_ref().filter(|_| self.gate_on) {
             Some((_, _, edge_hz)) => {
-                let (f0, f1) = (sweep.freqs_hz[0] as f64, *sweep.freqs_hz.last().unwrap() as f64);
+                let r = self.tdr_range();
+                let (f0, f1) = (sweep.freqs_hz[r.start] as f64, sweep.freqs_hz[r.end - 1] as f64);
                 vec![(f0 + edge_hz) / 1e6, (f1 - edge_hz) / 1e6]
             }
             None => Vec::new(),
@@ -1200,11 +1460,12 @@ impl App {
     }
 
     fn tdr_result(&mut self) -> Option<&TdrResult> {
+        let range = self.tdr_range();
         let sweep = self.shown.as_ref()?;
         let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.shown_rev && *vf == self.tdr_vf && *w == self.tdr_window);
         if !fresh {
             let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
-            match tdr(&sweep.freqs_hz, &sweep.s11, &cfg) {
+            match tdr(&sweep.freqs_hz[range.clone()], &sweep.s11[range], &cfg) {
                 Ok(t) => self.tdr_cache = Some((self.shown_rev, self.tdr_vf, self.tdr_window, t)),
                 Err(e) => {
                     self.error = Some(format!("TDR: {e}"));
@@ -1237,12 +1498,11 @@ impl App {
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let tag = if self.cal.apply && self.cal.solved.is_some() {
-                    RichText::new("CAL").color(Color32::from_rgb(120, 200, 120))
-                } else {
-                    RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
-                };
-                ui.label(tag.strong());
+                let partial = self.is_partially_calibrated();
+                let tag = ui.label(self.cal_tag().strong());
+                if partial {
+                    tag.on_hover_text("some segments have no usable calibration and are shown raw");
+                }
                 self.gate_tag(ui);
                 if self.gate_on {
                     ui.small("drag the orange lines to move the gate");
@@ -1362,12 +1622,11 @@ impl App {
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let tag = if self.cal.apply && self.cal.solved.is_some() {
-                    RichText::new("CAL").color(Color32::from_rgb(120, 200, 120))
-                } else {
-                    RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
-                };
-                ui.label(tag.strong());
+                let partial = self.is_partially_calibrated();
+                let tag = ui.label(self.cal_tag().strong());
+                if partial {
+                    tag.on_hover_text("some segments have no usable calibration and are shown raw");
+                }
                 self.gate_tag(ui);
             });
         });

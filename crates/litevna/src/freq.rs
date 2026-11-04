@@ -14,9 +14,11 @@ pub fn parse_hz(text: &str) -> Result<u64> {
         Some('g') => (&lower[..lower.len() - 1], 1e9),
         _ => (lower, 1.0),
     };
+    // Accept a decimal comma ("6,3G") as well as a point.
     let value: f64 = num
         .trim()
         .replace('_', "")
+        .replace(',', ".")
         .parse()
         .map_err(|_| Error::InvalidArgument(format!("not a frequency: {text:?}")))?;
     if value < 0.0 {
@@ -42,6 +44,12 @@ pub fn format_hz(hz: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decimal_comma() {
+        assert_eq!(parse_hz("6,3G").unwrap(), 6_300_000_000);
+        assert_eq!(parse_hz("14,2M").unwrap(), 14_200_000);
+    }
 
     #[test]
     fn parses_common_inputs() {

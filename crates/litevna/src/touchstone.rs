@@ -17,6 +17,11 @@ pub fn write_s2p<W: Write>(mut w: W, sweep: &SweepResult, comment: Option<&str>)
     writeln!(w, "! S11 and S21 measured; S12/S22 not available on a 1.5-port VNA (written as 0).")?;
     writeln!(w, "# Hz S RI R 50")?;
     for i in 0..sweep.freqs_hz.len() {
+        // Touchstone wants strictly increasing frequencies; touching sweep
+        // segments share their boundary point, so skip exact repeats.
+        if i > 0 && sweep.freqs_hz[i] == sweep.freqs_hz[i - 1] {
+            continue;
+        }
         let s11 = sweep.s11[i];
         let s21 = sweep.s21[i];
         writeln!(

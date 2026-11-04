@@ -74,6 +74,11 @@ enum Cmd {
         /// Velocity factor for --gate distances.
         #[arg(long, default_value_t = 0.70)]
         vf: f64,
+        /// Sweep several segments into one trace: `START:STOP:POINTS[@cal.json]`,
+        /// repeatable, e.g. `--segment 100k:50M:1001@hf.json --segment 50M:6.3G:1001@n6g3.json`.
+        /// Replaces --start/--stop/--points/--cal; segments must not overlap.
+        #[arg(long, value_name = "START:STOP:POINTS[@CAL]")]
+        segment: Vec<String>,
     },
     /// Measure a calibration standard into a calibration file, or inspect one.
     ///
@@ -275,8 +280,8 @@ fn main() -> Result<()> {
         Cmd::List => list(),
         Cmd::Info => info(&mut open(&conn)?),
         Cmd::Peek { addr, size } => peek(&mut open(&conn)?, &addr, size),
-        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf } => {
-            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf)
+        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf, segment } => {
+            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf, segment)
         }
         Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
         Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv } => {
@@ -440,6 +445,75 @@ struct Acquired {
 
 /// Resolve the grid (from args or the calibration file), sweep once and apply
 /// the calibration. Shared by `sweep` and `tdr`.
+/// Multi-segment sweep: each `START:STOP:POINTS[@cal.json]` is swept in
+/// turn (sorted by start) and corrected with its own calibration; the parts
+/// are concatenated into one result.
+fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mode: bool) -> Result<Acquired> {
+    let mut plan: Vec<(SweepConfig, Option<PathBuf>)> = Vec::new();
+    for spec in specs {
+        let (grid_part, cal_part) = match spec.split_once('@') {
+            Some((g, c)) => (g, Some(PathBuf::from(c))),
+            None => (spec.as_str(), None),
+        };
+        let parts: Vec<&str> = grid_part.split(':').collect();
+        if parts.len() != 3 {
+            bail!("--segment wants START:STOP:POINTS[@cal.json], got {spec:?}");
+        }
+        let cfg = SweepConfig::linear(parse_hz(parts[0])?, parse_hz(parts[1])?, parts[2].trim().parse().context("segment points")?)?;
+        plan.push((cfg, cal_part));
+    }
+    plan.sort_by_key(|(c, _)| c.start_hz);
+    for w in plan.windows(2) {
+        if w[1].0.start_hz < w[0].0.stop_hz() {
+            bail!("segments overlap: {}–{} and {}–{}", format_hz(w[0].0.start_hz), format_hz(w[0].0.stop_hz()), format_hz(w[1].0.start_hz), format_hz(w[1].0.stop_hz()));
+        }
+    }
+    // Solve the calibrations first so a bad file fails before touching the device.
+    let mut cals: Vec<Option<Calibration>> = Vec::new();
+    for (cfg, path) in &plan {
+        cals.push(match path {
+            Some(p) => {
+                let set = load_cal(p)?;
+                let freqs = cfg.frequencies();
+                let cal = set.solve_for(&freqs).with_context(|| format!("cannot use calibration {} on segment {}–{}", p.display(), format_hz(cfg.start_hz), format_hz(cfg.stop_hz())))?;
+                if let Some(w) = set.coarse_low_end_warning(&freqs) {
+                    eprintln!("WARNING: {}: {w}", p.display());
+                }
+                Some(cal)
+            }
+            None => None,
+        });
+    }
+    let mut dev = open(conn)?;
+    let mut raws = Vec::new();
+    let mut results = Vec::new();
+    for ((cfg, path), cal) in plan.iter().zip(&cals) {
+        eprintln!(
+            "segment {} → {} in {} points{}",
+            format_hz(cfg.start_hz),
+            format_hz(cfg.stop_hz()),
+            cfg.points,
+            match path {
+                Some(p) => format!(", calibration {}", p.display()),
+                None => ", raw".to_string(),
+            }
+        );
+        let raw = measure(&mut dev, cfg, m)?;
+        results.push(match cal {
+            Some(c) => c.apply(&raw)?,
+            None => raw.clone(),
+        });
+        raws.push(raw);
+    }
+    if keep_usb_mode {
+        dev.release_on_drop = false;
+    } else {
+        dev.exit_usb_mode()?;
+    }
+    let calibrated = cals.iter().any(|c| c.is_some());
+    Ok(Acquired { cfg: plan[0].0, raw: SweepResult::concat(&raws), calibrated, result: SweepResult::concat(&results) })
+}
+
 fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path>, keep_usb_mode: bool) -> Result<Acquired> {
     // With a calibration file the grid defaults to the calibrated one; an
     // explicit --start/--stop/--points inside that span is interpolated.
@@ -497,8 +571,13 @@ fn sweep(
     gate_arg: Option<String>,
     gate_notch: bool,
     vf: f64,
+    segments: Vec<String>,
 ) -> Result<()> {
-    let Acquired { cfg, raw, mut result, calibrated } = acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?;
+    let Acquired { cfg, raw, mut result, calibrated } = if segments.is_empty() {
+        acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?
+    } else {
+        acquire_segments(conn, &segments, &m, keep_usb_mode)?
+    };
 
     if let Some(spec) = &gate_arg {
         let (a, b) = spec.split_once(':').with_context(|| format!("--gate wants START:STOP in metres, got {spec:?}"))?;
@@ -529,7 +608,7 @@ fn sweep(
         let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
         let comment = format!(
             "LiteVNA sweep, {} points, {}",
-            cfg.points,
+            result.freqs_hz.len(),
             match (calibrated, &cal_file, cfg.calibrated) {
                 (true, Some(c), _) => format!("host calibration {}", c.display()),
                 (_, _, true) => "device calibrated".to_string(),
