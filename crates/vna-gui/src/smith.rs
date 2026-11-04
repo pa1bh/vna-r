@@ -8,6 +8,8 @@ pub struct SmithChart<'a> {
     /// Marker positions with their colours.
     pub markers: &'a [(Complex64, Color32)],
     pub trace_color: Color32,
+    /// Reference traces drawn thin behind the live one.
+    pub extra: &'a [(&'a [Complex64], Color32)],
 }
 
 pub struct SmithResponse {
@@ -75,6 +77,12 @@ impl<'a> SmithChart<'a> {
             }
         }
 
+        for (g, color) in self.extra {
+            if g.len() > 1 {
+                let pts: Vec<Pos2> = g.iter().map(|g| to_screen(clamp(*g))).collect();
+                painter.add(egui::Shape::line(pts, Stroke::new(1.0, *color)));
+            }
+        }
         // Trace
         if self.gamma.len() > 1 {
             let pts: Vec<Pos2> = self.gamma.iter().map(|g| to_screen(clamp(*g))).collect();

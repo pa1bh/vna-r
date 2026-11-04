@@ -17,7 +17,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 4 | Load-definitie fitten | M | onderzocht 2026-11-04: niet identificeerbaar, zie docs/03 §9 |
 | 5 | Averaging in software | S | gedaan 2026-11-04 |
 | 6 | Multi-segment sweeps | M | gedaan 2026-11-04 |
-| 7 | Referentietraces opslaan en vergelijken | S | open |
+| 7 | Referentietraces opslaan en vergelijken | S | gedaan 2026-11-04 |
 | 8 | Touchstone inlezen | S | open |
 | 9 | LiteVNA 64 verifiëren | S | open |
 | 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | open |

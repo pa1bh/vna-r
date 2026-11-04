@@ -24,6 +24,14 @@ const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
 const GATE_COLOR: Color32 = Color32::from_rgb(255, 150, 80);
 /// Upper bound for the software sweep average (ring buffer of raw sweeps).
 const MAX_SWEEP_AVG: usize = 64;
+/// Colours for held reference traces.
+const REF_COLORS: [Color32; 4] = [
+    Color32::from_rgb(150, 150, 150),
+    Color32::from_rgb(120, 170, 220),
+    Color32::from_rgb(210, 150, 210),
+    Color32::from_rgb(160, 210, 150),
+];
+const MAX_REFS: usize = 4;
 const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 const MARKERS: usize = 4;
@@ -173,6 +181,13 @@ struct SegCal {
     error: Option<String>,
 }
 
+/// A held trace: what was shown at the time (calibrated, gated as it was).
+struct Reference {
+    name: String,
+    sweep: SweepResult,
+    visible: bool,
+}
+
 #[derive(Clone, Copy, PartialEq)]
 struct GateKey {
     shown_rev: u64,
@@ -245,6 +260,9 @@ pub struct App {
     sweep_avg: usize,
     /// Last raw sweeps on the current grid, newest at the back.
     avg_buf: VecDeque<SweepResult>,
+    references: Vec<Reference>,
+    /// Reference the difference trace is taken against.
+    diff_ref: Option<usize>,
     /// (sweep number, vf, window) the cached result belongs to.
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
@@ -307,6 +325,8 @@ impl App {
             gated_cache: None,
             sweep_avg: 1,
             avg_buf: VecDeque::new(),
+            references: Vec::new(),
+            diff_ref: None,
             tdr_cache: None,
         };
         app.refresh_ports();
@@ -896,6 +916,7 @@ impl App {
             ui.heading("Traces");
             ui.checkbox(&mut self.show_s11, RichText::new("S11").color(S11_COLOR));
             ui.checkbox(&mut self.show_s21, RichText::new("S21").color(S21_COLOR));
+            self.references_panel(ui);
             ui.horizontal(|ui| {
                 ui.label("group delay aperture");
                 ui.add(egui::DragValue::new(&mut self.gd_aperture).range(1..=50).suffix(" pts"));
@@ -1151,6 +1172,50 @@ impl App {
         });
     }
 
+    fn hold_reference(&mut self) {
+        let Some(sweep) = self.freq_sweep() else { return };
+        let n = self.references.len() + 1;
+        let name = format!(
+            "ref {n}: {}–{}{}",
+            format_hz(sweep.freqs_hz[0]).replace(' ', ""),
+            format_hz(*sweep.freqs_hz.last().unwrap()).replace(' ', ""),
+            if self.is_calibrated() { "" } else { " raw" }
+        );
+        self.references.push(Reference { name, sweep, visible: true });
+    }
+
+    fn references_panel(&mut self, ui: &mut egui::Ui) {
+        if self.references.is_empty() {
+            ui.small("Hold (top bar) keeps the current trace as a reference to compare against.");
+            return;
+        }
+        ui.label("References");
+        let mut remove: Option<usize> = None;
+        for k in 0..self.references.len() {
+            let color = REF_COLORS[k % REF_COLORS.len()];
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut self.references[k].visible, "");
+                ui.add(egui::TextEdit::singleline(&mut self.references[k].name).desired_width(120.0).text_color(color));
+                let is_diff = self.diff_ref == Some(k);
+                if ui.selectable_label(is_diff, "Δ").on_hover_text("show live − this reference (dB / degrees) in log mag and phase plots").clicked() {
+                    self.diff_ref = if is_diff { None } else { Some(k) };
+                }
+                if ui.small_button("✕").clicked() {
+                    remove = Some(k);
+                }
+            });
+        }
+        if let Some(k) = remove {
+            self.references.remove(k);
+            self.diff_ref = match self.diff_ref {
+                Some(d) if d == k => None,
+                Some(d) if d > k => Some(d - 1),
+                other => other,
+            };
+        }
+        ui.small("References are not saved; export them as s2p to keep them (step 8 will read them back).");
+    }
+
     fn standard_buttons(&mut self, ui: &mut egui::Ui, standards: &[Standard], connected: bool) {
         ui.horizontal_wrapped(|ui| {
             for &std in standards {
@@ -1367,7 +1432,14 @@ impl App {
         ui.columns(2, |cols| {
             // Smith chart
             let w = cols[0].available_width();
-            let resp = SmithChart { gamma: &sweep.s11, markers: &marker_points, trace_color: S11_COLOR }.show(&mut cols[0], Vec2::new(w, h));
+            let extra: Vec<(&[Complex64], Color32)> = self
+                .references
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| r.visible)
+                .map(|(k, r)| (r.sweep.s11.as_slice(), REF_COLORS[k % REF_COLORS.len()]))
+                .collect();
+            let resp = SmithChart { gamma: &sweep.s11, markers: &marker_points, trace_color: S11_COLOR, extra: &extra }.show(&mut cols[0], Vec2::new(w, h));
             if resp.response.clicked() {
                 if let Some(p) = resp.response.interact_pointer_pos() {
                     // nearest trace point on screen
@@ -1430,6 +1502,47 @@ impl App {
                 lines.push((series.label, series.values, color, i == 1));
             }
         }
+        // Reference traces (thin, own colour) and the optional difference trace.
+        let mut ref_lines: Vec<(String, Vec<f64>, Vec<f64>, Color32)> = Vec::new();
+        for (k, r) in self.references.iter().enumerate() {
+            if !r.visible {
+                continue;
+            }
+            let color = REF_COLORS[k % REF_COLORS.len()];
+            let rmhz: Vec<f64> = r.sweep.freqs_hz.iter().map(|f| *f as f64 / 1e6).collect();
+            for (param, s, show) in [(Param::S11, &r.sweep.s11, self.show_s11), (Param::S21, &r.sweep.s21, self.show_s21)] {
+                if !show {
+                    continue;
+                }
+                for ser in traces::compute(kind, param, &r.sweep.freqs_hz, s, self.gd_aperture) {
+                    ref_lines.push((format!("{} {}", r.name, ser.label), rmhz.clone(), ser.values, color));
+                }
+            }
+        }
+        let mut diff_lines: Vec<(String, Vec<f64>)> = Vec::new();
+        if let Some(k) = self.diff_ref.filter(|k| *k < self.references.len()) {
+            if matches!(kind, TraceKind::LogMag | TraceKind::Phase) {
+                let r = &self.references[k];
+                let (rs11, rs21) = resample_complex(&r.sweep.freqs_hz, &r.sweep.s11, &r.sweep.s21, &sweep.freqs_hz);
+                for (param, live, refv, show) in [(Param::S11, &sweep.s11, &rs11, self.show_s11), (Param::S21, &sweep.s21, &rs21, self.show_s21)] {
+                    if !show {
+                        continue;
+                    }
+                    let vals: Vec<f64> = live
+                        .iter()
+                        .zip(refv)
+                        .map(|(a, b)| match kind {
+                            TraceKind::LogMag => db(a.norm()) - db(b.norm()),
+                            _ => {
+                                let d = (a.arg() - b.arg()).to_degrees();
+                                ((d + 180.0).rem_euclid(360.0)) - 180.0
+                            }
+                        })
+                        .collect();
+                    diff_lines.push((format!("Δ {} vs {}", param.name(), r.name), vals));
+                }
+            }
+        }
         let r = Plot::new(("plot", slot, kind.id()))
             .height((h - header_h).max(100.0))
             .legend(Legend::default())
@@ -1438,6 +1551,12 @@ impl App {
             .include_y(lo)
             .include_y(hi)
             .show(ui, |pui| {
+                for (label, x, values, color) in &ref_lines {
+                    pui.line(Line::new(label.clone(), series(x, values.iter().copied())).color(*color).width(1.0));
+                }
+                for (label, values) in &diff_lines {
+                    pui.line(Line::new(label.clone(), series(mhz, values.iter().copied())).color(Color32::from_rgb(255, 120, 120)).style(egui_plot::LineStyle::dotted_dense()));
+                }
                 for (label, values, color, dashed) in &lines {
                     let mut line = Line::new(label.clone(), series(mhz, values.iter().copied())).color(*color);
                     if *dashed {
@@ -1606,6 +1725,10 @@ impl App {
             }
             if ui.small_button("clear all").clicked() {
                 self.markers = [None; MARKERS];
+            }
+            ui.separator();
+            if ui.add_enabled(self.shown.is_some() && self.references.len() < MAX_REFS, egui::Button::new("Hold").small()).on_hover_text("keep the current trace as a reference (see Traces)").clicked() {
+                self.hold_reference();
             }
             ui.separator();
             if let Some(sweep) = self.freq_sweep() {
@@ -1781,6 +1904,32 @@ fn draw_gate(ui: &egui::Ui, transform: &egui_plot::PlotTransform, rect: egui::Re
     let stroke = egui::Stroke::new(1.5, GATE_COLOR);
     painter.vline(xa, rect.y_range(), stroke);
     painter.vline(xb, rect.y_range(), stroke);
+}
+
+/// Linear complex interpolation of a reference onto another grid (held at
+/// the ends outside the reference span).
+fn resample_complex(src_f: &[u64], s11: &[Complex64], s21: &[Complex64], dst_f: &[u64]) -> (Vec<Complex64>, Vec<Complex64>) {
+    let one = |v: &[Complex64]| -> Vec<Complex64> {
+        dst_f
+            .iter()
+            .map(|&f| {
+                if src_f.is_empty() {
+                    return Complex64::new(0.0, 0.0);
+                }
+                match src_f.binary_search(&f) {
+                    Ok(i) => v[i],
+                    Err(0) => v[0],
+                    Err(i) if i >= src_f.len() => v[src_f.len() - 1],
+                    Err(i) => {
+                        let (f0, f1) = (src_f[i - 1] as f64, src_f[i] as f64);
+                        let t = (f as f64 - f0) / (f1 - f0);
+                        v[i - 1] * (1.0 - t) + v[i] * t
+                    }
+                }
+            })
+            .collect()
+    };
+    (one(s11), one(s21))
 }
 
 fn nearest_index(freqs: &[u64], f: u64) -> usize {
