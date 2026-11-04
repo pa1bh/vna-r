@@ -278,18 +278,62 @@ struct Conn {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let conn = Conn { port: cli.port.clone(), trace: cli.trace };
+    let conn = Conn {
+        port: cli.port.clone(),
+        trace: cli.trace,
+    };
     match cli.cmd {
         Cmd::List => list(),
         Cmd::Info => info(&mut open(&conn)?),
         Cmd::Peek { addr, size } => peek(&mut open(&conn)?, &addr, size),
-        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf, segment } => {
-            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf, segment)
-        }
-        Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
-        Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv, from } => {
-            tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv, from)
-        }
+        Cmd::Sweep {
+            grid,
+            measure,
+            cal,
+            s2p,
+            csv,
+            rows,
+            keep_usb_mode,
+            gate,
+            gate_notch,
+            vf,
+            segment,
+        } => sweep(
+            &conn,
+            grid,
+            measure,
+            cal,
+            s2p,
+            csv,
+            rows,
+            keep_usb_mode,
+            gate,
+            gate_notch,
+            vf,
+            segment,
+        ),
+        Cmd::Cal {
+            what,
+            file,
+            grid,
+            measure,
+            note,
+            kit,
+            f_min,
+            apply,
+            as_delay,
+        } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
+        Cmd::Tdr {
+            grid,
+            measure,
+            cal,
+            vf,
+            window,
+            peaks,
+            max_distance,
+            csv,
+            from,
+        } => tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv, from),
         Cmd::Screenshot { out, little_endian } => screenshot(&mut open(&conn)?, &out, !little_endian),
         Cmd::Release => {
             open(&conn)?.exit_usb_mode()?;
@@ -432,7 +476,11 @@ fn measure(dev: &mut LiteVna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<Swee
     );
     if result.missing_points() > 0 {
         let idx = result.missing_indexes();
-        eprintln!("missing indexes: {:?}{}", &idx[..idx.len().min(40)], if idx.len() > 40 { " …" } else { "" });
+        eprintln!(
+            "missing indexes: {:?}{}",
+            &idx[..idx.len().min(40)],
+            if idx.len() > 40 { " …" } else { "" }
+        );
     }
     Ok(result)
 }
@@ -462,13 +510,23 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
         if parts.len() != 3 {
             bail!("--segment wants START:STOP:POINTS[@cal.json], got {spec:?}");
         }
-        let cfg = SweepConfig::linear(parse_hz(parts[0])?, parse_hz(parts[1])?, parts[2].trim().parse().context("segment points")?)?;
+        let cfg = SweepConfig::linear(
+            parse_hz(parts[0])?,
+            parse_hz(parts[1])?,
+            parts[2].trim().parse().context("segment points")?,
+        )?;
         plan.push((cfg, cal_part));
     }
     plan.sort_by_key(|(c, _)| c.start_hz);
     for w in plan.windows(2) {
         if w[1].0.start_hz < w[0].0.stop_hz() {
-            bail!("segments overlap: {}–{} and {}–{}", format_hz(w[0].0.start_hz), format_hz(w[0].0.stop_hz()), format_hz(w[1].0.start_hz), format_hz(w[1].0.stop_hz()));
+            bail!(
+                "segments overlap: {}–{} and {}–{}",
+                format_hz(w[0].0.start_hz),
+                format_hz(w[0].0.stop_hz()),
+                format_hz(w[1].0.start_hz),
+                format_hz(w[1].0.stop_hz())
+            );
         }
     }
     // Solve the calibrations first so a bad file fails before touching the device.
@@ -478,7 +536,14 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
             Some(p) => {
                 let set = load_cal(p)?;
                 let freqs = cfg.frequencies();
-                let cal = set.solve_for(&freqs).with_context(|| format!("cannot use calibration {} on segment {}–{}", p.display(), format_hz(cfg.start_hz), format_hz(cfg.stop_hz())))?;
+                let cal = set.solve_for(&freqs).with_context(|| {
+                    format!(
+                        "cannot use calibration {} on segment {}–{}",
+                        p.display(),
+                        format_hz(cfg.start_hz),
+                        format_hz(cfg.stop_hz())
+                    )
+                })?;
                 if let Some(w) = set.coarse_low_end_warning(&freqs) {
                     eprintln!("WARNING: {}: {w}", p.display());
                 }
@@ -514,7 +579,12 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
         dev.exit_usb_mode()?;
     }
     let calibrated = cals.iter().any(|c| c.is_some());
-    Ok(Acquired { cfg: plan[0].0, raw: SweepResult::concat(&raws), calibrated, result: SweepResult::concat(&results) })
+    Ok(Acquired {
+        cfg: plan[0].0,
+        raw: SweepResult::concat(&raws),
+        calibrated,
+        result: SweepResult::concat(&results),
+    })
 }
 
 fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path>, keep_usb_mode: bool) -> Result<Acquired> {
@@ -537,7 +607,11 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
                 format_hz(*set.freqs_hz.last().unwrap()),
                 set.kit.name,
                 if cal.has_through() { ", with through" } else { ", S21 uncorrected" },
-                if interpolated { format!(", interpolated to {} points", freqs.len()) } else { String::new() }
+                if interpolated {
+                    format!(", interpolated to {} points", freqs.len())
+                } else {
+                    String::new()
+                }
             );
             if let Some(w) = set.coarse_low_end_warning(&freqs) {
                 eprintln!("WARNING: {w}");
@@ -558,7 +632,12 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
         Some(cal) => cal.apply(&raw)?,
         None => raw.clone(),
     };
-    Ok(Acquired { cfg, raw, calibrated: calibration.is_some(), result })
+    Ok(Acquired {
+        cfg,
+        raw,
+        calibrated: calibration.is_some(),
+        result,
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -576,18 +655,32 @@ fn sweep(
     vf: f64,
     segments: Vec<String>,
 ) -> Result<()> {
-    let Acquired { cfg, raw, mut result, calibrated } = if segments.is_empty() {
+    let Acquired {
+        cfg,
+        raw,
+        mut result,
+        calibrated,
+    } = if segments.is_empty() {
         acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?
     } else {
         acquire_segments(conn, &segments, &m, keep_usb_mode)?
     };
 
     if let Some(spec) = &gate_arg {
-        let (a, b) = spec.split_once(':').with_context(|| format!("--gate wants START:STOP in metres, got {spec:?}"))?;
+        let (a, b) = spec
+            .split_once(':')
+            .with_context(|| format!("--gate wants START:STOP in metres, got {spec:?}"))?;
         let (start_m, stop_m): (f64, f64) = (a.trim().parse().context("gate start")?, b.trim().parse().context("gate stop")?);
         let to_s = |d: f64| 2.0 * d / (litevna::timedomain::C0 * vf);
-        let g = Gate { start_s: to_s(start_m), stop_s: to_s(stop_m), kind: if gate_notch { GateKind::Notch } else { GateKind::BandPass } };
-        let tcfg = TdrConfig { velocity_factor: vf, ..Default::default() };
+        let g = Gate {
+            start_s: to_s(start_m),
+            stop_s: to_s(stop_m),
+            kind: if gate_notch { GateKind::Notch } else { GateKind::BandPass },
+        };
+        let tcfg = TdrConfig {
+            velocity_factor: vf,
+            ..Default::default()
+        };
         let gated = compute_gate(&result.freqs_hz, &result.s11, &tcfg, &g)?;
         eprintln!(
             "time gate {} {:.3}..{:.3} m (VF {vf}): outer {} of the band on each side is unreliable",
@@ -650,7 +743,13 @@ fn tdr_cmd(
     let result = match from {
         Some(path) => {
             let r = litevna::touchstone::read_touchstone_file(&path).with_context(|| format!("reading {}", path.display()))?;
-            eprintln!("read {}: {} points {} → {}", path.display(), r.freqs_hz.len(), format_hz(r.freqs_hz[0]), format_hz(*r.freqs_hz.last().unwrap()));
+            eprintln!(
+                "read {}: {} points {} → {}",
+                path.display(),
+                r.freqs_hz.len(),
+                format_hz(r.freqs_hz[0]),
+                format_hz(*r.freqs_hz.last().unwrap())
+            );
             r
         }
         None => {
@@ -660,7 +759,11 @@ fn tdr_cmd(
             acquire(conn, &grid, &m, cal_file.as_deref(), false)?.result
         }
     };
-    let cfg = TdrConfig { window, velocity_factor: vf, fft_size: 0 };
+    let cfg = TdrConfig {
+        window,
+        velocity_factor: vf,
+        fft_size: 0,
+    };
     let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
 
     let limit_m = max_distance.unwrap_or(t.max_distance_m());
@@ -675,7 +778,12 @@ fn tdr_cmd(
     );
     let dt = t.time_s[1] - t.time_s[0];
     let min_sep = ((t.resolution_s / dt).ceil() as usize).max(2);
-    let peaks: Vec<_> = t.peaks(n_peaks * 4, min_sep).into_iter().filter(|(i, _)| t.distance_m[*i] <= limit_m).take(n_peaks).collect();
+    let peaks: Vec<_> = t
+        .peaks(n_peaks * 4, min_sep)
+        .into_iter()
+        .filter(|(i, _)| t.distance_m[*i] <= limit_m)
+        .take(n_peaks)
+        .collect();
     println!("{:>4} {:>10} {:>10} {:>9} {:>10}", "#", "distance", "time", "|Γ| dB", "Z behind");
     for (k, (i, mag)) in peaks.iter().enumerate() {
         // impedance a little beyond the edge, where the step has settled
@@ -697,7 +805,15 @@ fn tdr_cmd(
             if t.distance_m[i] > limit_m {
                 break;
             }
-            writeln!(f, "{:.5},{:.4},{:.2},{:.5},{:.2}", t.distance_m[i], t.time_s[i] * 1e9, db(t.impulse_mag[i]), t.step[i], t.impedance_ohm[i])?;
+            writeln!(
+                f,
+                "{:.5},{:.4},{:.2},{:.5},{:.2}",
+                t.distance_m[i],
+                t.time_s[i] * 1e9,
+                db(t.impulse_mag[i]),
+                t.step[i],
+                t.impedance_ohm[i]
+            )?;
         }
         eprintln!("wrote {}", path.display());
     }
@@ -708,7 +824,10 @@ fn print_table(result: &SweepResult, rows: usize) {
     let n = result.freqs_hz.len();
     let shown = if rows == 0 { n } else { rows.min(n) };
     let stride = (n + shown - 1) / shown.max(1);
-    println!("{:>14} {:>9} {:>8} {:>7} {:>9} {:>8}", "freq", "S11 dB", "S11 °", "SWR", "S21 dB", "S21 °");
+    println!(
+        "{:>14} {:>9} {:>8} {:>7} {:>9} {:>8}",
+        "freq", "S11 dB", "S11 °", "SWR", "S21 dB", "S21 °"
+    );
     for i in (0..n).step_by(stride.max(1)) {
         let s11 = result.s11[i];
         let s21 = result.s21[i];
@@ -776,7 +895,10 @@ fn cal(
                 chk.edge_hz / 1e6
             );
             println!("ripple = RMS of linear |Γ| around a smooth trend; 'gated' keeps only the far-end reflection");
-            println!("{:>13} {:>10} {:>10} {:>10} {:>10} {:>12}", "band GHz", "open", "short", "gated o", "gated s", "near-end dB");
+            println!(
+                "{:>13} {:>10} {:>10} {:>10} {:>10} {:>12}",
+                "band GHz", "open", "short", "gated o", "gated s", "near-end dB"
+            );
             for b in &chk.bands {
                 println!(
                     "{:>6.2}-{:<6.2} {:>10.4} {:>10.4} {:>10.4} {:>10.4} {:>12.1}",
@@ -820,7 +942,10 @@ fn cal(
                 set.kit.open.offset_delay_s * 1e12,
                 (set.kit.open.offset_delay_s + fit.delta_delay_s) * 1e12
             );
-            println!("  (short assumed as defined in the kit; the fit is exact for the {} model)", if as_delay { "delay" } else { "capacitance" });
+            println!(
+                "  (short assumed as defined in the kit; the fit is exact for the {} model)",
+                if as_delay { "delay" } else { "capacitance" }
+            );
             if apply {
                 set.apply_open_fit(&fit, model);
                 save_cal(file, &set)?;
@@ -840,7 +965,9 @@ fn cal(
         _ => {}
     }
     let standard = Standard::parse(what).with_context(|| {
-        format!("unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit, check or clear")
+        format!(
+            "unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit, check or clear"
+        )
     })?;
 
     // Grid: from the existing file unless this is the first standard.
@@ -873,12 +1000,16 @@ fn cal(
     }
 
     let cfg = SweepConfig::from_frequencies(&set.freqs_hz)?;
-    eprintln!("measuring standard {:?} — make sure it is connected to port 1{}", standard.name(), match standard {
-        Standard::Through => " and port 2",
-        Standard::Isolation => " (loads on both ports)",
-        Standard::LineOpen | Standard::LineShort => " via the line/cable, standard at the far end",
-        _ => "",
-    });
+    eprintln!(
+        "measuring standard {:?} — make sure it is connected to port 1{}",
+        standard.name(),
+        match standard {
+            Standard::Through => " and port 2",
+            Standard::Isolation => " (loads on both ports)",
+            Standard::LineOpen | Standard::LineShort => " via the line/cable, standard at the far end",
+            _ => "",
+        }
+    );
     let mut dev = open(conn)?;
     let sweep = measure(&mut dev, &cfg, &m)?;
     dev.exit_usb_mode()?;
@@ -925,14 +1056,34 @@ fn show_cal(set: &CalibrationSet) -> Result<()> {
     if let Some(n) = &set.note {
         println!("note     : {n}");
     }
-    let have: Vec<_> = Standard::ALL.iter().chain(Standard::LINE.iter()).filter(|s| set.has(**s)).map(|s| s.name()).collect();
-    let missing: Vec<_> = [Standard::Open, Standard::Short, Standard::Load].iter().filter(|s| !set.has(**s)).map(|s| s.name()).collect();
-    println!("measured : {}", if have.is_empty() { "nothing yet".to_string() } else { have.join(", ") });
+    let have: Vec<_> = Standard::ALL
+        .iter()
+        .chain(Standard::LINE.iter())
+        .filter(|s| set.has(**s))
+        .map(|s| s.name())
+        .collect();
+    let missing: Vec<_> = [Standard::Open, Standard::Short, Standard::Load]
+        .iter()
+        .filter(|s| !set.has(**s))
+        .map(|s| s.name())
+        .collect();
+    println!(
+        "measured : {}",
+        if have.is_empty() {
+            "nothing yet".to_string()
+        } else {
+            have.join(", ")
+        }
+    );
     match set.solve() {
         Ok(cal) => {
             println!(
                 "status   : complete for S11{}",
-                if cal.has_through() { " and S21 (through measured)" } else { "; S21 uncorrected until a through is measured" }
+                if cal.has_through() {
+                    " and S21 (through measured)"
+                } else {
+                    "; S21 uncorrected until a through is measured"
+                }
             );
             // Show the error terms at a few points: a feel for the hardware.
             println!("{:>14} {:>12} {:>12} {:>12}", "freq", "|e00| dB", "|e11| dB", "|e10e01| dB");
@@ -956,7 +1107,13 @@ fn show_cal(set: &CalibrationSet) -> Result<()> {
 fn screenshot(dev: &mut LiteVna, out: &Path, big_endian: bool) -> Result<()> {
     eprintln!("requesting screenshot (register 0x{:02X}) …", reg::SCREENSHOT);
     let shot = dev.screenshot()?;
-    eprintln!("{}x{} @ {} bpp, {} bytes", shot.width, shot.height, shot.bits_per_pixel, shot.data.len());
+    eprintln!(
+        "{}x{} @ {} bpp, {} bytes",
+        shot.width,
+        shot.height,
+        shot.bits_per_pixel,
+        shot.data.len()
+    );
     if shot.bits_per_pixel != 16 {
         bail!("only 16-bit RGB565 screenshots are supported, got {} bpp", shot.bits_per_pixel);
     }

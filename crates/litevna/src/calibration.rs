@@ -42,7 +42,13 @@ pub enum Standard {
 
 impl Standard {
     /// The calibration standards proper.
-    pub const ALL: [Standard; 5] = [Standard::Open, Standard::Short, Standard::Load, Standard::Through, Standard::Isolation];
+    pub const ALL: [Standard; 5] = [
+        Standard::Open,
+        Standard::Short,
+        Standard::Load,
+        Standard::Through,
+        Standard::Isolation,
+    ];
     /// Auxiliary measurements used by [`CalibrationSet::fit_open_capacitance`].
     pub const LINE: [Standard; 2] = [Standard::LineOpen, Standard::LineShort];
 
@@ -92,13 +98,22 @@ pub struct StandardModel {
 
 impl StandardModel {
     pub fn ideal_open() -> Self {
-        StandardModel { offset_delay_s: 0.0, termination: Termination::Open { c: [0.0; 4] } }
+        StandardModel {
+            offset_delay_s: 0.0,
+            termination: Termination::Open { c: [0.0; 4] },
+        }
     }
     pub fn ideal_short() -> Self {
-        StandardModel { offset_delay_s: 0.0, termination: Termination::Short { l: [0.0; 4] } }
+        StandardModel {
+            offset_delay_s: 0.0,
+            termination: Termination::Short { l: [0.0; 4] },
+        }
     }
     pub fn ideal_load() -> Self {
-        StandardModel { offset_delay_s: 0.0, termination: Termination::Load { resistance: Z0 } }
+        StandardModel {
+            offset_delay_s: 0.0,
+            termination: Termination::Load { resistance: Z0 },
+        }
     }
 
     /// Actual reflection coefficient of this standard at `f_hz`.
@@ -284,7 +299,10 @@ impl CalibrationSet {
         if sweep.missing_points() > 0 {
             return Err(Error::Calibration(format!("{} points missing in sweep", sweep.missing_points())));
         }
-        *self.slot(standard) = Some(StandardMeasurement { s11: sweep.s11.clone(), s21: sweep.s21.clone() });
+        *self.slot(standard) = Some(StandardMeasurement {
+            s11: sweep.s11.clone(),
+            s21: sweep.s21.clone(),
+        });
         Ok(())
     }
 
@@ -323,9 +341,8 @@ impl CalibrationSet {
                 (self.kit.short.gamma(f), short.s11[i]),
                 (self.kit.load.gamma(f), load.s11[i]),
             ];
-            let (e00, e11, delta) = solve_one_port(&standards).ok_or_else(|| {
-                Error::Calibration(format!("degenerate standards at {} Hz", self.freqs_hz[i]))
-            })?;
+            let (e00, e11, delta) =
+                solve_one_port(&standards).ok_or_else(|| Error::Calibration(format!("degenerate standards at {} Hz", self.freqs_hz[i])))?;
             let e10e01 = e00 * e11 - delta;
 
             let e30 = self.isolation.as_ref().map_or(C64::new(0.0, 0.0), |iso| iso.s21[i]);
@@ -334,9 +351,18 @@ impl CalibrationSet {
                 // denominator (1 − e11·S11a) is 1.
                 (thru.s21[i] - e30) / self.kit.through_s21(f)
             });
-            terms.push(ErrorTerms { e00, e11, e10e01, e30, e10e32 });
+            terms.push(ErrorTerms {
+                e00,
+                e11,
+                e10e01,
+                e30,
+                e10e32,
+            });
         }
-        Ok(Calibration { freqs_hz: self.freqs_hz.clone(), terms })
+        Ok(Calibration {
+            freqs_hz: self.freqs_hz.clone(),
+            terms,
+        })
     }
 }
 
@@ -626,9 +652,7 @@ pub fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<S
         Standard::Through if s21_db < -6.0 => Some(format!(
             "median raw |S21| is {s21_db:.1} dB; a through should pass nearly everything. Cable connected to port 2?"
         )),
-        Standard::Isolation if s21_db > -40.0 => Some(format!(
-            "median raw |S21| is {s21_db:.1} dB; isolation needs loads on both ports."
-        )),
+        Standard::Isolation if s21_db > -40.0 => Some(format!("median raw |S21| is {s21_db:.1} dB; isolation needs loads on both ports.")),
         Standard::LineOpen | Standard::LineShort if s11_db < -6.0 => Some(format!(
             "median raw |S11| is {s11_db:.1} dB; the far-end {} should still reflect most of the signal.",
             if standard == Standard::LineOpen { "open" } else { "short" }
@@ -759,8 +783,16 @@ impl CalibrationSet {
             .ok_or_else(|| Error::Calibration("no far-end reflection found on the line-short".into()))?;
         let far_s = t.time_s[far_bin];
         let res = t.resolution_s;
-        let near = Gate { start_s: -2.5 * res, stop_s: (far_s / 3.0).min(10.0 * res), kind: GateKind::BandPass };
-        let far = Gate { start_s: far_s - 8.0 * res, stop_s: far_s + 8.0 * res, kind: GateKind::BandPass };
+        let near = Gate {
+            start_s: -2.5 * res,
+            stop_s: (far_s / 3.0).min(10.0 * res),
+            kind: GateKind::BandPass,
+        };
+        let far = Gate {
+            start_s: far_s - 8.0 * res,
+            stop_s: far_s + 8.0 * res,
+            kind: GateKind::BandPass,
+        };
         let (xo, xs) = (gate(&self.freqs_hz, &lo, &cfg, &near)?, gate(&self.freqs_hz, &ls, &cfg, &near)?);
         let (go, gs) = (gate(&self.freqs_hz, &lo, &cfg, &far)?, gate(&self.freqs_hz, &ls, &cfg, &far)?);
         let edge_hz = xo.edge_hz.max(go.edge_hz);
@@ -779,8 +811,17 @@ impl CalibrationSet {
         }
         while lo_f + band_hz / 2.0 < f_last {
             let hi_f = (lo_f + band_hz).min(f_last);
-            let mag: Vec<f64> = f.iter().zip(&near_end).filter(|(x, _)| **x >= lo_f && **x <= hi_f).map(|(_, c)| c.norm()).collect();
-            let near_mag = if mag.is_empty() { 0.0 } else { mag.iter().sum::<f64>() / mag.len() as f64 };
+            let mag: Vec<f64> = f
+                .iter()
+                .zip(&near_end)
+                .filter(|(x, _)| **x >= lo_f && **x <= hi_f)
+                .map(|(_, c)| c.norm())
+                .collect();
+            let near_mag = if mag.is_empty() {
+                0.0
+            } else {
+                mag.iter().sum::<f64>() / mag.len() as f64
+            };
             bands.push(LineBand {
                 f_lo_hz: lo_f,
                 f_hi_hz: hi_f,
@@ -820,7 +861,14 @@ impl CalibrationSet {
         }
         let k = if sxx > 0.0 { sxy / sxx } else { 0.0 };
 
-        Ok(LineCheck { bands, far_end_s: far_s, near_end, near_end_open_short_rms, gated_refit_delta_c_farad: k / Z0, edge_hz })
+        Ok(LineCheck {
+            bands,
+            far_end_s: far_s,
+            near_end,
+            near_end_open_short_rms,
+            gated_refit_delta_c_farad: k / Z0,
+            edge_hz,
+        })
     }
 }
 
@@ -841,7 +889,11 @@ fn solve_one_port(standards: &[(C64, C64); 3]) -> Option<(C64, C64, C64)> {
         }
         m
     };
-    let base = [[rows[0][0], rows[0][1], rows[0][2]], [rows[1][0], rows[1][1], rows[1][2]], [rows[2][0], rows[2][1], rows[2][2]]];
+    let base = [
+        [rows[0][0], rows[0][1], rows[0][2]],
+        [rows[1][0], rows[1][1], rows[1][2]],
+        [rows[2][0], rows[2][1], rows[2][2]],
+    ];
     let d = det3(base);
     if d.norm() < 1e-30 {
         return None;
@@ -927,7 +979,10 @@ mod tests {
         let freqs: Vec<u64> = (0..1001).map(|i| 50_000 + i * 6_299_950).collect();
         let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
         let n = freqs.len();
-        let meas = |g: Vec<C64>| StandardMeasurement { s21: vec![C64::new(0.0, 0.0); n], s11: g };
+        let meas = |g: Vec<C64>| StandardMeasurement {
+            s21: vec![C64::new(0.0, 0.0); n],
+            s11: g,
+        };
         set.open = Some(meas(vec![C64::new(1.0, 0.0); n]));
         set.short = Some(meas(vec![C64::new(-1.0, 0.0); n]));
         set.load = Some(meas(vec![C64::new(0.0, 0.0); n]));
@@ -950,7 +1005,12 @@ mod tests {
             assert!((b.near_end_mag - 0.03).abs() < 0.002, "near end {}", b.near_end_mag);
             // imaginary D on a 0.85 line: ripple ≈ 0.03·1.72/√2 = 0.036
             assert!(b.ripple_short > 0.025 && b.ripple_short < 0.045, "ripple {}", b.ripple_short);
-            assert!(b.gated_short < 0.003 && b.gated_open < 0.003, "gated {} {}", b.gated_open, b.gated_short);
+            assert!(
+                b.gated_short < 0.003 && b.gated_open < 0.003,
+                "gated {} {}",
+                b.gated_open,
+                b.gated_short
+            );
         }
         assert!(chk.near_end_open_short_rms < 0.002);
         assert!(chk.gated_refit_delta_c_farad.abs() < 1e-15);
@@ -971,7 +1031,9 @@ mod tests {
         assert!(set1.coarse_low_end_warning(&hf[20..]).is_some());
         // a dense HF calibration is fine
         let dense: Vec<u64> = (0..1001).map(|i| 100_000 + i * 49_900).collect();
-        assert!(CalibrationSet::new(dense, CalKit::ideal()).coarse_low_end_warning(&hf[1..500]).is_none());
+        assert!(CalibrationSet::new(dense, CalKit::ideal())
+            .coarse_low_end_warning(&hf[1..500])
+            .is_none());
     }
     use std::time::Duration;
 
@@ -1066,7 +1128,9 @@ mod tests {
     fn roundtrip_non_ideal_kit() {
         let mut kit = CalKit::ideal();
         kit.name = "test kit".into();
-        kit.open.termination = Termination::Open { c: [50e-15, 0.0, 0.0, 0.0] };
+        kit.open.termination = Termination::Open {
+            c: [50e-15, 0.0, 0.0, 0.0],
+        };
         kit.open.offset_delay_s = 30e-12;
         kit.short.termination = Termination::Short { l: [2e-12, 0.0, 0.0, 0.0] };
         kit.short.offset_delay_s = 30e-12;
@@ -1077,17 +1141,32 @@ mod tests {
 
     #[test]
     fn standard_models_behave() {
-        let open = StandardModel { offset_delay_s: 0.0, termination: Termination::Open { c: [50e-15, 0.0, 0.0, 0.0] } };
+        let open = StandardModel {
+            offset_delay_s: 0.0,
+            termination: Termination::Open {
+                c: [50e-15, 0.0, 0.0, 0.0],
+            },
+        };
         let g = open.gamma(1e9);
         assert!((g.norm() - 1.0).abs() < 1e-12);
-        assert!(g.arg() < 0.0 && g.arg() > -0.1, "open with C rotates slightly clockwise: {}", g.arg());
-        let short = StandardModel { offset_delay_s: 0.0, termination: Termination::Short { l: [1e-9, 0.0, 0.0, 0.0] } };
+        assert!(
+            g.arg() < 0.0 && g.arg() > -0.1,
+            "open with C rotates slightly clockwise: {}",
+            g.arg()
+        );
+        let short = StandardModel {
+            offset_delay_s: 0.0,
+            termination: Termination::Short { l: [1e-9, 0.0, 0.0, 0.0] },
+        };
         let g = short.gamma(1e9);
         assert!((g.norm() - 1.0).abs() < 1e-12 && g.re < 0.0);
         let load = StandardModel::ideal_load();
         assert!(load.gamma(1e9).norm() < 1e-15);
         // 30 ps one-way offset at 1 GHz: round trip 2·2π·1e9·30e-12 ≈ 0.377 rad
-        let delayed = StandardModel { offset_delay_s: 30e-12, termination: Termination::Open { c: [0.0; 4] } };
+        let delayed = StandardModel {
+            offset_delay_s: 30e-12,
+            termination: Termination::Open { c: [0.0; 4] },
+        };
         assert!((delayed.gamma(1e9).arg() + 0.37699).abs() < 1e-4);
     }
 
@@ -1224,13 +1303,22 @@ mod tests {
     fn json_roundtrip_and_missing_standard() {
         let freqs = vec![1_000_000, 2_000_000];
         let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
-        set.set(Standard::Open, &sweep_from(&freqs, vec![C64::new(1.0, 0.0); 2], vec![C64::new(0.0, 0.0); 2])).unwrap();
+        set.set(
+            Standard::Open,
+            &sweep_from(&freqs, vec![C64::new(1.0, 0.0); 2], vec![C64::new(0.0, 0.0); 2]),
+        )
+        .unwrap();
         let json = set.to_json().unwrap();
         let back = CalibrationSet::from_json(&json).unwrap();
         assert_eq!(back, set);
         let err = back.solve().unwrap_err().to_string();
         assert!(err.contains("short") && err.contains("load"), "{err}");
         // wrong grid rejected
-        assert!(set.set(Standard::Short, &sweep_from(&[1, 2], vec![C64::new(0.0, 0.0); 2], vec![C64::new(0.0, 0.0); 2])).is_err());
+        assert!(set
+            .set(
+                Standard::Short,
+                &sweep_from(&[1, 2], vec![C64::new(0.0, 0.0); 2], vec![C64::new(0.0, 0.0); 2])
+            )
+            .is_err());
     }
 }

@@ -172,10 +172,7 @@ pub struct FifoPoint {
 impl FifoPoint {
     pub fn parse(record: &[u8]) -> crate::Result<Self> {
         if record.len() < FIFO_POINT_SIZE {
-            return Err(crate::Error::protocol(format!(
-                "FIFO record too short: {} bytes",
-                record.len()
-            )));
+            return Err(crate::Error::protocol(format!("FIFO record too short: {} bytes", record.len())));
         }
         let i32_at = |o: usize| i32::from_le_bytes([record[o], record[o + 1], record[o + 2], record[o + 3]]);
         let checksum = record[0x1F];

@@ -75,7 +75,11 @@ pub struct TdrConfig {
 
 impl Default for TdrConfig {
     fn default() -> Self {
-        TdrConfig { window: Window::Hann, velocity_factor: 0.70, fft_size: 0 }
+        TdrConfig {
+            window: Window::Hann,
+            velocity_factor: 0.70,
+            fft_size: 0,
+        }
     }
 }
 
@@ -135,7 +139,15 @@ impl TdrResult {
 
 /// Compute the TDR views of `s11` measured on the uniform grid `freqs_hz`.
 pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrResult> {
-    let Grid { n, df, f0, fmax, span, m, nfft } = check_grid(freqs_hz, s11, cfg)?;
+    let Grid {
+        n,
+        df,
+        f0,
+        fmax,
+        span,
+        m,
+        nfft,
+    } = check_grid(freqs_hz, s11, cfg)?;
 
     let mut planner = FftPlanner::<f64>::new();
     let ifft = planner.plan_fft_inverse(nfft);
@@ -244,8 +256,20 @@ fn check_grid(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<Gr
     let fmax = *freqs_hz.last().unwrap() as f64;
     // Harmonic grid k·Δf, k = 0..=m, covering the measured band.
     let m = (fmax / df).round() as usize;
-    let nfft = if cfg.fft_size > 0 { cfg.fft_size.max(2 * m + 2) } else { (8 * (m + 1)).next_power_of_two() };
-    Ok(Grid { n, df, f0, fmax, span: fmax - f0, m, nfft })
+    let nfft = if cfg.fft_size > 0 {
+        cfg.fft_size.max(2 * m + 2)
+    } else {
+        (8 * (m + 1)).next_power_of_two()
+    };
+    Ok(Grid {
+        n,
+        df,
+        f0,
+        fmax,
+        span: fmax - f0,
+        m,
+        nfft,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +379,11 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
         rise(t - g.start_s) * (1.0 - rise(t - g.stop_s))
     };
     for (j, c) in buf.iter_mut().enumerate() {
-        let t = if j < nfft / 2 { j as f64 * dt } else { (j as f64 - nfft as f64) * dt };
+        let t = if j < nfft / 2 {
+            j as f64 * dt
+        } else {
+            (j as f64 - nfft as f64) * dt
+        };
         let keep = match g.kind {
             GateKind::BandPass => shape(t),
             GateKind::Notch => 1.0 - shape(t),
@@ -376,7 +404,11 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
             buf[k] * scale / w.max(GATE_WINDOW_FLOOR)
         })
         .collect();
-    Ok(GatedResult { s11: s11g, edge_hz: 1.0 / (g.stop_s - g.start_s), clamped_points: clamped / 2 })
+    Ok(GatedResult {
+        s11: s11g,
+        edge_hz: 1.0 / (g.stop_s - g.start_s),
+        clamped_points: clamped / 2,
+    })
 }
 
 fn extrapolate_dc(freqs_hz: &[u64], s11: &[Complex64]) -> f64 {
@@ -386,7 +418,11 @@ fn extrapolate_dc(freqs_hz: &[u64], s11: &[Complex64]) -> f64 {
     let mx = xs.iter().sum::<f64>() / k as f64;
     let my = ys.iter().sum::<f64>() / k as f64;
     let sxx: f64 = xs.iter().map(|x| (x - mx).powi(2)).sum();
-    let slope = if sxx > 0.0 { xs.iter().zip(&ys).map(|(x, y)| (x - mx) * (y - my)).sum::<f64>() / sxx } else { 0.0 };
+    let slope = if sxx > 0.0 {
+        xs.iter().zip(&ys).map(|(x, y)| (x - mx) * (y - my)).sum::<f64>() / sxx
+    } else {
+        0.0
+    };
     (my - slope * mx).clamp(-1.0, 1.0)
 }
 
@@ -414,7 +450,11 @@ mod tests {
     fn gate_isolates_the_far_reflection() {
         let (freqs, s11, tau) = two_reflections();
         let cfg = TdrConfig::default();
-        let g = Gate { start_s: tau - 3e-9, stop_s: tau + 3e-9, kind: GateKind::BandPass };
+        let g = Gate {
+            start_s: tau - 3e-9,
+            stop_s: tau + 3e-9,
+            kind: GateKind::BandPass,
+        };
         let out = gate(&freqs, &s11, &cfg, &g).unwrap();
         assert_eq!(out.s11.len(), freqs.len());
         // mid-band (away from the edges by more than edge_hz) only the short remains
@@ -436,7 +476,11 @@ mod tests {
         let (freqs, s11, tau) = two_reflections();
         let cfg = TdrConfig::default();
         // notch around t = 0: removes the 0.05, keeps the short
-        let g = Gate { start_s: -3e-9, stop_s: 3e-9, kind: GateKind::Notch };
+        let g = Gate {
+            start_s: -3e-9,
+            stop_s: 3e-9,
+            kind: GateKind::Notch,
+        };
         let out = gate(&freqs, &s11, &cfg, &g).unwrap();
         let (mut worst, mut count) = (0.0f64, 0);
         for (i, &f) in freqs.iter().enumerate() {
@@ -450,7 +494,11 @@ mod tests {
         }
         assert!(count > 300 && worst < 0.02, "worst {worst}");
         // band pass around t = 0 keeps only the 0.05
-        let g = Gate { start_s: -3e-9, stop_s: 3e-9, kind: GateKind::BandPass };
+        let g = Gate {
+            start_s: -3e-9,
+            stop_s: 3e-9,
+            kind: GateKind::BandPass,
+        };
         let out = gate(&freqs, &s11, &cfg, &g).unwrap();
         for (i, &f) in freqs.iter().enumerate() {
             if (300e6..=700e6).contains(&(f as f64)) {
@@ -463,13 +511,36 @@ mod tests {
     fn gate_rejects_bad_windows() {
         let (freqs, s11, _) = two_reflections();
         let cfg = TdrConfig::default();
-        assert!(gate(&freqs, &s11, &cfg, &Gate { start_s: 5e-9, stop_s: 5e-9, kind: GateKind::BandPass }).is_err());
-        assert!(gate(&freqs, &s11, &cfg, &Gate { start_s: 0.0, stop_s: 1.0, kind: GateKind::BandPass }).is_err());
+        assert!(gate(
+            &freqs,
+            &s11,
+            &cfg,
+            &Gate {
+                start_s: 5e-9,
+                stop_s: 5e-9,
+                kind: GateKind::BandPass
+            }
+        )
+        .is_err());
+        assert!(gate(
+            &freqs,
+            &s11,
+            &cfg,
+            &Gate {
+                start_s: 0.0,
+                stop_s: 1.0,
+                kind: GateKind::BandPass
+            }
+        )
+        .is_err());
     }
 
     /// S11 of a lossless line of one-way delay `tau` terminated in `gamma_load`.
     fn line(freqs: &[u64], tau: f64, gamma_load: Complex64) -> Vec<Complex64> {
-        freqs.iter().map(|&f| gamma_load * Complex64::from_polar(1.0, -2.0 * PI * f as f64 * 2.0 * tau)).collect()
+        freqs
+            .iter()
+            .map(|&f| gamma_load * Complex64::from_polar(1.0, -2.0 * PI * f as f64 * 2.0 * tau))
+            .collect()
     }
 
     fn grid() -> Vec<u64> {
@@ -480,12 +551,19 @@ mod tests {
     fn short_at_known_distance() {
         let freqs = grid();
         let tau = 2.5e-9; // ≈ 52 cm at VF 0.70
-        let cfg = TdrConfig { velocity_factor: 0.70, ..Default::default() };
+        let cfg = TdrConfig {
+            velocity_factor: 0.70,
+            ..Default::default()
+        };
         let r = tdr(&freqs, &line(&freqs, tau, Complex64::new(-1.0, 0.0)), &cfg).unwrap();
         let peaks = r.peaks(1, 10);
         let (bin, mag) = peaks[0];
         let expect_m = tau * C0 * 0.70;
-        assert!((r.distance_m[bin] - expect_m).abs() < 0.01, "peak at {} m, expected {expect_m} m", r.distance_m[bin]);
+        assert!(
+            (r.distance_m[bin] - expect_m).abs() < 0.01,
+            "peak at {} m, expected {expect_m} m",
+            r.distance_m[bin]
+        );
         assert!((mag - 1.0).abs() < 0.05, "peak magnitude {mag}");
         // step goes to -1 (short) just after the reflection, impedance ≈ 0
         let after = bin + (0.3e-9 / (r.time_s[1] - r.time_s[0])) as usize;

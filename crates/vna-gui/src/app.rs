@@ -121,7 +121,11 @@ impl Default for Settings {
 enum Connection {
     Disconnected,
     Connecting(String),
-    Connected { port: String, info: DeviceInfo, battery_mv: Option<u16> },
+    Connected {
+        port: String,
+        info: DeviceInfo,
+        battery_mv: Option<u16>,
+    },
 }
 
 #[derive(Default)]
@@ -146,7 +150,11 @@ struct CalState {
 
 impl CalState {
     fn fit_model(&self) -> OpenModel {
-        if self.fit_as_delay { OpenModel::Delay } else { OpenModel::Capacitance }
+        if self.fit_as_delay {
+            OpenModel::Delay
+        } else {
+            OpenModel::Capacitance
+        }
     }
 }
 
@@ -300,7 +308,10 @@ impl App {
             seg_cals: HashMap::new(),
             seg_calibrated: Vec::new(),
             sweep_count: 0,
-            cal: CalState { apply: true, ..Default::default() },
+            cal: CalState {
+                apply: true,
+                ..Default::default()
+            },
             markers: [None; MARKERS],
             active_marker: 0,
             pending_marker_freqs: None,
@@ -406,7 +417,11 @@ impl App {
             marker_freqs,
             fit_f_min: self.cal.fit_f_min.clone(),
             fit_as_delay: self.cal.fit_as_delay,
-            plot_kinds: [self.plot_kinds[0].id().into(), self.plot_kinds[1].id().into(), self.plot_kinds[2].id().into()],
+            plot_kinds: [
+                self.plot_kinds[0].id().into(),
+                self.plot_kinds[1].id().into(),
+                self.plot_kinds[2].id().into(),
+            ],
             gd_aperture: self.gd_aperture,
             gate_on: self.gate_on,
             gate_start_m: self.gate_start_m,
@@ -488,7 +503,11 @@ impl App {
             self.running = continuous;
             self.sent_plan_cals = plan.iter().map(|(_, c)| c.clone()).collect();
             let cfgs = plan.into_iter().map(|(c, _)| c).collect();
-            self.send(Cmd::Sweep { cfgs, purpose: Purpose::Display, continuous });
+            self.send(Cmd::Sweep {
+                cfgs,
+                purpose: Purpose::Display,
+                continuous,
+            });
         }
     }
 
@@ -512,7 +531,10 @@ impl App {
     fn seg_correct(&mut self, path: &Path, part: &SweepResult) -> SweepResult {
         let entry = self.seg_cals.entry(path.to_path_buf()).or_default();
         if entry.set.is_none() && entry.error.is_none() {
-            match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
+            match std::fs::read_to_string(path)
+                .map_err(|e| e.to_string())
+                .and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string()))
+            {
                 Ok(set) => entry.set = Some(set),
                 Err(e) => entry.error = Some(format!("{}: {e}", path.display())),
             }
@@ -523,7 +545,9 @@ impl App {
             match set.solve_for(&part.freqs_hz) {
                 Ok(cal) => {
                     entry.solved = Some((part.freqs_hz.clone(), cal));
-                    entry.error = set.coarse_low_end_warning(&part.freqs_hz).map(|w| format!("{}: {w}", path.display()));
+                    entry.error = set
+                        .coarse_low_end_warning(&part.freqs_hz)
+                        .map(|w| format!("{}: {w}", path.display()));
                 }
                 Err(e) => {
                     entry.solved = None;
@@ -581,7 +605,11 @@ impl App {
                 }
                 Event::SweepDone { cfgs, result, purpose } => match purpose {
                     Purpose::Display => {
-                        self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() { self.sent_plan_cals.clone() } else { vec![None; cfgs.len()] };
+                        self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() {
+                            self.sent_plan_cals.clone()
+                        } else {
+                            vec![None; cfgs.len()]
+                        };
                         self.last_plan = cfgs;
                         self.file_trace = None;
                         self.sweep_count += 1;
@@ -636,9 +664,20 @@ impl App {
         }
         let range = self.tdr_range();
         let sweep = self.shown.as_ref()?;
-        let key = GateKey { shown_rev: self.shown_rev, vf: self.tdr_vf, window: self.tdr_window, start_m: self.gate_start_m, stop_m: self.gate_stop_m, notch: self.gate_notch };
+        let key = GateKey {
+            shown_rev: self.shown_rev,
+            vf: self.tdr_vf,
+            window: self.tdr_window,
+            start_m: self.gate_start_m,
+            stop_m: self.gate_stop_m,
+            notch: self.gate_notch,
+        };
         if !matches!(&self.gated_cache, Some((k, _, _)) if *k == key) {
-            let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
+            let cfg = TdrConfig {
+                window: self.tdr_window,
+                velocity_factor: self.tdr_vf,
+                fft_size: 0,
+            };
             let g = Gate {
                 start_s: self.gate_time(self.gate_start_m),
                 stop_s: self.gate_time(self.gate_stop_m),
@@ -673,7 +712,8 @@ impl App {
 
     fn gate_tag(&self, ui: &mut egui::Ui) {
         if self.gate_on && self.gated_cache.is_some() {
-            ui.label(RichText::new("GATED").color(GATE_COLOR).strong()).on_hover_text("S11 is time-gated; see the TDR panel");
+            ui.label(RichText::new("GATED").color(GATE_COLOR).strong())
+                .on_hover_text("S11 is time-gated; see the TDR panel");
         }
     }
 
@@ -712,7 +752,8 @@ impl App {
             return raw.clone();
         }
         let ranges = SweepResult::segment_ranges(&self.last_plan);
-        let segmented = ranges.len() > 1 && ranges.last().map_or(0, |r| r.end) == raw.freqs_hz.len() && self.last_plan_cals.len() == ranges.len();
+        let segmented =
+            ranges.len() > 1 && ranges.last().map_or(0, |r| r.end) == raw.freqs_hz.len() && self.last_plan_cals.len() == ranges.len();
         if !segmented {
             return match self.cal.calibration_for(&raw.freqs_hz) {
                 Some(cal) => {
@@ -789,15 +830,23 @@ impl App {
             let connected = self.connected();
             ui.add_enabled_ui(!connected, |ui| {
                 let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
-                egui::ComboBox::from_id_salt("port").selected_text(selected_text).width(260.0).show_ui(ui, |ui| {
-                    for p in &self.ports {
-                        let label = match &p.usb {
-                            Some(u) => format!("{} {} {}", if p.looks_like_vna() { "★" } else { " " }, p.path, u.product.clone().unwrap_or_default()),
-                            None => format!("  {}", p.path),
-                        };
-                        ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
-                    }
-                });
+                egui::ComboBox::from_id_salt("port")
+                    .selected_text(selected_text)
+                    .width(260.0)
+                    .show_ui(ui, |ui| {
+                        for p in &self.ports {
+                            let label = match &p.usb {
+                                Some(u) => format!(
+                                    "{} {} {}",
+                                    if p.looks_like_vna() { "★" } else { " " },
+                                    p.path,
+                                    u.product.clone().unwrap_or_default()
+                                ),
+                                None => format!("  {}", p.path),
+                            };
+                            ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
+                        }
+                    });
                 if ui.button("⟳").on_hover_text("rescan ports").clicked() {
                     self.refresh_ports();
                 }
@@ -1067,8 +1116,16 @@ impl App {
                     format_hz(set.freqs_hz[0]),
                     format_hz(*set.freqs_hz.last().unwrap())
                 ));
-                let have: Vec<_> = Standard::ALL.iter().chain(Standard::LINE.iter()).filter(|s| set.has(**s)).map(|s| s.name()).collect();
-                ui.label(format!("measured: {}", if have.is_empty() { "—".to_string() } else { have.join(", ") }));
+                let have: Vec<_> = Standard::ALL
+                    .iter()
+                    .chain(Standard::LINE.iter())
+                    .filter(|s| set.has(**s))
+                    .map(|s| s.name())
+                    .collect();
+                ui.label(format!(
+                    "measured: {}",
+                    if have.is_empty() { "—".to_string() } else { have.join(", ") }
+                ));
                 ui.label(format!(
                     "kit: {} (open C0 {:.1} fF, delay {:.2} ps)",
                     set.kit.name,
@@ -1202,7 +1259,11 @@ impl App {
             format_hz(*sweep.freqs_hz.last().unwrap()).replace(' ', ""),
             if self.is_calibrated() { "" } else { " raw" }
         );
-        self.references.push(Reference { name, sweep, visible: true });
+        self.references.push(Reference {
+            name,
+            sweep,
+            visible: true,
+        });
     }
 
     fn references_panel(&mut self, ui: &mut egui::Ui) {
@@ -1216,9 +1277,17 @@ impl App {
             let color = REF_COLORS[k % REF_COLORS.len()];
             ui.horizontal(|ui| {
                 ui.checkbox(&mut self.references[k].visible, "");
-                ui.add(egui::TextEdit::singleline(&mut self.references[k].name).desired_width(120.0).text_color(color));
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.references[k].name)
+                        .desired_width(120.0)
+                        .text_color(color),
+                );
                 let is_diff = self.diff_ref == Some(k);
-                if ui.selectable_label(is_diff, "Δ").on_hover_text("show live − this reference (dB / degrees) in log mag and phase plots").clicked() {
+                if ui
+                    .selectable_label(is_diff, "Δ")
+                    .on_hover_text("show live − this reference (dB / degrees) in log mag and phase plots")
+                    .clicked()
+                {
                     self.diff_ref = if is_diff { None } else { Some(k) };
                 }
                 if ui.small_button("✕").clicked() {
@@ -1241,11 +1310,22 @@ impl App {
         ui.horizontal_wrapped(|ui| {
             for &std in standards {
                 let pending = self.cal.pending == Some(std);
-                let label = if pending { format!("{}…", std.name()) } else { std.name().to_string() };
-                if ui.add_enabled(connected && self.cal.pending.is_none(), egui::Button::new(label)).clicked() {
+                let label = if pending {
+                    format!("{}…", std.name())
+                } else {
+                    std.name().to_string()
+                };
+                if ui
+                    .add_enabled(connected && self.cal.pending.is_none(), egui::Button::new(label))
+                    .clicked()
+                {
                     if let Some(cfg) = self.current_config() {
                         self.cal.pending = Some(std);
-                        self.send(Cmd::Sweep { cfgs: vec![cfg], purpose: Purpose::Standard(std), continuous: false });
+                        self.send(Cmd::Sweep {
+                            cfgs: vec![cfg],
+                            purpose: Purpose::Standard(std),
+                            continuous: false,
+                        });
                     }
                 }
             }
@@ -1255,7 +1335,11 @@ impl App {
     /// Kit fit from line-open / line-short measurements (see docs/03-calibratie.md §8).
     fn kit_fit_panel(&mut self, ui: &mut egui::Ui) {
         let connected = self.connected();
-        let have_lines = self.cal.set.as_ref().map_or(false, |s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
+        let have_lines = self
+            .cal
+            .set
+            .as_ref()
+            .map_or(false, |s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
         let solvable = self.cal.set.as_ref().map_or(false, |s| s.solve().is_ok());
         ui.small("With open, short and load done: put a cable (≥ 50 cm) on port 1 and measure it with an open and a short at the far end. The ripple difference gives the open/short asymmetry of the kit.");
         self.standard_buttons(ui, &Standard::LINE, connected);
@@ -1340,7 +1424,11 @@ impl App {
         let Some(set) = &mut self.cal.set else { return };
         set.apply_open_fit(&fit, model);
         self.cal.solved = None;
-        self.cal.message = Some(format!("kit updated: open C0 {:.1} fF, delay {:.2} ps — save to keep it", set.kit.open_c0() * 1e15, set.kit.open.offset_delay_s * 1e12));
+        self.cal.message = Some(format!(
+            "kit updated: open C0 {:.1} fF, delay {:.2} ps — save to keep it",
+            set.kit.open_c0() * 1e15,
+            set.kit.open.offset_delay_s * 1e12
+        ));
         if let Some(raw) = self.raw.clone() {
             let corrected = self.corrected(&raw);
             self.set_shown(corrected);
@@ -1348,12 +1436,17 @@ impl App {
     }
 
     fn load_cal(&mut self) {
-        let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() else { return };
+        let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() else {
+            return;
+        };
         self.load_cal_from(&path);
     }
 
     fn load_cal_from(&mut self, path: &Path) {
-        match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
+        match std::fs::read_to_string(path)
+            .map_err(|e| e.to_string())
+            .and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string()))
+        {
             Ok(set) => {
                 self.cal.set = Some(set);
                 self.cal.file = Some(path.to_path_buf());
@@ -1372,8 +1465,18 @@ impl App {
 
     fn save_cal(&mut self) {
         let Some(set) = &self.cal.set else { return };
-        let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).set_file_name("litevna.cal.json").save_file() else { return };
-        match set.to_json().map_err(|e| e.to_string()).and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string())) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("calibration", &["json"])
+            .set_file_name("litevna.cal.json")
+            .save_file()
+        else {
+            return;
+        };
+        match set
+            .to_json()
+            .map_err(|e| e.to_string())
+            .and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string()))
+        {
             Ok(()) => {
                 self.cal.file = Some(path);
                 self.cal.message = Some("saved".into());
@@ -1383,12 +1486,18 @@ impl App {
     }
 
     fn open_touchstone(&mut self, as_reference: bool) {
-        let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s1p", "s2p"]).pick_file() else { return };
+        let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s1p", "s2p"]).pick_file() else {
+            return;
+        };
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         match read_touchstone_file(&path) {
             Ok(sweep) => {
                 if as_reference {
-                    self.references.push(Reference { name, sweep, visible: true });
+                    self.references.push(Reference {
+                        name,
+                        sweep,
+                        visible: true,
+                    });
                 } else {
                     if self.running {
                         self.stop_sweep();
@@ -1408,16 +1517,33 @@ impl App {
 
     fn save_s2p(&mut self) {
         let Some(sweep) = self.freq_sweep() else { return };
-        let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s2p"]).set_file_name("sweep.s2p").save_file() else { return };
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Touchstone", &["s2p"])
+            .set_file_name("sweep.s2p")
+            .save_file()
+        else {
+            return;
+        };
         let gated = if self.gate_on && self.gated_cache.is_some() {
-            format!(", S11 time-gated {:.2}..{:.2} m {}", self.gate_start_m, self.gate_stop_m, if self.gate_notch { "notch" } else { "band pass" })
+            format!(
+                ", S11 time-gated {:.2}..{:.2} m {}",
+                self.gate_start_m,
+                self.gate_stop_m,
+                if self.gate_notch { "notch" } else { "band pass" }
+            )
         } else {
             String::new()
         };
         let comment = format!(
             "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),
-            if self.is_calibrated() { "host calibrated" } else if self.is_partially_calibrated() { "partly host calibrated (see segments)" } else { "uncalibrated raw" },
+            if self.is_calibrated() {
+                "host calibrated"
+            } else if self.is_partially_calibrated() {
+                "partly host calibrated (see segments)"
+            } else {
+                "uncalibrated raw"
+            },
             gated
         );
         match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
@@ -1452,7 +1578,13 @@ impl App {
         let mhz: Vec<f64> = sweep.freqs_hz.iter().map(|f| *f as f64 / 1e6).collect();
         // Arrow keys nudge the active marker (shift: 10 points).
         let n_pts = sweep.freqs_hz.len();
-        let (left, right, shift) = ui.input(|i| (i.key_pressed(egui::Key::ArrowLeft), i.key_pressed(egui::Key::ArrowRight), i.modifiers.shift));
+        let (left, right, shift) = ui.input(|i| {
+            (
+                i.key_pressed(egui::Key::ArrowLeft),
+                i.key_pressed(egui::Key::ArrowRight),
+                i.modifiers.shift,
+            )
+        });
         if left || right {
             if let Some(i) = self.markers[self.active_marker] {
                 let step = if shift { 10 } else { 1 };
@@ -1484,7 +1616,13 @@ impl App {
                 .filter(|(_, r)| r.visible)
                 .map(|(k, r)| (r.sweep.s11.as_slice(), REF_COLORS[k % REF_COLORS.len()]))
                 .collect();
-            let resp = SmithChart { gamma: &sweep.s11, markers: &marker_points, trace_color: S11_COLOR, extra: &extra }.show(&mut cols[0], Vec2::new(w, h));
+            let resp = SmithChart {
+                gamma: &sweep.s11,
+                markers: &marker_points,
+                trace_color: S11_COLOR,
+                extra: &extra,
+            }
+            .show(&mut cols[0], Vec2::new(w, h));
             if resp.response.clicked() {
                 if let Some(p) = resp.response.interact_pointer_pos() {
                     // nearest trace point on screen
@@ -1513,7 +1651,11 @@ impl App {
 
         if let Some(x) = clicked_x {
             // nearest frequency index
-            let best = mhz.iter().enumerate().map(|(i, f)| (i, (f - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
+            let best = mhz
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (i, (f - x).abs()))
+                .min_by(|a, b| a.1.total_cmp(&b.1));
             self.markers[self.active_marker] = best.map(|(i, _)| i);
         }
     }
@@ -1521,7 +1663,16 @@ impl App {
     /// One selectable plot: a header with the trace-kind combo box, then the
     /// plot itself. Returns the clicked x (MHz) if the user clicked in it.
     #[allow(clippy::too_many_arguments)]
-    fn kind_plot(&mut self, ui: &mut egui::Ui, slot: usize, h: f32, mhz: &[f64], sweep: &SweepResult, marker_lines: &[(f64, Color32)], edge_lines: &[f64]) -> Option<f64> {
+    fn kind_plot(
+        &mut self,
+        ui: &mut egui::Ui,
+        slot: usize,
+        h: f32,
+        mhz: &[f64],
+        sweep: &SweepResult,
+        marker_lines: &[(f64, Color32)],
+        edge_lines: &[f64],
+    ) -> Option<f64> {
         let header_h = 22.0;
         ui.horizontal(|ui| {
             egui::ComboBox::from_id_salt(("plot_kind", slot))
@@ -1538,11 +1689,17 @@ impl App {
         let kind = self.plot_kinds[slot];
         let (lo, hi) = kind.default_range();
         let mut lines: Vec<(String, Vec<f64>, Color32, bool)> = Vec::new();
-        for (param, s, color, show) in [(Param::S11, &sweep.s11, S11_COLOR, self.show_s11), (Param::S21, &sweep.s21, S21_COLOR, self.show_s21)] {
+        for (param, s, color, show) in [
+            (Param::S11, &sweep.s11, S11_COLOR, self.show_s11),
+            (Param::S21, &sweep.s21, S21_COLOR, self.show_s21),
+        ] {
             if !show {
                 continue;
             }
-            for (i, series) in traces::compute(kind, param, &sweep.freqs_hz, s, self.gd_aperture).into_iter().enumerate() {
+            for (i, series) in traces::compute(kind, param, &sweep.freqs_hz, s, self.gd_aperture)
+                .into_iter()
+                .enumerate()
+            {
                 // second series of a pair (X of R+jX) dashed
                 lines.push((series.label, series.values, color, i == 1));
             }
@@ -1569,7 +1726,10 @@ impl App {
             if matches!(kind, TraceKind::LogMag | TraceKind::Phase) {
                 let r = &self.references[k];
                 let (rs11, rs21) = resample_complex(&r.sweep.freqs_hz, &r.sweep.s11, &r.sweep.s21, &sweep.freqs_hz);
-                for (param, live, refv, show) in [(Param::S11, &sweep.s11, &rs11, self.show_s11), (Param::S21, &sweep.s21, &rs21, self.show_s21)] {
+                for (param, live, refv, show) in [
+                    (Param::S11, &sweep.s11, &rs11, self.show_s11),
+                    (Param::S21, &sweep.s21, &rs21, self.show_s21),
+                ] {
                     if !show {
                         continue;
                     }
@@ -1600,7 +1760,11 @@ impl App {
                     pui.line(Line::new(label.clone(), series(x, values.iter().copied())).color(*color).width(1.0));
                 }
                 for (label, values) in &diff_lines {
-                    pui.line(Line::new(label.clone(), series(mhz, values.iter().copied())).color(Color32::from_rgb(255, 120, 120)).style(egui_plot::LineStyle::dotted_dense()));
+                    pui.line(
+                        Line::new(label.clone(), series(mhz, values.iter().copied()))
+                            .color(Color32::from_rgb(255, 120, 120))
+                            .style(egui_plot::LineStyle::dotted_dense()),
+                    );
                 }
                 for (label, values, color, dashed) in &lines {
                     let mut line = Line::new(label.clone(), series(mhz, values.iter().copied())).color(*color);
@@ -1613,7 +1777,11 @@ impl App {
                     pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
                 }
                 for x in edge_lines {
-                    pui.vline(VLine::new("gate edge", *x).color(Color32::from_gray(110)).style(egui_plot::LineStyle::dashed_dense()));
+                    pui.vline(
+                        VLine::new("gate edge", *x)
+                            .color(Color32::from_gray(110))
+                            .style(egui_plot::LineStyle::dashed_dense()),
+                    );
                 }
                 (pui.response().clicked(), pui.pointer_coordinate())
             });
@@ -1628,7 +1796,11 @@ impl App {
         let sweep = self.shown.as_ref()?;
         let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.shown_rev && *vf == self.tdr_vf && *w == self.tdr_window);
         if !fresh {
-            let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
+            let cfg = TdrConfig {
+                window: self.tdr_window,
+                velocity_factor: self.tdr_vf,
+                fft_size: 0,
+            };
             match tdr(&sweep.freqs_hz[range.clone()], &sweep.s11[range], &cfg) {
                 Ok(t) => self.tdr_cache = Some((self.shown_rev, self.tdr_vf, self.tdr_window, t)),
                 Err(e) => {
@@ -1649,7 +1821,11 @@ impl App {
         ui.horizontal(|ui| {
             match self.tdr_marker {
                 Some(i) if i < t.distance_m.len() => {
-                    ui.label(RichText::new(format!("M  {:.3} m  {:.2} ns", t.distance_m[i], t.time_s[i] * 1e9)).strong().color(MARKER_COLOR));
+                    ui.label(
+                        RichText::new(format!("M  {:.3} m  {:.2} ns", t.distance_m[i], t.time_s[i] * 1e9))
+                            .strong()
+                            .color(MARKER_COLOR),
+                    );
                     ui.separator();
                     ui.label(RichText::new(format!("|Γ| {:.1} dB", db(t.impulse_mag[i]))).color(S11_COLOR));
                     ui.label(format!("Z {:.1} Ω", t.impedance_ohm[i]));
@@ -1677,7 +1853,11 @@ impl App {
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
         let limit = self.tdr_max_m.min(t.max_distance_m());
-        let gate_x = if self.gate_on { Some((self.gate_start_m, self.gate_stop_m)) } else { None };
+        let gate_x = if self.gate_on {
+            Some((self.gate_start_m, self.gate_stop_m))
+        } else {
+            None
+        };
         let plot_drag_ok = self.gate_hover.is_none() && self.gate_drag.is_none();
         self.gate_hover = None;
         let mut gate_events: Vec<GateEvent> = Vec::new();
@@ -1748,7 +1928,11 @@ impl App {
             }
         }
         if let Some(x) = clicked_x {
-            let best = dist.iter().enumerate().map(|(i, d)| (i, (d - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
+            let best = dist
+                .iter()
+                .enumerate()
+                .map(|(i, d)| (i, (d - x).abs()))
+                .min_by(|a, b| a.1.total_cmp(&b.1));
             self.tdr_marker = best.map(|(i, _)| i);
         }
     }
@@ -1772,14 +1956,25 @@ impl App {
                 self.markers = [None; MARKERS];
             }
             ui.separator();
-            if ui.add_enabled(self.shown.is_some() && self.references.len() < MAX_REFS, egui::Button::new("Hold").small()).on_hover_text("keep the current trace as a reference (see Traces)").clicked() {
+            if ui
+                .add_enabled(
+                    self.shown.is_some() && self.references.len() < MAX_REFS,
+                    egui::Button::new("Hold").small(),
+                )
+                .on_hover_text("keep the current trace as a reference (see Traces)")
+                .clicked()
+            {
                 self.hold_reference();
             }
             ui.separator();
             if let Some(sweep) = self.freq_sweep() {
                 let n = sweep.freqs_hz.len();
                 let argmin = |f: &dyn Fn(usize) -> f64| (0..n).min_by(|a, b| f(*a).total_cmp(&f(*b)));
-                if ui.small_button("min SWR").on_hover_text("move the active marker to the lowest |S11|").clicked() {
+                if ui
+                    .small_button("min SWR")
+                    .on_hover_text("move the active marker to the lowest |S11|")
+                    .clicked()
+                {
                     self.markers[self.active_marker] = argmin(&|i| sweep.s11[i].norm());
                 }
                 if ui.small_button("max S21").clicked() {
@@ -1801,7 +1996,13 @@ impl App {
 
         let Some(sweep_owned) = self.freq_sweep() else { return };
         let sweep = &sweep_owned;
-        let placed: Vec<(usize, usize)> = self.markers.iter().enumerate().filter_map(|(k, m)| m.map(|i| (k, i))).filter(|(_, i)| *i < sweep.freqs_hz.len()).collect();
+        let placed: Vec<(usize, usize)> = self
+            .markers
+            .iter()
+            .enumerate()
+            .filter_map(|(k, m)| m.map(|i| (k, i)))
+            .filter(|(_, i)| *i < sweep.freqs_hz.len())
+            .collect();
         if placed.is_empty() {
             return;
         }
@@ -1848,17 +2049,20 @@ impl App {
         }
         let mut open = self.show_screenshot;
         let mut save = false;
-        egui::Window::new("Device screenshot").open(&mut open).resizable(true).show(ctx, |ui| {
-            if let Some((tex, shot)) = &self.screenshot {
-                ui.horizontal(|ui| {
-                    ui.label(format!("{}×{}", shot.width, shot.height));
-                    if ui.button("Save PNG…").clicked() {
-                        save = true;
-                    }
-                });
-                ui.add(egui::Image::new(tex).max_width(ui.available_width().min(1024.0)));
-            }
-        });
+        egui::Window::new("Device screenshot")
+            .open(&mut open)
+            .resizable(true)
+            .show(ctx, |ui| {
+                if let Some((tex, shot)) = &self.screenshot {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("{}×{}", shot.width, shot.height));
+                        if ui.button("Save PNG…").clicked() {
+                            save = true;
+                        }
+                    });
+                    ui.add(egui::Image::new(tex).max_width(ui.available_width().min(1024.0)));
+                }
+            });
         self.show_screenshot = open;
         if save {
             self.save_screenshot();
@@ -1867,7 +2071,13 @@ impl App {
 
     fn save_screenshot(&mut self) {
         let Some((_, shot)) = &self.screenshot else { return };
-        let Some(path) = rfd::FileDialog::new().add_filter("PNG", &["png"]).set_file_name("litevna.png").save_file() else { return };
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("PNG", &["png"])
+            .set_file_name("litevna.png")
+            .save_file()
+        else {
+            return;
+        };
         let rgb = shot.to_rgb888(true);
         let result = (|| -> anyhow::Result<()> {
             let file = std::io::BufWriter::new(std::fs::File::create(&path)?);
@@ -1898,7 +2108,10 @@ impl eframe::App for App {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
         egui::Panel::top("top").show(ui, |ui| self.top_bar(ui));
-        egui::Panel::left("side").resizable(true).default_size(300.0).show(ui, |ui| self.side_panel(ui));
+        egui::Panel::left("side")
+            .resizable(true)
+            .default_size(300.0)
+            .show(ui, |ui| self.side_panel(ui));
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.screenshot_window(&ctx);
     }
@@ -1932,7 +2145,14 @@ impl GateEvent {
             }
             _ => None,
         };
-        GateEvent { clicked: resp.clicked(), pointer, hover, drag_started: resp.drag_started(), dragged: resp.dragged(), drag_stopped: resp.drag_stopped() }
+        GateEvent {
+            clicked: resp.clicked(),
+            pointer,
+            hover,
+            drag_started: resp.drag_started(),
+            dragged: resp.dragged(),
+            drag_stopped: resp.drag_stopped(),
+        }
     }
 }
 
@@ -1978,10 +2198,14 @@ fn resample_complex(src_f: &[u64], s11: &[Complex64], s21: &[Complex64], dst_f: 
 }
 
 fn nearest_index(freqs: &[u64], f: u64) -> usize {
-    freqs.iter().enumerate().min_by_key(|(_, x)| x.abs_diff(f)).map(|(i, _)| i).unwrap_or(0)
+    freqs
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, x)| x.abs_diff(f))
+        .map(|(i, _)| i)
+        .unwrap_or(0)
 }
 
 fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
     x.iter().zip(y).map(|(x, y)| [*x, y]).collect()
 }
-

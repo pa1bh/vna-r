@@ -46,7 +46,13 @@ impl<'a> SmithChart<'a> {
             let c = to_screen(Complex64::new(r / (1.0 + r), 0.0));
             painter.circle_stroke(c, radius / (1.0 + r) as f32, if r == 1.0 { grid } else { grid_light });
             let label = to_screen(Complex64::new((r - 1.0) / (r + 1.0), 0.0));
-            painter.text(label + Vec2::new(0.0, 8.0), Align2::CENTER_TOP, format!("{r}"), FontId::proportional(10.0), text_color);
+            painter.text(
+                label + Vec2::new(0.0, 8.0),
+                Align2::CENTER_TOP,
+                format!("{r}"),
+                FontId::proportional(10.0),
+                text_color,
+            );
         }
         // Constant-reactance arcs: centre (1, 1/x), radius 1/|x|, clipped to the unit circle.
         for x in [0.2, 0.5, 1.0, 2.0, 5.0] {
@@ -73,7 +79,13 @@ impl<'a> SmithChart<'a> {
                 let z = Complex64::new(0.0, xs);
                 let g = (z - 1.0) / (z + 1.0);
                 let p = to_screen(g * 1.08);
-                painter.text(p, Align2::CENTER_CENTER, format!("{}{x}j", if sign > 0.0 { "+" } else { "−" }), FontId::proportional(10.0), text_color);
+                painter.text(
+                    p,
+                    Align2::CENTER_CENTER,
+                    format!("{}{x}j", if sign > 0.0 { "+" } else { "−" }),
+                    FontId::proportional(10.0),
+                    text_color,
+                );
             }
         }
 
@@ -92,7 +104,13 @@ impl<'a> SmithChart<'a> {
             let p = to_screen(clamp(*m));
             painter.circle_filled(p, 4.5, *color);
             painter.circle_stroke(p, 6.5, Stroke::new(1.5, Color32::WHITE));
-            painter.text(p + Vec2::new(8.0, -8.0), Align2::LEFT_BOTTOM, format!("M{}", k + 1), FontId::proportional(11.0), *color);
+            painter.text(
+                p + Vec2::new(8.0, -8.0),
+                Align2::LEFT_BOTTOM,
+                format!("M{}", k + 1),
+                FontId::proportional(11.0),
+                *color,
+            );
         }
         SmithResponse { response, center, radius }
     }

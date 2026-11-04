@@ -42,7 +42,11 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
                     "MHZ" => unit = 1e6,
                     "GHZ" => unit = 1e9,
                     "S" => {}
-                    "Y" | "Z" | "G" | "H" => return Err(Error::InvalidArgument(format!("Touchstone parameter type {w} not supported (only S)"))),
+                    "Y" | "Z" | "G" | "H" => {
+                        return Err(Error::InvalidArgument(format!(
+                            "Touchstone parameter type {w} not supported (only S)"
+                        )))
+                    }
                     "RI" => format = Format::Ri,
                     "MA" => format = Format::Ma,
                     "DB" => format = Format::Db,
@@ -58,7 +62,9 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
             return Err(Error::InvalidArgument("Touchstone v2 ([Version] keywords) is not supported".into()));
         }
         for t in body.split_whitespace() {
-            let v: f64 = t.parse().map_err(|_| Error::InvalidArgument(format!("line {}: not a number: {t:?}", lineno + 1)))?;
+            let v: f64 = t
+                .parse()
+                .map_err(|_| Error::InvalidArgument(format!("line {}: not a number: {t:?}", lineno + 1)))?;
             tokens.push(v);
         }
     }
@@ -75,12 +81,18 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
             } else if tokens.len() % 3 == 0 {
                 3
             } else {
-                return Err(Error::InvalidArgument(format!("{} values do not form 1-port (3) or 2-port (9) records", tokens.len())));
+                return Err(Error::InvalidArgument(format!(
+                    "{} values do not form 1-port (3) or 2-port (9) records",
+                    tokens.len()
+                )));
             }
         }
     };
     if tokens.len() % per != 0 {
-        return Err(Error::InvalidArgument(format!("{} values do not form records of {per}", tokens.len())));
+        return Err(Error::InvalidArgument(format!(
+            "{} values do not form records of {per}",
+            tokens.len()
+        )));
     }
     let n = tokens.len() / per;
     let mut freqs_hz = Vec::with_capacity(n);
@@ -94,7 +106,11 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
         freqs_hz.push(f.round() as u64);
         s11.push(format.to_complex(rec[1], rec[2]));
         // two-port column order is S11 S21 S12 S22
-        s21.push(if per == 9 { format.to_complex(rec[3], rec[4]) } else { Complex64::new(0.0, 0.0) });
+        s21.push(if per == 9 {
+            format.to_complex(rec[3], rec[4])
+        } else {
+            Complex64::new(0.0, 0.0)
+        });
     }
     if freqs_hz.windows(2).any(|w| w[1] < w[0]) {
         return Err(Error::InvalidArgument("frequencies are not increasing".into()));
@@ -125,7 +141,14 @@ pub fn read_touchstone_file(path: &std::path::Path) -> Result<SweepResult> {
 /// With an ambiguous token count (a multiple of 9 is also a multiple of 3),
 /// prefer the reading whose frequencies increase.
 fn looks_like_two_port(tokens: &[f64]) -> bool {
-    let inc = |step: usize| tokens.chunks(step).map(|c| c[0]).collect::<Vec<_>>().windows(2).all(|w| w[1] > w[0]);
+    let inc = |step: usize| {
+        tokens
+            .chunks(step)
+            .map(|c| c[0])
+            .collect::<Vec<_>>()
+            .windows(2)
+            .all(|w| w[1] > w[0])
+    };
     inc(9) && !inc(3)
 }
 
@@ -221,7 +244,16 @@ mod tests {
         let freqs_hz: Vec<u64> = (1..=5).map(|k| k * 10_000_000).collect();
         let s11: Vec<Complex64> = freqs_hz.iter().map(|&f| Complex64::from_polar(0.3, -(f as f64) * 1e-8)).collect();
         let s21: Vec<Complex64> = freqs_hz.iter().map(|&f| Complex64::from_polar(0.9, -(f as f64) * 3e-8)).collect();
-        SweepResult { points: vec![None; 5], freqs_hz, s11, s21, checksum_ok: 0, checksum_bad: 0, duplicates: 0, elapsed: Duration::ZERO }
+        SweepResult {
+            points: vec![None; 5],
+            freqs_hz,
+            s11,
+            s21,
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        }
     }
 
     #[test]

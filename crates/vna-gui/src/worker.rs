@@ -21,7 +21,11 @@ pub enum Cmd {
     Connect(String),
     Disconnect,
     /// One sweep over these segments (in order), or start sweeping them continuously.
-    Sweep { cfgs: Vec<SweepConfig>, purpose: Purpose, continuous: bool },
+    Sweep {
+        cfgs: Vec<SweepConfig>,
+        purpose: Purpose,
+        continuous: bool,
+    },
     /// Stop continuous sweeping and hand the screen back to the device.
     Stop,
     SetAverage(u8),
@@ -30,10 +34,18 @@ pub enum Cmd {
 
 #[derive(Debug)]
 pub enum Event {
-    Connected { port: String, info: DeviceInfo, battery_mv: Option<u16> },
+    Connected {
+        port: String,
+        info: DeviceInfo,
+        battery_mv: Option<u16>,
+    },
     Disconnected,
     /// `result` is the concatenation of the segments in `cfgs`.
-    SweepDone { cfgs: Vec<SweepConfig>, result: SweepResult, purpose: Purpose },
+    SweepDone {
+        cfgs: Vec<SweepConfig>,
+        result: SweepResult,
+        purpose: Purpose,
+    },
     Screenshot(Screenshot),
     Error(String),
 }
@@ -61,7 +73,12 @@ struct Worker {
 }
 
 fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
-    let mut w = Worker { dev: None, continuous: None, events, ctx };
+    let mut w = Worker {
+        dev: None,
+        continuous: None,
+        events,
+        ctx,
+    };
     loop {
         // Block for a command when idle; only peek when sweeping continuously.
         let cmd = if w.continuous.is_some() {
@@ -183,7 +200,11 @@ impl Worker {
                 }
             }
         }
-        let result = if parts.len() == 1 { parts.pop().unwrap() } else { SweepResult::concat(&parts) };
+        let result = if parts.len() == 1 {
+            parts.pop().unwrap()
+        } else {
+            SweepResult::concat(&parts)
+        };
         self.emit(Event::SweepDone { cfgs, result, purpose });
     }
 }

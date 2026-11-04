@@ -52,7 +52,13 @@ impl SweepConfig {
         if step_hz == 0 {
             return Err(Error::InvalidArgument("span too small for this many points".into()));
         }
-        Ok(SweepConfig { start_hz, step_hz, points, values_per_freq: 1, calibrated: false })
+        Ok(SweepConfig {
+            start_hz,
+            step_hz,
+            points,
+            values_per_freq: 1,
+            calibrated: false,
+        })
     }
 
     /// Rebuild a config from a uniformly spaced frequency list (e.g. from a
@@ -61,15 +67,22 @@ impl SweepConfig {
         if freqs.len() < 2 || freqs.len() > u16::MAX as usize {
             return Err(Error::InvalidArgument(format!("{} frequencies: need 2..=65535", freqs.len())));
         }
-        let step = freqs[1].checked_sub(freqs[0]).filter(|s| *s > 0).ok_or_else(|| {
-            Error::InvalidArgument("frequencies must be strictly increasing".into())
-        })?;
+        let step = freqs[1]
+            .checked_sub(freqs[0])
+            .filter(|s| *s > 0)
+            .ok_or_else(|| Error::InvalidArgument("frequencies must be strictly increasing".into()))?;
         for w in freqs.windows(2) {
             if w[1].wrapping_sub(w[0]) != step {
                 return Err(Error::InvalidArgument("frequencies are not uniformly spaced".into()));
             }
         }
-        Ok(SweepConfig { start_hz: freqs[0], step_hz: step, points: freqs.len() as u16, values_per_freq: 1, calibrated: false })
+        Ok(SweepConfig {
+            start_hz: freqs[0],
+            step_hz: step,
+            points: freqs.len() as u16,
+            values_per_freq: 1,
+            calibrated: false,
+        })
     }
 
     pub fn stop_hz(&self) -> u64 {
@@ -156,7 +169,12 @@ impl SweepResult {
     }
 
     pub fn missing_indexes(&self) -> Vec<usize> {
-        self.points.iter().enumerate().filter(|(_, p)| p.is_none()).map(|(i, _)| i).collect()
+        self.points
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.is_none())
+            .map(|(i, _)| i)
+            .collect()
     }
 }
 
@@ -216,7 +234,12 @@ impl LiteVna {
     pub fn open(path: &str) -> Result<Self> {
         // Baud rate is meaningless for USB CDC but must be set.
         let port = serialport::new(path, 115_200).timeout(Duration::from_millis(250)).open()?;
-        let mut dev = LiteVna { port, trace: false, release_on_drop: true, configured: None };
+        let mut dev = LiteVna {
+            port,
+            trace: false,
+            release_on_drop: true,
+            configured: None,
+        };
         dev.reset_protocol()?;
         Ok(dev)
     }
@@ -242,7 +265,10 @@ impl LiteVna {
                 if self.trace && filled > 0 {
                     eprintln!("rx (partial): {}", hex(&buf[..filled]));
                 }
-                return Err(Error::Timeout { expected: buf.len(), got: filled });
+                return Err(Error::Timeout {
+                    expected: buf.len(),
+                    got: filled,
+                });
             }
             let slice = (deadline - now).min(Duration::from_millis(250));
             self.port.set_timeout(slice)?;
@@ -530,7 +556,12 @@ impl LiteVna {
         let size = width as usize * height as usize * (bpp as usize / 8);
         let mut data = vec![0u8; size];
         self.recv_exact(&mut data, Duration::from_secs(30))?;
-        Ok(Screenshot { width, height, bits_per_pixel: bpp, data })
+        Ok(Screenshot {
+            width,
+            height,
+            bits_per_pixel: bpp,
+            data,
+        })
     }
 
     /// Opcode constants re-exported for callers that want to poke registers by hand.
@@ -553,7 +584,6 @@ impl Drop for LiteVna {
         }
     }
 }
-
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")

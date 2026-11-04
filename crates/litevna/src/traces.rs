@@ -214,12 +214,21 @@ pub fn compute(kind: TraceKind, param: Param, freqs_hz: &[u64], s: &[C64], apert
         TraceKind::Impedance => {
             let z: Vec<C64> = s.iter().map(|c| impedance(*c)).collect();
             vec![
-                TraceSeries { label: "R".into(), values: z.iter().map(|z| clamp(z.re)).collect() },
-                TraceSeries { label: "X".into(), values: z.iter().map(|z| clamp(z.im)).collect() },
+                TraceSeries {
+                    label: "R".into(),
+                    values: z.iter().map(|z| clamp(z.re)).collect(),
+                },
+                TraceSeries {
+                    label: "X".into(),
+                    values: z.iter().map(|z| clamp(z.im)).collect(),
+                },
             ]
         }
         TraceKind::ImpedanceMag => one("|Z|".into(), s.iter().map(|c| clamp(impedance(*c).norm())).collect()),
-        TraceKind::GroupDelay => one(format!("τg {name}"), group_delay(freqs_hz, s, aperture).iter().map(|t| t * 1e9).collect()),
+        TraceKind::GroupDelay => one(
+            format!("τg {name}"),
+            group_delay(freqs_hz, s, aperture).iter().map(|t| t * 1e9).collect(),
+        ),
     }
 }
 
