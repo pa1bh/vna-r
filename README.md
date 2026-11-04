@@ -136,5 +136,5 @@ Twee protocollen achter één `Vna`-handle, gekozen op USB-id:
 - **Releases**: een tag `v*` laat [release.yml](.github/workflows/release.yml) tarballs voor x86_64-Linux en
   Apple Silicon aan een GitHub-release hangen. Daartussen publiceert de CI niets.
 - **CI**: [.github/workflows/ci.yml](.github/workflows/ci.yml) bouwt en test op Ubuntu en macOS bij elke
-  push; de GUI is op Linux gebouwd en getest in een Debian-container, maar nog niet op een echte
-  Linux-desktop gedraaid.
+  push. De CLI is op een NixOS-laptop geverifieerd (LiteVNA 67 op `/dev/ttyACM0`, 329 punten/s, geen
+  verloren punten); de GUI is op Linux gebouwd, maar nog niet met een scherm gedraaid.

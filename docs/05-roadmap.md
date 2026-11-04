@@ -21,7 +21,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 8 | Touchstone inlezen | S | gedaan 2026-11-04 |
 | 9 | LiteVNA 64 verifiëren | S | gedaan 2026-11-04 (zonder cal: kit-load defect) |
 | 10 | NanoVNA-H tekstprotocol (LiteVNA-H1) | L | gedaan 2026-11-04 op de NanoVNA-F 4.3 (H1 niet getest), zie docs/06 |
-| 11 | Linux-build | S | gedaan 2026-11-04 (CI + container; geen Linux-desktop getest) |
+| 11 | Linux-build | S | gedaan 2026-11-04 (CI, flake, CLI op NixOS-laptop geverifieerd; GUI nog niet met scherm) |
 | 12 | Gebruikersdocumentatie | L | gedaan 2026-11-04 (docs/handleiding) |
 
 ---
