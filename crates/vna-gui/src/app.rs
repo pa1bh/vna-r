@@ -1,5 +1,6 @@
 //! Application state and all panels.
 
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -21,6 +22,8 @@ use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
 const S11_COLOR: Color32 = Color32::from_rgb(255, 204, 0);
 const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
 const GATE_COLOR: Color32 = Color32::from_rgb(255, 150, 80);
+/// Upper bound for the software sweep average (ring buffer of raw sweeps).
+const MAX_SWEEP_AVG: usize = 64;
 const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 const MARKERS: usize = 4;
@@ -58,6 +61,8 @@ struct Settings {
     gate_start_m: f64,
     gate_stop_m: f64,
     gate_notch: bool,
+    /// Number of sweeps averaged in software (1 = off).
+    sweep_avg: usize,
 }
 
 impl Default for Settings {
@@ -85,6 +90,7 @@ impl Default for Settings {
             gate_start_m: -0.1,
             gate_stop_m: 0.5,
             gate_notch: false,
+            sweep_avg: 1,
         }
     }
 }
@@ -204,6 +210,9 @@ pub struct App {
     gate_drag: Option<usize>,
     gate_error: Option<String>,
     gated_cache: Option<(GateKey, Vec<Complex64>, f64)>,
+    sweep_avg: usize,
+    /// Last raw sweeps on the current grid, newest at the back.
+    avg_buf: VecDeque<SweepResult>,
     /// (sweep number, vf, window) the cached result belongs to.
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
@@ -259,6 +268,8 @@ impl App {
             gate_drag: None,
             gate_error: None,
             gated_cache: None,
+            sweep_avg: 1,
+            avg_buf: VecDeque::new(),
             tdr_cache: None,
         };
         app.refresh_ports();
@@ -300,6 +311,7 @@ impl App {
         self.gate_start_m = s.gate_start_m;
         self.gate_stop_m = s.gate_stop_m;
         self.gate_notch = s.gate_notch;
+        self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -339,6 +351,7 @@ impl App {
             gate_start_m: self.gate_start_m,
             gate_stop_m: self.gate_stop_m,
             gate_notch: self.gate_notch,
+            sweep_avg: self.sweep_avg,
         }
     }
 
@@ -402,6 +415,7 @@ impl App {
                     Purpose::Display => {
                         self.last_cfg = Some(cfg);
                         self.sweep_count += 1;
+                        let result = self.push_average(result);
                         let corrected = self.corrected(&result);
                         self.set_shown(corrected);
                         if let Some(freqs) = self.pending_marker_freqs.take() {
@@ -487,6 +501,36 @@ impl App {
         if self.gate_on && self.gated_cache.is_some() {
             ui.label(RichText::new("GATED").color(GATE_COLOR).strong()).on_hover_text("S11 is time-gated; see the TDR panel");
         }
+    }
+
+    /// Add a raw sweep to the ring buffer and return the complex mean of the
+    /// last `sweep_avg` sweeps (the newest alone when averaging is off). The
+    /// buffer resets when the grid changes. Averaging complex values shrinks
+    /// noise without biasing the magnitude, unlike averaging dB.
+    fn push_average(&mut self, raw: SweepResult) -> SweepResult {
+        if self.avg_buf.front().map_or(false, |b| b.freqs_hz != raw.freqs_hz) {
+            self.avg_buf.clear();
+        }
+        self.avg_buf.push_back(raw);
+        while self.avg_buf.len() > self.sweep_avg.max(1) {
+            self.avg_buf.pop_front();
+        }
+        let newest = self.avg_buf.back().unwrap();
+        if self.avg_buf.len() == 1 {
+            return newest.clone();
+        }
+        let n = self.avg_buf.len() as f64;
+        let mut out = newest.clone();
+        for (i, (a, b)) in out.s11.iter_mut().zip(out.s21.iter_mut()).enumerate() {
+            let (mut s1, mut s2) = (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0));
+            for sw in &self.avg_buf {
+                s1 += sw.s11[i];
+                s2 += sw.s21[i];
+            }
+            *a = s1 / n;
+            *b = s2 / n;
+        }
+        out
     }
 
     fn corrected(&mut self, raw: &SweepResult) -> SweepResult {
@@ -630,6 +674,23 @@ impl App {
                     }
                 });
                 ui.end_row();
+                ui.label("Sweep avg");
+                ui.horizontal(|ui| {
+                    let before = self.sweep_avg;
+                    ui.add(egui::DragValue::new(&mut self.sweep_avg).range(1..=MAX_SWEEP_AVG)).on_hover_text("complex mean of the last N sweeps, in software; resets when the grid changes");
+                    if self.sweep_avg < before {
+                        while self.avg_buf.len() > self.sweep_avg {
+                            self.avg_buf.pop_front();
+                        }
+                    }
+                    if self.sweep_avg > 1 {
+                        ui.small(format!("{}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg));
+                        if ui.small_button("reset").clicked() {
+                            self.avg_buf.clear();
+                        }
+                    }
+                });
+                ui.end_row();
             });
             if let Some(e) = &self.sweep_error {
                 ui.colored_label(Color32::from_rgb(255, 110, 110), e);
@@ -747,12 +808,13 @@ impl App {
             ui.add_space(12.0);
             if let Some(cfg) = &self.last_cfg {
                 ui.small(format!(
-                    "last sweep: {} → {} in {} points, {} ms, sweep #{}",
+                    "last sweep: {} → {} in {} points, {} ms, sweep #{}{}",
                     format_hz(cfg.start_hz),
                     format_hz(cfg.stop_hz()),
                     cfg.points,
                     self.raw.as_ref().map(|r| r.elapsed.as_millis()).unwrap_or(0),
-                    self.sweep_count
+                    self.sweep_count,
+                    if self.sweep_avg > 1 { format!(", avg {}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg) } else { String::new() }
                 ));
             }
         });

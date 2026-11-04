@@ -56,6 +56,10 @@ boven ~1 GHz: onder **Kit fit** meet je een kabel met open en short aan het verr
 de open/short-asymmetrie van de kit (als capaciteit of offset delay) en **Apply to kit** zet die in de
 calibratie; een onwaarschijnlijke standaardmeting (losse open, vergeten load) geeft een waarschuwing.
 
+Middelen: **Sweep avg** N middelt de laatste N sweeps complex in software (teller k/N, reset bij een
+ander raster), naast de *Average* van het apparaat zelf. Complex middelen drukt ruis op lage niveaus
+zonder de magnitude te vertekenen, wat middelen in dB wel doet.
+
 Weergaven: de Smith-chart staat vast; de drie andere grafieken kiezen in hun kop wat ze tonen: log mag,
 lin mag, fase, SWR, R + jX, |Z| of groepsvertraging (−dφ/dω over ±N punten, N instelbaar onder
 **Traces**). De rekenkant zit in `litevna::traces`.

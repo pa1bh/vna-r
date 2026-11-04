@@ -15,7 +15,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 | 2 | Meer weergaven: R/X, fase, groepsvertraging | M | gedaan 2026-11-04 |
 | 3 | Gated TDR (time gating) | M | gedaan 2026-11-04 |
 | 4 | Load-definitie fitten | M | onderzocht 2026-11-04: niet identificeerbaar, zie docs/03 §9 |
-| 5 | Averaging in software | S | open |
+| 5 | Averaging in software | S | gedaan 2026-11-04 |
 | 6 | Multi-segment sweeps | M | open |
 | 7 | Referentietraces opslaan en vergelijken | S | open |
 | 8 | Touchstone inlezen | S | open |
