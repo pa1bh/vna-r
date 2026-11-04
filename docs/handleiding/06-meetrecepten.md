@@ -16,7 +16,7 @@ het referentievlak daar.
    aanpassing überhaupt haalbaar is: ver van 50 Ω helpt inkorten niet, dan is een
    aanpassingsnetwerk nodig.
 4. Druk **Hold** voordat je knipt of schuift. De grijze referentie laat zien waar je
-   vandaan kwam; met **Δ** zie je het verschil in dB.
+   vandaan kwam; met **Δ** zie je het verschil, in dB, SWR of ohm naar keuze.
 5. Op een lange voedingslijn: zet een gate om het antenne-eind (hoofdstuk 5) om de
    invloed van connectoren en de lijn zelf te scheiden van de antenne. Of calibreer met de
    standaarden aan het eind van de voedingslijn.

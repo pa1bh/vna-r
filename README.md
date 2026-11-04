@@ -73,8 +73,8 @@ laadt het als referentie. Formaten RI/MA/DB, eenheden Hz–GHz, ook bestanden va
 `vna-cli tdr --from meting.s2p`.
 
 Referenties: **Hold** in de markerbalk zet de huidige trace vast (maximaal vier, elk met naam en eigen
-kleur, aan/uit onder **Traces**); de knop **Δ** bij een referentie tekent live min referentie in dB en
-graden in de log mag- en fase-grafieken. Referenties worden niet bewaard; exporteer ze als s2p en open ze later als referentie.
+kleur, aan/uit onder **Traces**); de knop **Δ** bij een referentie tekent live min referentie in elke
+grafiek, in de eenheid van die grafiek. Referenties worden niet bewaard; exporteer ze als s2p en open ze later als referentie.
 
 Middelen: **Sweep avg** N middelt de laatste N sweeps complex in software (teller k/N, reset bij een
 ander raster), naast de *Average* van het apparaat zelf. Complex middelen drukt ruis op lage niveaus

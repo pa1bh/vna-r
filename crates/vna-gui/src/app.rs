@@ -1742,30 +1742,38 @@ impl App {
                 }
             }
         }
+        // Difference trace: live minus reference, in the unit of this view. The
+        // reference is resampled (complex, linear) onto the live grid first, then
+        // the same derived quantity is computed for both and subtracted; phase
+        // differences are wrapped to ±180°.
         let mut diff_lines: Vec<(String, Vec<f64>)> = Vec::new();
         if let Some(k) = self.diff_ref.filter(|k| *k < self.references.len()) {
-            if matches!(kind, TraceKind::LogMag | TraceKind::Phase) {
-                let r = &self.references[k];
-                let (rs11, rs21) = resample_complex(&r.sweep.freqs_hz, &r.sweep.s11, &r.sweep.s21, &sweep.freqs_hz);
-                for (param, live, refv, show) in [
-                    (Param::S11, &sweep.s11, &rs11, self.show_s11),
-                    (Param::S21, &sweep.s21, &rs21, self.show_s21),
-                ] {
-                    if !show {
-                        continue;
-                    }
-                    let vals: Vec<f64> = live
+            let r = &self.references[k];
+            let (rs11, rs21) = resample_complex(&r.sweep.freqs_hz, &r.sweep.s11, &r.sweep.s21, &sweep.freqs_hz);
+            for (param, live, refv, show) in [
+                (Param::S11, &sweep.s11, &rs11, self.show_s11),
+                (Param::S21, &sweep.s21, &rs21, self.show_s21),
+            ] {
+                if !show {
+                    continue;
+                }
+                let live_series = traces::compute(kind, param, &sweep.freqs_hz, live, self.gd_aperture);
+                let ref_series = traces::compute(kind, param, &sweep.freqs_hz, refv, self.gd_aperture);
+                for (ls, rs) in live_series.into_iter().zip(ref_series) {
+                    let vals: Vec<f64> = ls
+                        .values
                         .iter()
-                        .zip(refv)
-                        .map(|(a, b)| match kind {
-                            TraceKind::LogMag => db(a.norm()) - db(b.norm()),
-                            _ => {
-                                let d = (a.arg() - b.arg()).to_degrees();
+                        .zip(&rs.values)
+                        .map(|(a, b)| {
+                            let d = a - b;
+                            if kind == TraceKind::Phase {
                                 ((d + 180.0).rem_euclid(360.0)) - 180.0
+                            } else {
+                                d
                             }
                         })
                         .collect();
-                    diff_lines.push((format!("Δ {} vs {}", param.name(), r.name), vals));
+                    diff_lines.push((format!("Δ {} vs {}", ls.label, r.name), vals));
                 }
             }
         }
