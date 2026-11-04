@@ -51,8 +51,15 @@ cargo run --release -p vna-gui
 
 Kies de poort (★ = LiteVNA), **Connect**, **Run**. Links de sweep-instellingen en het calibratiepaneel:
 meet open/short/load (en optioneel through/isolation) op het huidige raster, zet **apply** aan en sla
-de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`. Klik in een grafiek
-of op de Smith-chart voor een marker met frequentie, S11, impedantie, SWR en S21.
+de calibratie op als JSON; dezelfde bestanden werken ook met `vna-cli sweep --cal`.
+
+Markers: vier stuks (M1–M4). Kies de actieve bovenin, klik in een grafiek of op de Smith-chart om hem te
+plaatsen, pijltjestoetsen verschuiven hem per punt (shift: ×10). De tabel toont frequentie, S11, Z, SWR
+en S21 per marker en het verschil tussen de eerste twee; knoppen springen naar min SWR, max S21, min S21.
+
+Instellingen (poort, sweep, average, calibratiebestand, traces, TDR, markers, venstergrootte) worden bij
+afsluiten bewaard en bij de volgende start hersteld; een bestaand calibratiebestand wordt automatisch
+geladen.
 
 ### TDR
 

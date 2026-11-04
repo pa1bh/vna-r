@@ -5,7 +5,8 @@ use num_complex::Complex64;
 
 pub struct SmithChart<'a> {
     pub gamma: &'a [Complex64],
-    pub marker: Option<Complex64>,
+    /// Marker positions with their colours.
+    pub markers: &'a [(Complex64, Color32)],
     pub trace_color: Color32,
 }
 
@@ -79,10 +80,11 @@ impl<'a> SmithChart<'a> {
             let pts: Vec<Pos2> = self.gamma.iter().map(|g| to_screen(clamp(*g))).collect();
             painter.add(egui::Shape::line(pts, Stroke::new(1.8, self.trace_color)));
         }
-        if let Some(m) = self.marker {
-            let p = to_screen(clamp(m));
-            painter.circle_filled(p, 4.5, Color32::WHITE);
-            painter.circle_stroke(p, 6.0, Stroke::new(1.5, self.trace_color));
+        for (k, (m, color)) in self.markers.iter().enumerate() {
+            let p = to_screen(clamp(*m));
+            painter.circle_filled(p, 4.5, *color);
+            painter.circle_stroke(p, 6.5, Stroke::new(1.5, Color32::WHITE));
+            painter.text(p + Vec2::new(8.0, -8.0), Align2::LEFT_BOTTOM, format!("M{}", k + 1), FontId::proportional(11.0), *color);
         }
         SmithResponse { response, center, radius }
     }

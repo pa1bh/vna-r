@@ -1,6 +1,6 @@
 //! Application state and all panels.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use egui::{Color32, RichText, Vec2};
@@ -12,6 +12,7 @@ use litevna::timedomain::{tdr, TdrConfig, TdrResult, Window};
 use litevna::touchstone::{db, swr, write_s2p};
 use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
 use num_complex::Complex64;
+use serde::{Deserialize, Serialize};
 
 use crate::smith::SmithChart;
 use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
@@ -20,6 +21,54 @@ const S11_COLOR: Color32 = Color32::from_rgb(255, 204, 0);
 const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
 const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
+const MARKERS: usize = 4;
+const MARKER_COLORS: [Color32; MARKERS] = [
+    Color32::from_rgb(255, 90, 90),
+    Color32::from_rgb(90, 200, 255),
+    Color32::from_rgb(255, 120, 255),
+    Color32::from_rgb(255, 170, 60),
+];
+
+/// Everything worth remembering between sessions (stored by eframe).
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(default)]
+struct Settings {
+    port: Option<String>,
+    start: String,
+    stop: String,
+    points: u16,
+    average: u8,
+    cal_file: Option<PathBuf>,
+    cal_apply: bool,
+    show_s11: bool,
+    show_s21: bool,
+    view_tdr: bool,
+    tdr_vf: f64,
+    tdr_window: String,
+    tdr_max_m: f64,
+    marker_freqs: [Option<u64>; MARKERS],
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Settings {
+            port: None,
+            start: "1M".into(),
+            stop: "30M".into(),
+            points: 201,
+            average: 1,
+            cal_file: None,
+            cal_apply: true,
+            show_s11: true,
+            show_s21: true,
+            view_tdr: false,
+            tdr_vf: 0.70,
+            tdr_window: "hann".into(),
+            tdr_max_m: 2.0,
+            marker_freqs: [None; MARKERS],
+        }
+    }
+}
 
 enum Connection {
     Disconnected,
@@ -78,7 +127,10 @@ pub struct App {
     sweep_count: u64,
 
     cal: CalState,
-    marker: Option<usize>,
+    markers: [Option<usize>; MARKERS],
+    active_marker: usize,
+    /// Marker frequencies from the last session, mapped onto the first sweep.
+    pending_marker_freqs: Option<[Option<u64>; MARKERS]>,
     show_s11: bool,
     show_s21: bool,
 
@@ -121,7 +173,9 @@ impl App {
             last_cfg: None,
             sweep_count: 0,
             cal: CalState { apply: true, ..Default::default() },
-            marker: None,
+            markers: [None; MARKERS],
+            active_marker: 0,
+            pending_marker_freqs: None,
             show_s11: true,
             show_s21: true,
             error: None,
@@ -135,7 +189,64 @@ impl App {
             tdr_cache: None,
         };
         app.refresh_ports();
+        if let Some(storage) = cc.storage {
+            if let Some(settings) = eframe::get_value::<Settings>(storage, eframe::APP_KEY) {
+                app.apply_settings(settings);
+            }
+        }
         app
+    }
+
+    fn apply_settings(&mut self, s: Settings) {
+        if let Some(p) = &s.port {
+            if self.ports.iter().any(|c| &c.path == p) {
+                self.selected_port = Some(p.clone());
+            }
+        }
+        self.start = s.start;
+        self.stop = s.stop;
+        self.points = s.points;
+        self.average = s.average;
+        self.cal.apply = s.cal_apply;
+        self.show_s11 = s.show_s11;
+        self.show_s21 = s.show_s21;
+        self.view = if s.view_tdr { View::Tdr } else { View::Frequency };
+        self.tdr_vf = s.tdr_vf;
+        self.tdr_window = Window::parse(&s.tdr_window).unwrap_or(Window::Hann);
+        self.tdr_max_m = s.tdr_max_m;
+        self.pending_marker_freqs = Some(s.marker_freqs);
+        if let Some(path) = s.cal_file {
+            if path.exists() {
+                self.load_cal_from(&path);
+            }
+        }
+    }
+
+    fn settings(&self) -> Settings {
+        let mut marker_freqs = [None; MARKERS];
+        if let Some(sweep) = &self.shown {
+            for (k, m) in self.markers.iter().enumerate() {
+                marker_freqs[k] = m.and_then(|i| sweep.freqs_hz.get(i).copied());
+            }
+        } else if let Some(p) = self.pending_marker_freqs {
+            marker_freqs = p;
+        }
+        Settings {
+            port: self.selected_port.clone(),
+            start: self.start.clone(),
+            stop: self.stop.clone(),
+            points: self.points,
+            average: self.average,
+            cal_file: self.cal.file.clone(),
+            cal_apply: self.cal.apply,
+            show_s11: self.show_s11,
+            show_s21: self.show_s21,
+            view_tdr: self.view == View::Tdr,
+            tdr_vf: self.tdr_vf,
+            tdr_window: self.tdr_window.name().into(),
+            tdr_max_m: self.tdr_max_m,
+            marker_freqs,
+        }
     }
 
     fn refresh_ports(&mut self) {
@@ -199,6 +310,11 @@ impl App {
                         self.last_cfg = Some(cfg);
                         self.sweep_count += 1;
                         self.shown = Some(self.corrected(&result));
+                        if let Some(freqs) = self.pending_marker_freqs.take() {
+                            for (k, f) in freqs.iter().enumerate() {
+                                self.markers[k] = f.map(|f| nearest_index(&result.freqs_hz, f));
+                            }
+                        }
                         self.raw = Some(result);
                     }
                     Purpose::Standard(std) => {
@@ -512,10 +628,14 @@ impl App {
 
     fn load_cal(&mut self) {
         let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() else { return };
-        match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
+        self.load_cal_from(&path);
+    }
+
+    fn load_cal_from(&mut self, path: &Path) {
+        match std::fs::read_to_string(path).map_err(|e| e.to_string()).and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
             Ok(set) => {
                 self.cal.set = Some(set);
-                self.cal.file = Some(path);
+                self.cal.file = Some(path.to_path_buf());
                 self.cal.solved = None;
                 self.cal.message = Some("loaded".into());
                 if let Some(raw) = self.raw.clone() {
@@ -567,18 +687,34 @@ impl App {
             return;
         };
         let mhz: Vec<f64> = sweep.freqs_hz.iter().map(|f| *f as f64 / 1e6).collect();
-        let marker_x = self.marker.and_then(|i| mhz.get(i).copied());
+        // Arrow keys nudge the active marker (shift: 10 points).
+        let n_pts = sweep.freqs_hz.len();
+        let (left, right, shift) = ui.input(|i| (i.key_pressed(egui::Key::ArrowLeft), i.key_pressed(egui::Key::ArrowRight), i.modifiers.shift));
+        if left || right {
+            if let Some(i) = self.markers[self.active_marker] {
+                let step = if shift { 10 } else { 1 };
+                let j = if left { i.saturating_sub(step) } else { (i + step).min(n_pts - 1) };
+                self.markers[self.active_marker] = Some(j);
+            }
+        }
+        let marker_lines: Vec<(f64, Color32)> = self
+            .markers
+            .iter()
+            .enumerate()
+            .filter_map(|(k, m)| m.and_then(|i| mhz.get(i).map(|x| (*x, MARKER_COLORS[k]))))
+            .collect();
+        let marker_points: Vec<(Complex64, Color32)> = self
+            .markers
+            .iter()
+            .enumerate()
+            .filter_map(|(k, m)| m.and_then(|i| sweep.s11.get(i).map(|g| (*g, MARKER_COLORS[k]))))
+            .collect();
         let mut clicked_x: Option<f64> = None;
 
         ui.columns(2, |cols| {
             // Smith chart
             let w = cols[0].available_width();
-            let resp = SmithChart {
-                gamma: &sweep.s11,
-                marker: self.marker.and_then(|i| sweep.s11.get(i).copied()),
-                trace_color: S11_COLOR,
-            }
-            .show(&mut cols[0], Vec2::new(w, h));
+            let resp = SmithChart { gamma: &sweep.s11, markers: &marker_points, trace_color: S11_COLOR }.show(&mut cols[0], Vec2::new(w, h));
             if resp.response.clicked() {
                 if let Some(p) = resp.response.interact_pointer_pos() {
                     // nearest trace point on screen
@@ -589,7 +725,7 @@ impl App {
                         .map(|(i, g)| (i, resp.pos_of(*g).distance(p)))
                         .min_by(|a, b| a.1.total_cmp(&b.1));
                     if let Some((i, _)) = best {
-                        self.marker = Some(i);
+                        self.markers[self.active_marker] = Some(i);
                     }
                 }
             }
@@ -608,8 +744,8 @@ impl App {
                     if self.show_s21 {
                         pui.line(Line::new("S21", series(&mhz, sweep.s21.iter().map(|s| db(s.norm())))).color(S21_COLOR));
                     }
-                    if let Some(x) = marker_x {
-                        pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                    for (k, (x, c)) in marker_lines.iter().enumerate() {
+                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
                     }
                     (pui.response().clicked(), pui.pointer_coordinate())
                 });
@@ -626,8 +762,8 @@ impl App {
                 .include_y(3.0)
                 .show(&mut cols[0], |pui| {
                     pui.line(Line::new("SWR", series(&mhz, sweep.s11.iter().map(|s| swr(s.norm()).min(20.0)))).color(S11_COLOR));
-                    if let Some(x) = marker_x {
-                        pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                    for (k, (x, c)) in marker_lines.iter().enumerate() {
+                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
                     }
                     (pui.response().clicked(), pui.pointer_coordinate())
                 });
@@ -648,8 +784,8 @@ impl App {
                     if self.show_s21 {
                         pui.line(Line::new("S21 °", series(&mhz, sweep.s21.iter().map(|s| s.arg().to_degrees()))).color(S21_COLOR));
                     }
-                    if let Some(x) = marker_x {
-                        pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                    for (k, (x, c)) in marker_lines.iter().enumerate() {
+                        pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
                     }
                     (pui.response().clicked(), pui.pointer_coordinate())
                 });
@@ -661,7 +797,7 @@ impl App {
         if let Some(x) = clicked_x {
             // nearest frequency index
             let best = mhz.iter().enumerate().map(|(i, f)| (i, (f - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
-            self.marker = best.map(|(i, _)| i);
+            self.markers[self.active_marker] = best.map(|(i, _)| i);
         }
     }
 
@@ -764,24 +900,34 @@ impl App {
 
     fn marker_readout(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            match (&self.shown, self.marker) {
-                (Some(sweep), Some(i)) if i < sweep.freqs_hz.len() => {
-                    let s11 = sweep.s11[i];
-                    let s21 = sweep.s21[i];
-                    let z = impedance(s11);
-                    ui.label(RichText::new(format!("M1  {}", format_hz(sweep.freqs_hz[i]))).strong().color(MARKER_COLOR));
-                    ui.separator();
-                    ui.label(RichText::new(format!("S11 {:.2} dB  {:.1}°", db(s11.norm()), s11.arg().to_degrees())).color(S11_COLOR));
-                    ui.label(format!("Z = {:.1} {} j{:.1} Ω", z.re, if z.im < 0.0 { "−" } else { "+" }, z.im.abs()));
-                    ui.label(format!("SWR {:.2}", swr(s11.norm())));
-                    ui.separator();
-                    ui.label(RichText::new(format!("S21 {:.2} dB  {:.1}°", db(s21.norm()), s21.arg().to_degrees())).color(S21_COLOR));
-                    if ui.small_button("clear").clicked() {
-                        self.marker = None;
-                    }
+            ui.label("Markers");
+            for k in 0..MARKERS {
+                let placed = self.markers[k].is_some();
+                let text = RichText::new(format!("M{}", k + 1)).color(MARKER_COLORS[k]);
+                let text = if placed { text.strong() } else { text.weak() };
+                if ui.selectable_label(self.active_marker == k, text).clicked() {
+                    self.active_marker = k;
                 }
-                _ => {
-                    ui.small("Click in a plot or on the Smith chart to place a marker.");
+            }
+            ui.small("click in a plot places the active one; ← → nudge, shift for ×10");
+            if ui.small_button("clear").clicked() {
+                self.markers[self.active_marker] = None;
+            }
+            if ui.small_button("clear all").clicked() {
+                self.markers = [None; MARKERS];
+            }
+            ui.separator();
+            if let Some(sweep) = self.shown.clone() {
+                let n = sweep.freqs_hz.len();
+                let argmin = |f: &dyn Fn(usize) -> f64| (0..n).min_by(|a, b| f(*a).total_cmp(&f(*b)));
+                if ui.small_button("min SWR").on_hover_text("move the active marker to the lowest |S11|").clicked() {
+                    self.markers[self.active_marker] = argmin(&|i| sweep.s11[i].norm());
+                }
+                if ui.small_button("max S21").clicked() {
+                    self.markers[self.active_marker] = argmin(&|i| -sweep.s21[i].norm());
+                }
+                if ui.small_button("min S21").clicked() {
+                    self.markers[self.active_marker] = argmin(&|i| sweep.s21[i].norm());
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -792,6 +938,47 @@ impl App {
                 };
                 ui.label(tag.strong());
             });
+        });
+
+        let Some(sweep) = &self.shown else { return };
+        let placed: Vec<(usize, usize)> = self.markers.iter().enumerate().filter_map(|(k, m)| m.map(|i| (k, i))).filter(|(_, i)| *i < sweep.freqs_hz.len()).collect();
+        if placed.is_empty() {
+            return;
+        }
+        egui::Grid::new("marker-table").striped(true).spacing([14.0, 2.0]).show(ui, |ui| {
+            for h in ["", "frequency", "S11 dB", "S11 °", "Z", "SWR", "S21 dB", "S21 °"] {
+                ui.label(RichText::new(h).weak());
+            }
+            ui.end_row();
+            for (k, i) in &placed {
+                let s11 = sweep.s11[*i];
+                let s21 = sweep.s21[*i];
+                let z = impedance(s11);
+                ui.label(RichText::new(format!("M{}", k + 1)).color(MARKER_COLORS[*k]).strong());
+                ui.label(format_hz(sweep.freqs_hz[*i]));
+                ui.label(RichText::new(format!("{:.2}", db(s11.norm()))).color(S11_COLOR));
+                ui.label(format!("{:.1}", s11.arg().to_degrees()));
+                ui.label(format!("{:.1} {} j{:.1} Ω", z.re, if z.im < 0.0 { "−" } else { "+" }, z.im.abs()));
+                ui.label(format!("{:.2}", swr(s11.norm())));
+                ui.label(RichText::new(format!("{:.2}", db(s21.norm()))).color(S21_COLOR));
+                ui.label(format!("{:.1}", s21.arg().to_degrees()));
+                ui.end_row();
+            }
+            // Delta between the first two placed markers.
+            if placed.len() >= 2 {
+                let (ka, a) = placed[0];
+                let (kb, b) = placed[1];
+                let df = sweep.freqs_hz[b] as i64 - sweep.freqs_hz[a] as i64;
+                ui.label(RichText::new(format!("M{}−M{}", kb + 1, ka + 1)).weak());
+                ui.label(format!("{}{}", if df < 0 { "−" } else { "" }, format_hz(df.unsigned_abs())));
+                ui.label(format!("{:+.2}", db(sweep.s11[b].norm()) - db(sweep.s11[a].norm())));
+                ui.label(format!("{:+.1}", sweep.s11[b].arg().to_degrees() - sweep.s11[a].arg().to_degrees()));
+                ui.label("");
+                ui.label("");
+                ui.label(format!("{:+.2}", db(sweep.s21[b].norm()) - db(sweep.s21[a].norm())));
+                ui.label(format!("{:+.1}", sweep.s21[b].arg().to_degrees() - sweep.s21[a].arg().to_degrees()));
+                ui.end_row();
+            }
         });
     }
 
@@ -839,6 +1026,10 @@ impl App {
 }
 
 impl eframe::App for App {
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        eframe::set_value(storage, eframe::APP_KEY, &self.settings());
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_events(&ctx);
@@ -851,6 +1042,10 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.screenshot_window(&ctx);
     }
+}
+
+fn nearest_index(freqs: &[u64], f: u64) -> usize {
+    freqs.iter().enumerate().min_by_key(|(_, x)| x.abs_diff(f)).map(|(i, _)| i).unwrap_or(0)
 }
 
 fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
