@@ -135,24 +135,7 @@ impl TdrResult {
 
 /// Compute the TDR views of `s11` measured on the uniform grid `freqs_hz`.
 pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrResult> {
-    let n = freqs_hz.len();
-    if n < 8 || s11.len() != n {
-        return Err(Error::InvalidArgument("TDR needs at least 8 points with matching S11".into()));
-    }
-    let df = (freqs_hz[1] - freqs_hz[0]) as f64;
-    if df <= 0.0 || freqs_hz.windows(2).any(|w| w[1] - w[0] != freqs_hz[1] - freqs_hz[0]) {
-        return Err(Error::InvalidArgument("TDR needs a uniformly spaced sweep".into()));
-    }
-    if !(0.1..=1.0).contains(&cfg.velocity_factor) {
-        return Err(Error::InvalidArgument("velocity factor must be within 0.1..=1".into()));
-    }
-    let f0 = freqs_hz[0] as f64;
-    let fmax = *freqs_hz.last().unwrap() as f64;
-    let span = fmax - f0;
-
-    // Harmonic grid k·Δf, k = 0..=m, covering the measured band.
-    let m = (fmax / df).round() as usize;
-    let nfft = if cfg.fft_size > 0 { cfg.fft_size.max(2 * m + 2) } else { (8 * (m + 1)).next_power_of_two() };
+    let Grid { n, df, f0, fmax, span, m, nfft } = check_grid(freqs_hz, s11, cfg)?;
 
     let mut planner = FftPlanner::<f64>::new();
     let ifft = planner.plan_fft_inverse(nfft);
@@ -234,6 +217,168 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
 
 /// Γ at DC must be real. Extrapolate the real part linearly from the lowest
 /// few points (a single lowest point is often the noisiest of the sweep).
+struct Grid {
+    n: usize,
+    df: f64,
+    f0: f64,
+    fmax: f64,
+    span: f64,
+    /// Index of the highest measured frequency on the harmonic grid k·Δf.
+    m: usize,
+    nfft: usize,
+}
+
+fn check_grid(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<Grid> {
+    let n = freqs_hz.len();
+    if n < 8 || s11.len() != n {
+        return Err(Error::InvalidArgument("TDR needs at least 8 points with matching S11".into()));
+    }
+    let df = (freqs_hz[1] - freqs_hz[0]) as f64;
+    if df <= 0.0 || freqs_hz.windows(2).any(|w| w[1] - w[0] != freqs_hz[1] - freqs_hz[0]) {
+        return Err(Error::InvalidArgument("TDR needs a uniformly spaced sweep".into()));
+    }
+    if !(0.1..=1.0).contains(&cfg.velocity_factor) {
+        return Err(Error::InvalidArgument("velocity factor must be within 0.1..=1".into()));
+    }
+    let f0 = freqs_hz[0] as f64;
+    let fmax = *freqs_hz.last().unwrap() as f64;
+    // Harmonic grid k·Δf, k = 0..=m, covering the measured band.
+    let m = (fmax / df).round() as usize;
+    let nfft = if cfg.fft_size > 0 { cfg.fft_size.max(2 * m + 2) } else { (8 * (m + 1)).next_power_of_two() };
+    Ok(Grid { n, df, f0, fmax, span: fmax - f0, m, nfft })
+}
+
+// ---------------------------------------------------------------------------
+// Time gating
+// ---------------------------------------------------------------------------
+
+/// Keep or remove the reflections inside a time window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GateKind {
+    /// Keep what lies between start and stop (e.g. only the antenna end of a feed line).
+    BandPass,
+    /// Remove what lies between start and stop (e.g. the connector at the reference plane).
+    Notch,
+}
+
+impl GateKind {
+    pub fn name(&self) -> &'static str {
+        match self {
+            GateKind::BandPass => "band pass",
+            GateKind::Notch => "notch",
+        }
+    }
+}
+
+/// A time gate on the band-pass impulse response. Times are round-trip,
+/// seconds, like [`TdrResult::time_s`]; `start_s` may be negative to include
+/// the reference plane itself. The flanks are raised-cosine, each
+/// [`GATE_EDGE_RESOLUTIONS`] × the TDR resolution wide, centred on start and
+/// stop.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Gate {
+    pub start_s: f64,
+    pub stop_s: f64,
+    pub kind: GateKind,
+}
+
+/// Width of each gate flank in units of the TDR resolution (1/span).
+pub const GATE_EDGE_RESOLUTIONS: f64 = 2.0;
+/// Smallest window weight the compensation divides by.
+pub const GATE_WINDOW_FLOOR: f64 = 0.1;
+
+/// Result of [`gate`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct GatedResult {
+    /// Gated S11 on the input grid.
+    pub s11: Vec<Complex64>,
+    /// A gate of width T blurs the frequency response over about 1/T: the
+    /// outermost `edge_hz` of the band on each side is unreliable.
+    pub edge_hz: f64,
+    /// Points at each band edge where the window compensation was clamped to
+    /// [`GATE_WINDOW_FLOOR`] (there the gated trace is attenuated and noisier).
+    pub clamped_points: usize,
+}
+
+/// Time-gate `s11`: transform the (windowed) band to the time domain, multiply
+/// by the gate, transform back and undo the window.
+///
+/// This is what bench analysers do ("gating"). The window keeps the sinc
+/// sidelobes of strong reflections from leaking across the gate; dividing it
+/// out afterwards restores the band, except at the very edges where the
+/// window is small — there the division is clamped and the result tapers.
+/// The frequency blur of the gate (≈ 1/gate width) is inherent: a narrow gate
+/// cannot resolve fine frequency detail. Use a gate several resolutions wide
+/// and judge the result away from the band edges.
+pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> Result<GatedResult> {
+    let Grid { n, df, span, nfft, .. } = check_grid(freqs_hz, s11, cfg)?;
+    if !(g.stop_s > g.start_s) || !g.start_s.is_finite() || !g.stop_s.is_finite() {
+        return Err(Error::InvalidArgument("gate stop must lie after gate start".into()));
+    }
+    let max_t = 1.0 / df;
+    if g.stop_s > max_t / 2.0 || g.start_s < -max_t / 2.0 {
+        return Err(Error::InvalidArgument(format!(
+            "gate must lie within ±{:.1} ns (half the alias-free range)",
+            max_t / 2.0 * 1e9
+        )));
+    }
+    let mut planner = FftPlanner::<f64>::new();
+    let ifft = planner.plan_fft_inverse(nfft);
+    let fft = planner.plan_fft_forward(nfft);
+
+    let mut buf = vec![Complex64::new(0.0, 0.0); nfft];
+    let mut weights = Vec::with_capacity(n);
+    let mut bins = Vec::with_capacity(n);
+    for (i, s) in s11.iter().enumerate() {
+        let x = 2.0 * i as f64 / (n - 1) as f64 - 1.0;
+        let w = cfg.window.at(x);
+        let k = ((freqs_hz[i] as f64) / df).round() as usize % nfft;
+        buf[k] = s * w;
+        weights.push(w);
+        bins.push(k);
+    }
+    ifft.process(&mut buf);
+
+    let dt = 1.0 / (nfft as f64 * df);
+    let edge = GATE_EDGE_RESOLUTIONS / span;
+    let shape = |t: f64| -> f64 {
+        // raised-cosine flanks centred on start and stop
+        let rise = |u: f64| -> f64 {
+            if u <= -edge / 2.0 {
+                0.0
+            } else if u >= edge / 2.0 {
+                1.0
+            } else {
+                0.5 * (1.0 + (PI * u / edge).sin())
+            }
+        };
+        rise(t - g.start_s) * (1.0 - rise(t - g.stop_s))
+    };
+    for (j, c) in buf.iter_mut().enumerate() {
+        let t = if j < nfft / 2 { j as f64 * dt } else { (j as f64 - nfft as f64) * dt };
+        let keep = match g.kind {
+            GateKind::BandPass => shape(t),
+            GateKind::Notch => 1.0 - shape(t),
+        };
+        *c *= keep;
+    }
+    fft.process(&mut buf);
+
+    let scale = 1.0 / nfft as f64;
+    let mut clamped = 0;
+    let s11g: Vec<Complex64> = bins
+        .iter()
+        .zip(&weights)
+        .map(|(&k, &w)| {
+            if w < GATE_WINDOW_FLOOR {
+                clamped += 1;
+            }
+            buf[k] * scale / w.max(GATE_WINDOW_FLOOR)
+        })
+        .collect();
+    Ok(GatedResult { s11: s11g, edge_hz: 1.0 / (g.stop_s - g.start_s), clamped_points: clamped / 2 })
+}
+
 fn extrapolate_dc(freqs_hz: &[u64], s11: &[Complex64]) -> f64 {
     let k = (s11.len() / 20).clamp(2, 8);
     let xs: Vec<f64> = freqs_hz[..k].iter().map(|f| *f as f64).collect();
@@ -248,6 +393,79 @@ fn extrapolate_dc(freqs_hz: &[u64], s11: &[Complex64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Two reflections: a small one at the reference plane and a lossy short
+    /// 1 m down a VF-0.7 line, on a 1 MHz..1 GHz grid (1 ns resolution).
+    fn two_reflections() -> (Vec<u64>, Vec<Complex64>, f64) {
+        let freqs: Vec<u64> = (1..=1000).map(|k| k * 1_000_000).collect();
+        let tau = 2.0 * 1.0 / (C0 * 0.7); // round trip
+        let s11 = freqs
+            .iter()
+            .map(|&f| {
+                let f = f as f64;
+                let far = -0.9 * Complex64::from_polar(1.0, -2.0 * PI * f * tau);
+                Complex64::new(0.05, 0.0) + far
+            })
+            .collect();
+        (freqs, s11, tau)
+    }
+
+    #[test]
+    fn gate_isolates_the_far_reflection() {
+        let (freqs, s11, tau) = two_reflections();
+        let cfg = TdrConfig::default();
+        let g = Gate { start_s: tau - 3e-9, stop_s: tau + 3e-9, kind: GateKind::BandPass };
+        let out = gate(&freqs, &s11, &cfg, &g).unwrap();
+        assert_eq!(out.s11.len(), freqs.len());
+        // mid-band (away from the edges by more than edge_hz) only the short remains
+        let lo = out.edge_hz;
+        for (i, &f) in freqs.iter().enumerate() {
+            let f = f as f64;
+            if f < 1e6 + lo || f > 1e9 - lo {
+                continue;
+            }
+            let want = -0.9 * Complex64::from_polar(1.0, -2.0 * PI * f * tau);
+            let err = (out.s11[i] - want).norm();
+            assert!(err < 0.02, "f={f}: err {err}");
+        }
+        assert!(out.edge_hz < 200e6);
+    }
+
+    #[test]
+    fn notch_removes_the_reference_plane() {
+        let (freqs, s11, tau) = two_reflections();
+        let cfg = TdrConfig::default();
+        // notch around t = 0: removes the 0.05, keeps the short
+        let g = Gate { start_s: -3e-9, stop_s: 3e-9, kind: GateKind::Notch };
+        let out = gate(&freqs, &s11, &cfg, &g).unwrap();
+        let (mut worst, mut count) = (0.0f64, 0);
+        for (i, &f) in freqs.iter().enumerate() {
+            let f = f as f64;
+            if f < 300e6 || f > 700e6 {
+                continue;
+            }
+            let want = -0.9 * Complex64::from_polar(1.0, -2.0 * PI * f * tau);
+            worst = worst.max((out.s11[i] - want).norm());
+            count += 1;
+        }
+        assert!(count > 300 && worst < 0.02, "worst {worst}");
+        // band pass around t = 0 keeps only the 0.05
+        let g = Gate { start_s: -3e-9, stop_s: 3e-9, kind: GateKind::BandPass };
+        let out = gate(&freqs, &s11, &cfg, &g).unwrap();
+        for (i, &f) in freqs.iter().enumerate() {
+            if (300e6..=700e6).contains(&(f as f64)) {
+                assert!((out.s11[i].norm() - 0.05).abs() < 0.01, "f={f}: {}", out.s11[i].norm());
+            }
+        }
+    }
+
+    #[test]
+    fn gate_rejects_bad_windows() {
+        let (freqs, s11, _) = two_reflections();
+        let cfg = TdrConfig::default();
+        assert!(gate(&freqs, &s11, &cfg, &Gate { start_s: 5e-9, stop_s: 5e-9, kind: GateKind::BandPass }).is_err());
+        assert!(gate(&freqs, &s11, &cfg, &Gate { start_s: 0.0, stop_s: 1.0, kind: GateKind::BandPass }).is_err());
+    }
 
     /// S11 of a lossless line of one-way delay `tau` terminated in `gamma_load`.
     fn line(freqs: &[u64], tau: f64, gamma_load: Complex64) -> Vec<Complex64> {

@@ -10,7 +10,7 @@ use litevna::calibration::{plausibility_warning, CalKit, Calibration, Calibratio
 use litevna::discovery;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel, DataMode};
-use litevna::timedomain::{tdr as compute_tdr, TdrConfig, Window};
+use litevna::timedomain::{gate as compute_gate, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
 use litevna::touchstone::{db, swr, write_csv, write_s2p};
 use litevna::{LiteVna, SweepConfig, SweepResult};
 
@@ -64,6 +64,16 @@ enum Cmd {
         /// Leave the device in USB data mode afterwards (screen stays frozen).
         #[arg(long)]
         keep_usb_mode: bool,
+        /// Time-gate S11: keep only reflections between these one-way distances
+        /// in metres, e.g. `--gate 0.9:1.2` (uses --vf). Needs a uniform grid.
+        #[arg(long, value_name = "START:STOP")]
+        gate: Option<String>,
+        /// With --gate: remove the reflections inside the gate instead of keeping them.
+        #[arg(long, requires = "gate")]
+        gate_notch: bool,
+        /// Velocity factor for --gate distances.
+        #[arg(long, default_value_t = 0.70)]
+        vf: f64,
     },
     /// Measure a calibration standard into a calibration file, or inspect one.
     ///
@@ -265,8 +275,8 @@ fn main() -> Result<()> {
         Cmd::List => list(),
         Cmd::Info => info(&mut open(&conn)?),
         Cmd::Peek { addr, size } => peek(&mut open(&conn)?, &addr, size),
-        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode } => {
-            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode)
+        Cmd::Sweep { grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf } => {
+            sweep(&conn, grid, measure, cal, s2p, csv, rows, keep_usb_mode, gate, gate_notch, vf)
         }
         Cmd::Cal { what, file, grid, measure, note, kit, f_min, apply, as_delay } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
         Cmd::Tdr { grid, measure, cal, vf, window, peaks, max_distance, csv } => {
@@ -484,8 +494,28 @@ fn sweep(
     csv: Option<PathBuf>,
     rows: usize,
     keep_usb_mode: bool,
+    gate_arg: Option<String>,
+    gate_notch: bool,
+    vf: f64,
 ) -> Result<()> {
-    let Acquired { cfg, raw, result, calibrated } = acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?;
+    let Acquired { cfg, raw, mut result, calibrated } = acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?;
+
+    if let Some(spec) = &gate_arg {
+        let (a, b) = spec.split_once(':').with_context(|| format!("--gate wants START:STOP in metres, got {spec:?}"))?;
+        let (start_m, stop_m): (f64, f64) = (a.trim().parse().context("gate start")?, b.trim().parse().context("gate stop")?);
+        let to_s = |d: f64| 2.0 * d / (litevna::timedomain::C0 * vf);
+        let g = Gate { start_s: to_s(start_m), stop_s: to_s(stop_m), kind: if gate_notch { GateKind::Notch } else { GateKind::BandPass } };
+        let tcfg = TdrConfig { velocity_factor: vf, ..Default::default() };
+        let gated = compute_gate(&result.freqs_hz, &result.s11, &tcfg, &g)?;
+        eprintln!(
+            "time gate {} {:.3}..{:.3} m (VF {vf}): outer {} of the band on each side is unreliable",
+            g.kind.name(),
+            start_m,
+            stop_m,
+            format_hz(gated.edge_hz as u64)
+        );
+        result.s11 = gated.s11;
+    }
 
     print_table(&result, rows);
     if let Some(p) = raw.points.iter().flatten().next() {

@@ -13,7 +13,7 @@ Grootte: S = een avond, M = een paar sessies, L = meerdere dagen inclusief meten
 |---|------|---------|--------|
 | 1 | Kit-fit in de GUI | S | gedaan 2026-11-04 |
 | 2 | Meer weergaven: R/X, fase, groepsvertraging | M | gedaan 2026-11-04 |
-| 3 | Gated TDR (time gating) | M | open |
+| 3 | Gated TDR (time gating) | M | gedaan 2026-11-04 |
 | 4 | Load-definitie fitten | M | open |
 | 5 | Averaging in software | S | open |
 | 6 | Multi-segment sweeps | M | open |

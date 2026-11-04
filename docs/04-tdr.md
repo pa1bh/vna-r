@@ -86,3 +86,38 @@ Twee implementatiefouten die de synthetische tests niet vingen maar de echte met
 een piekzoeker die bin 0 (het referentievlak) oversloeg, en een stapresponse die de helft van een
 impuls op t = 0 miste omdat die in de IFFT op "negatieve tijd" terechtkomt. Beide zijn gerepareerd
 en hebben nu een test.
+
+## 6. Time gating (4 november 2026)
+
+Een gate is een venster in de tijd: je houdt de reflecties tussen `start` en `stop` (band pass) of
+haalt ze juist weg (notch), en rekent het resultaat terug naar het frequentiedomein. Zo kun je de
+connectorreflectie bij 0 m uit een antennemeting snijden, of alleen het antenne-eind van een
+voedingslijn bekijken.
+
+Implementatie (`timedomain::gate`), zoals tafel-analyzers het doen:
+
+1. de gemeten band krijgt het TDR-venster (Hann) en gaat met een complexe IFFT naar de tijd, op
+   de echte bins zodat negatieve tijden netjes in de bovenste helft van de buffer belanden;
+2. de tijdresponsie wordt vermenigvuldigd met de gate: 1 binnenin, 0 erbuiten, flanken van
+   raised-cosine met een breedte van 2× de TDR-resolutie (voor notch 1 − gate);
+3. FFT terug, de bins van de meetfrequenties worden gelezen en het venster wordt er weer uit
+   gedeeld. Waar het venster onder 0,1 komt (de uiterste punten van de band) wordt de deling
+   afgekapt: daar is de trace gedempt en ruiser.
+
+Twee beperkingen zijn inherent, niet van deze implementatie:
+
+- **Bandranden.** Een gate van breedte T smeert het frequentiebeeld uit over ≈ 1/T. Een gate van
+  5 ns (0,5 m bij VF 0,7) geeft 200 MHz: de buitenste 200 MHz aan elke kant van de band zijn niet
+  te vertrouwen. De GUI tekent daar grijze stippellijnen, `GatedResult::edge_hz` geeft de waarde.
+  Breder gaten en breder sweepen helpt beide.
+- **Resolutie.** Een gate kan niets scheiden dat dichter bij elkaar ligt dan 1/span.
+
+Synthetische test (`gate_isolates_the_far_reflection`): 0,05 reflectie op het referentievlak plus
+een short van 0,9 op 1 m, 1 MHz–1 GHz; een band-pass gate van 6 ns rond de short geeft midden in de
+band de short terug met een fout < 0,02, de notch rond 0 m eveneens; een band-pass rond 0 m houdt
+alleen de 0,05 over.
+
+GUI: **Gate** in het TDR-paneel, start/stop in meters (sleepbaar als oranje lijnen in de TDR-plots,
+of "Gate around TDR marker"), band pass/notch. Met de gate aan toont het frequentiebeeld de
+gegate S11 met het label GATED, inclusief markers, Smith-chart en de s2p-export. CLI:
+`vna-cli sweep --cal x.json --gate 0.9:1.2 [--gate-notch] [--vf 0.7] --s2p out.s2p`.

@@ -70,7 +70,10 @@ geladen.
 
 ### TDR
 
-Zie [docs/04-tdr.md](docs/04-tdr.md). In de GUI: kies **TDR** in het linkerpaneel.
+Zie [docs/04-tdr.md](docs/04-tdr.md). In de GUI: kies **TDR** in het linkerpaneel. Met **Gate** aan
+houd je alleen de reflecties tussen twee afstanden over (of haal je ze weg met *notch*); de oranje
+lijnen in de TDR-plots zijn sleepbaar en het frequentiebeeld toont dan de gegate S11 (label GATED).
+CLI: `vna-cli sweep --cal x.json --gate 0.9:1.2 --s2p uit.s2p`.
 
 ### Calibratie
 

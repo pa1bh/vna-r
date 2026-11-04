@@ -8,7 +8,7 @@ use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
 use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
-use litevna::timedomain::{tdr, TdrConfig, TdrResult, Window};
+use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
 use litevna::touchstone::{db, swr, write_s2p};
 use litevna::traces::{self, impedance, Param, TraceKind};
 use litevna::{DeviceInfo, Screenshot, SweepConfig, SweepResult};
@@ -20,6 +20,7 @@ use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
 
 const S11_COLOR: Color32 = Color32::from_rgb(255, 204, 0);
 const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
+const GATE_COLOR: Color32 = Color32::from_rgb(255, 150, 80);
 const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 const MARKERS: usize = 4;
@@ -53,6 +54,10 @@ struct Settings {
     /// Trace kind per plot (ids from TraceKind::id), top-right, bottom-left, bottom-right.
     plot_kinds: [String; 3],
     gd_aperture: usize,
+    gate_on: bool,
+    gate_start_m: f64,
+    gate_stop_m: f64,
+    gate_notch: bool,
 }
 
 impl Default for Settings {
@@ -76,6 +81,10 @@ impl Default for Settings {
             fit_as_delay: false,
             plot_kinds: ["logmag".into(), "swr".into(), "phase".into()],
             gd_aperture: 2,
+            gate_on: false,
+            gate_start_m: -0.1,
+            gate_stop_m: 0.5,
+            gate_notch: false,
         }
     }
 }
@@ -135,6 +144,16 @@ impl CalState {
     }
 }
 
+#[derive(Clone, Copy, PartialEq)]
+struct GateKey {
+    shown_rev: u64,
+    vf: f64,
+    window: Window,
+    start_m: f64,
+    stop_m: f64,
+    notch: bool,
+}
+
 pub struct App {
     worker: WorkerHandle,
     ports: Vec<PortCandidate>,
@@ -173,7 +192,20 @@ pub struct App {
     tdr_window: Window,
     tdr_max_m: f64,
     tdr_marker: Option<usize>,
+    /// Bumped whenever `shown` changes (new sweep, calibration toggled or loaded).
+    shown_rev: u64,
+    gate_on: bool,
+    /// Gate edges as one-way distance (m), like the TDR x axis.
+    gate_start_m: f64,
+    gate_stop_m: f64,
+    gate_notch: bool,
+    /// Which gate edge the pointer hovers / drags in the TDR plots (0 = start, 1 = stop).
+    gate_hover: Option<usize>,
+    gate_drag: Option<usize>,
+    gate_error: Option<String>,
+    gated_cache: Option<(GateKey, Vec<Complex64>, f64)>,
     /// (sweep number, vf, window) the cached result belongs to.
+    /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
 }
 
@@ -218,6 +250,15 @@ impl App {
             tdr_window: Window::Hann,
             tdr_max_m: 2.0,
             tdr_marker: None,
+            shown_rev: 0,
+            gate_on: false,
+            gate_start_m: -0.1,
+            gate_stop_m: 0.5,
+            gate_notch: false,
+            gate_hover: None,
+            gate_drag: None,
+            gate_error: None,
+            gated_cache: None,
             tdr_cache: None,
         };
         app.refresh_ports();
@@ -255,6 +296,10 @@ impl App {
             }
         }
         self.gd_aperture = s.gd_aperture.clamp(1, 50);
+        self.gate_on = s.gate_on;
+        self.gate_start_m = s.gate_start_m;
+        self.gate_stop_m = s.gate_stop_m;
+        self.gate_notch = s.gate_notch;
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -290,6 +335,10 @@ impl App {
             fit_as_delay: self.cal.fit_as_delay,
             plot_kinds: [self.plot_kinds[0].id().into(), self.plot_kinds[1].id().into(), self.plot_kinds[2].id().into()],
             gd_aperture: self.gd_aperture,
+            gate_on: self.gate_on,
+            gate_start_m: self.gate_start_m,
+            gate_stop_m: self.gate_stop_m,
+            gate_notch: self.gate_notch,
         }
     }
 
@@ -353,7 +402,8 @@ impl App {
                     Purpose::Display => {
                         self.last_cfg = Some(cfg);
                         self.sweep_count += 1;
-                        self.shown = Some(self.corrected(&result));
+                        let corrected = self.corrected(&result);
+                        self.set_shown(corrected);
                         if let Some(freqs) = self.pending_marker_freqs.take() {
                             for (k, f) in freqs.iter().enumerate() {
                                 self.markers[k] = f.map(|f| nearest_index(&result.freqs_hz, f));
@@ -382,6 +432,60 @@ impl App {
                     }
                 }
             }
+        }
+    }
+
+    fn set_shown(&mut self, sweep: SweepResult) {
+        self.shown = Some(sweep);
+        self.shown_rev += 1;
+    }
+
+    /// Round-trip seconds for a one-way distance at the current VF.
+    fn gate_time(&self, d_m: f64) -> f64 {
+        2.0 * d_m / (C0 * self.tdr_vf)
+    }
+
+    /// Gated S11 of the shown sweep (cached), with the unreliable band-edge width in Hz.
+    fn gated_s11(&mut self) -> Option<(Vec<Complex64>, f64)> {
+        if !self.gate_on {
+            return None;
+        }
+        let sweep = self.shown.as_ref()?;
+        let key = GateKey { shown_rev: self.shown_rev, vf: self.tdr_vf, window: self.tdr_window, start_m: self.gate_start_m, stop_m: self.gate_stop_m, notch: self.gate_notch };
+        if !matches!(&self.gated_cache, Some((k, _, _)) if *k == key) {
+            let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
+            let g = Gate {
+                start_s: self.gate_time(self.gate_start_m),
+                stop_s: self.gate_time(self.gate_stop_m),
+                kind: if self.gate_notch { GateKind::Notch } else { GateKind::BandPass },
+            };
+            match gate(&sweep.freqs_hz, &sweep.s11, &cfg, &g) {
+                Ok(r) => {
+                    self.gated_cache = Some((key, r.s11, r.edge_hz));
+                    self.gate_error = None;
+                }
+                Err(e) => {
+                    self.gated_cache = None;
+                    self.gate_error = Some(e.to_string());
+                    return None;
+                }
+            }
+        }
+        self.gated_cache.as_ref().map(|(_, s, e)| (s.clone(), *e))
+    }
+
+    /// The sweep the frequency view works on: `shown`, with S11 gated when the gate is on.
+    fn freq_sweep(&mut self) -> Option<SweepResult> {
+        let mut sweep = self.shown.clone()?;
+        if let Some((s11, _)) = self.gated_s11() {
+            sweep.s11 = s11;
+        }
+        Some(sweep)
+    }
+
+    fn gate_tag(&self, ui: &mut egui::Ui) {
+        if self.gate_on && self.gated_cache.is_some() {
+            ui.label(RichText::new("GATED").color(GATE_COLOR).strong()).on_hover_text("S11 is time-gated; see the TDR panel");
         }
     }
 
@@ -417,7 +521,8 @@ impl App {
         }
         self.cal.solved = None;
         if let Some(raw) = self.raw.clone() {
-            self.shown = Some(self.corrected(&raw));
+            let corrected = self.corrected(&raw);
+            self.set_shown(corrected);
         }
     }
 
@@ -597,6 +702,42 @@ impl App {
                 }
             }
 
+            ui.add_space(6.0);
+            ui.checkbox(&mut self.gate_on, "Gate").on_hover_text("Time-gate S11: keep (band pass) or remove (notch) the reflections between start and stop. Applies to the frequency view and exports.");
+            if self.gate_on {
+                egui::Grid::new("gate-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+                    ui.label("Start");
+                    ui.add(egui::DragValue::new(&mut self.gate_start_m).speed(0.005).fixed_decimals(3).suffix(" m"));
+                    ui.end_row();
+                    ui.label("Stop");
+                    ui.add(egui::DragValue::new(&mut self.gate_stop_m).speed(0.005).fixed_decimals(3).suffix(" m"));
+                    ui.end_row();
+                    ui.label("Kind");
+                    egui::ComboBox::from_id_salt("gate-kind").selected_text(if self.gate_notch { "notch" } else { "band pass" }).show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.gate_notch, false, "band pass");
+                        ui.selectable_value(&mut self.gate_notch, true, "notch");
+                    });
+                    ui.end_row();
+                });
+                if self.gate_stop_m <= self.gate_start_m {
+                    self.gate_stop_m = self.gate_start_m + 0.01;
+                }
+                let res_m = self.tdr_cache.as_ref().map(|(_, _, _, t)| t.resolution_m());
+                let marker_d = self.tdr_marker.and_then(|i| self.tdr_cache.as_ref().and_then(|(_, _, _, t)| t.distance_m.get(i).copied()));
+                if let (Some(res), Some(d)) = (res_m, marker_d) {
+                    if ui.small_button("Gate around TDR marker").on_hover_text("±3 resolutions around the marker").clicked() {
+                        self.gate_start_m = d - 3.0 * res;
+                        self.gate_stop_m = d + 3.0 * res;
+                    }
+                }
+                if let Some((_, _, edge_hz)) = &self.gated_cache {
+                    ui.small(format!("band edges: outer {} on each side unreliable (gate blur ≈ 1/width)", format_hz(*edge_hz as u64)));
+                }
+                if let Some(e) = &self.gate_error {
+                    ui.colored_label(GATE_COLOR, format!("gate: {e}"));
+                }
+            }
+
             ui.add_space(12.0);
             ui.heading("Export");
             if ui.add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)")).clicked() {
@@ -665,7 +806,8 @@ impl App {
             let changed = ui.checkbox(&mut self.cal.apply, "apply").changed();
             if changed {
                 if let Some(raw) = self.raw.clone() {
-                    self.shown = Some(self.corrected(&raw));
+                    let corrected = self.corrected(&raw);
+                    self.set_shown(corrected);
                 }
             }
             if ui.button("Load…").clicked() {
@@ -682,7 +824,7 @@ impl App {
                     ..Default::default()
                 };
                 if let Some(raw) = self.raw.clone() {
-                    self.shown = Some(raw);
+                    self.set_shown(raw);
                 }
             }
         });
@@ -737,7 +879,8 @@ impl App {
                 self.cal.solved = None;
                 self.cal.message = Some("kit reset to ideal".into());
                 if let Some(raw) = self.raw.clone() {
-                    self.shown = Some(self.corrected(&raw));
+                    let corrected = self.corrected(&raw);
+                    self.set_shown(corrected);
                 }
             }
         });
@@ -792,7 +935,8 @@ impl App {
         self.cal.solved = None;
         self.cal.message = Some(format!("kit updated: open C0 {:.1} fF, delay {:.2} ps — save to keep it", set.kit.open_c0() * 1e15, set.kit.open.offset_delay_s * 1e12));
         if let Some(raw) = self.raw.clone() {
-            self.shown = Some(self.corrected(&raw));
+            let corrected = self.corrected(&raw);
+            self.set_shown(corrected);
         }
     }
 
@@ -811,7 +955,8 @@ impl App {
                 self.cal.warning = None;
                 self.cal.message = Some("loaded".into());
                 if let Some(raw) = self.raw.clone() {
-                    self.shown = Some(self.corrected(&raw));
+                    let corrected = self.corrected(&raw);
+                    self.set_shown(corrected);
                 }
             }
             Err(e) => self.error = Some(format!("loading calibration: {e}")),
@@ -831,14 +976,20 @@ impl App {
     }
 
     fn save_s2p(&mut self) {
-        let Some(sweep) = &self.shown else { return };
+        let Some(sweep) = self.freq_sweep() else { return };
         let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s2p"]).set_file_name("sweep.s2p").save_file() else { return };
+        let gated = if self.gate_on && self.gated_cache.is_some() {
+            format!(", S11 time-gated {:.2}..{:.2} m {}", self.gate_start_m, self.gate_stop_m, if self.gate_notch { "notch" } else { "band pass" })
+        } else {
+            String::new()
+        };
         let comment = format!(
-            "vna-r, {} points, {}",
+            "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),
-            if self.cal.apply && self.cal.solved.is_some() { "host calibrated" } else { "uncalibrated raw" }
+            if self.cal.apply && self.cal.solved.is_some() { "host calibrated" } else { "uncalibrated raw" },
+            gated
         );
-        match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), sweep, Some(&comment))) {
+        match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
             Ok(()) => self.cal.message = Some(format!("wrote {}", path.display())),
             Err(e) => self.error = Some(format!("saving s2p: {e}")),
         }
@@ -854,9 +1005,17 @@ impl App {
         self.marker_readout(ui);
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
-        let Some(sweep) = self.shown.clone() else {
+        let Some(sweep) = self.freq_sweep() else {
             ui.centered_and_justified(|ui| ui.label("Connect and press Run"));
             return;
+        };
+        // Grey lines where a gated trace stops being trustworthy.
+        let edge_lines: Vec<f64> = match self.gated_cache.as_ref().filter(|_| self.gate_on) {
+            Some((_, _, edge_hz)) => {
+                let (f0, f1) = (sweep.freqs_hz[0] as f64, *sweep.freqs_hz.last().unwrap() as f64);
+                vec![(f0 + edge_hz) / 1e6, (f1 - edge_hz) / 1e6]
+            }
+            None => Vec::new(),
         };
         let mhz: Vec<f64> = sweep.freqs_hz.iter().map(|f| *f as f64 / 1e6).collect();
         // Arrow keys nudge the active marker (shift: 10 points).
@@ -901,13 +1060,13 @@ impl App {
                     }
                 }
             }
-            if let Some(x) = self.kind_plot(&mut cols[1], 0, h, &mhz, &sweep, &marker_lines) {
+            if let Some(x) = self.kind_plot(&mut cols[1], 0, h, &mhz, &sweep, &marker_lines, &edge_lines) {
                 clicked_x = Some(x);
             }
         });
         ui.columns(2, |cols| {
             for (col, k) in [(0usize, 1usize), (1, 2)] {
-                if let Some(x) = self.kind_plot(&mut cols[col], k, h, &mhz, &sweep, &marker_lines) {
+                if let Some(x) = self.kind_plot(&mut cols[col], k, h, &mhz, &sweep, &marker_lines, &edge_lines) {
                     clicked_x = Some(x);
                 }
             }
@@ -922,7 +1081,8 @@ impl App {
 
     /// One selectable plot: a header with the trace-kind combo box, then the
     /// plot itself. Returns the clicked x (MHz) if the user clicked in it.
-    fn kind_plot(&mut self, ui: &mut egui::Ui, slot: usize, h: f32, mhz: &[f64], sweep: &SweepResult, marker_lines: &[(f64, Color32)]) -> Option<f64> {
+    #[allow(clippy::too_many_arguments)]
+    fn kind_plot(&mut self, ui: &mut egui::Ui, slot: usize, h: f32, mhz: &[f64], sweep: &SweepResult, marker_lines: &[(f64, Color32)], edge_lines: &[f64]) -> Option<f64> {
         let header_h = 22.0;
         ui.horizontal(|ui| {
             egui::ComboBox::from_id_salt(("plot_kind", slot))
@@ -966,6 +1126,9 @@ impl App {
                 for (k, (x, c)) in marker_lines.iter().enumerate() {
                     pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
                 }
+                for x in edge_lines {
+                    pui.vline(VLine::new("gate edge", *x).color(Color32::from_gray(110)).style(egui_plot::LineStyle::dashed_dense()));
+                }
                 (pui.response().clicked(), pui.pointer_coordinate())
             });
         match r.inner {
@@ -976,11 +1139,11 @@ impl App {
 
     fn tdr_result(&mut self) -> Option<&TdrResult> {
         let sweep = self.shown.as_ref()?;
-        let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.sweep_count && *vf == self.tdr_vf && *w == self.tdr_window);
+        let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.shown_rev && *vf == self.tdr_vf && *w == self.tdr_window);
         if !fresh {
             let cfg = TdrConfig { window: self.tdr_window, velocity_factor: self.tdr_vf, fft_size: 0 };
             match tdr(&sweep.freqs_hz, &sweep.s11, &cfg) {
-                Ok(t) => self.tdr_cache = Some((self.sweep_count, self.tdr_vf, self.tdr_window, t)),
+                Ok(t) => self.tdr_cache = Some((self.shown_rev, self.tdr_vf, self.tdr_window, t)),
                 Err(e) => {
                     self.error = Some(format!("TDR: {e}"));
                     self.tdr_cache = None;
@@ -1018,12 +1181,20 @@ impl App {
                     RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
                 };
                 ui.label(tag.strong());
+                self.gate_tag(ui);
+                if self.gate_on {
+                    ui.small("drag the orange lines to move the gate");
+                }
             });
         });
 
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
         let limit = self.tdr_max_m.min(t.max_distance_m());
+        let gate_x = if self.gate_on { Some((self.gate_start_m, self.gate_stop_m)) } else { None };
+        let plot_drag_ok = self.gate_hover.is_none() && self.gate_drag.is_none();
+        self.gate_hover = None;
+        let mut gate_events: Vec<GateEvent> = Vec::new();
         let n = t.distance_m.iter().position(|d| *d > limit).unwrap_or(t.distance_m.len());
         let dist = &t.distance_m[..n];
         let marker_x = self.tdr_marker.and_then(|i| dist.get(i).copied());
@@ -1037,16 +1208,16 @@ impl App {
             .include_y(-60.0)
             .include_x(0.0)
             .include_x(limit)
+            .allow_drag(plot_drag_ok)
             .show(ui, |pui| {
                 pui.line(Line::new("impulse", series(dist, t.impulse_mag[..n].iter().map(|m| db(*m).max(-100.0)))).color(S11_COLOR));
                 if let Some(x) = marker_x {
                     pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
                 }
-                (pui.response().clicked(), pui.pointer_coordinate())
+                GateEvent::read(pui, gate_x)
             });
-        if let (true, Some(p)) = r.inner {
-            clicked_x = Some(p.x);
-        }
+        draw_gate(ui, &r.transform, r.response.rect, gate_x);
+        gate_events.push(r.inner);
         let r = Plot::new("tdr-z")
             .height(h)
             .x_axis_label("m")
@@ -1055,15 +1226,40 @@ impl App {
             .include_y(100.0)
             .include_x(0.0)
             .include_x(limit)
+            .allow_drag(plot_drag_ok)
             .show(ui, |pui| {
                 pui.line(Line::new("Z", series(dist, t.impedance_ohm[..n].iter().map(|z| z.min(500.0)))).color(S21_COLOR));
                 if let Some(x) = marker_x {
                     pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
                 }
-                (pui.response().clicked(), pui.pointer_coordinate())
+                GateEvent::read(pui, gate_x)
             });
-        if let (true, Some(p)) = r.inner {
-            clicked_x = Some(p.x);
+        draw_gate(ui, &r.transform, r.response.rect, gate_x);
+        gate_events.push(r.inner);
+
+        for ev in gate_events {
+            if ev.hover.is_some() {
+                self.gate_hover = ev.hover;
+                ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+            }
+            if ev.drag_started && ev.hover.is_some() {
+                self.gate_drag = ev.hover;
+            }
+            if ev.dragged {
+                if let (Some(edge), Some(x)) = (self.gate_drag, ev.pointer.map(|p| p.x)) {
+                    let min_gap = t.resolution_m() * 0.5;
+                    match edge {
+                        0 => self.gate_start_m = x.min(self.gate_stop_m - min_gap),
+                        _ => self.gate_stop_m = x.max(self.gate_start_m + min_gap),
+                    }
+                }
+            }
+            if ev.drag_stopped {
+                self.gate_drag = None;
+            }
+            if ev.clicked && ev.hover.is_none() && self.gate_drag.is_none() {
+                clicked_x = ev.pointer.map(|p| p.x);
+            }
         }
         if let Some(x) = clicked_x {
             let best = dist.iter().enumerate().map(|(i, d)| (i, (d - x).abs())).min_by(|a, b| a.1.total_cmp(&b.1));
@@ -1090,7 +1286,7 @@ impl App {
                 self.markers = [None; MARKERS];
             }
             ui.separator();
-            if let Some(sweep) = self.shown.clone() {
+            if let Some(sweep) = self.freq_sweep() {
                 let n = sweep.freqs_hz.len();
                 let argmin = |f: &dyn Fn(usize) -> f64| (0..n).min_by(|a, b| f(*a).total_cmp(&f(*b)));
                 if ui.small_button("min SWR").on_hover_text("move the active marker to the lowest |S11|").clicked() {
@@ -1110,10 +1306,12 @@ impl App {
                     RichText::new("RAW").color(Color32::from_rgb(230, 150, 80))
                 };
                 ui.label(tag.strong());
+                self.gate_tag(ui);
             });
         });
 
-        let Some(sweep) = &self.shown else { return };
+        let Some(sweep_owned) = self.freq_sweep() else { return };
+        let sweep = &sweep_owned;
         let placed: Vec<(usize, usize)> = self.markers.iter().enumerate().filter_map(|(k, m)| m.map(|i| (k, i))).filter(|(_, i)| *i < sweep.freqs_hz.len()).collect();
         if placed.is_empty() {
             return;
@@ -1215,6 +1413,53 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.screenshot_window(&ctx);
     }
+}
+
+/// Pointer interaction with the gate lines in one TDR plot.
+struct GateEvent {
+    clicked: bool,
+    pointer: Option<egui_plot::PlotPoint>,
+    /// Gate edge under the pointer (0 = start, 1 = stop).
+    hover: Option<usize>,
+    drag_started: bool,
+    dragged: bool,
+    drag_stopped: bool,
+}
+
+impl GateEvent {
+    fn read(pui: &egui_plot::PlotUi<'_>, gate_x: Option<(f64, f64)>) -> Self {
+        let resp = pui.response();
+        let pointer = pui.pointer_coordinate();
+        let near = pui.plot_bounds().width() * 0.015;
+        let hover = match (pointer, gate_x) {
+            (Some(p), Some((a, b))) if resp.hovered() || resp.dragged() => {
+                if (p.x - a).abs() < near {
+                    Some(0)
+                } else if (p.x - b).abs() < near {
+                    Some(1)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+        GateEvent { clicked: resp.clicked(), pointer, hover, drag_started: resp.drag_started(), dragged: resp.dragged(), drag_stopped: resp.drag_stopped() }
+    }
+}
+
+/// Paint the gate on top of a plot in screen space, so it never feeds back
+/// into the plot's auto-bounds (a data-space polygon sized to the current
+/// bounds would grow the bounds every frame).
+fn draw_gate(ui: &egui::Ui, transform: &egui_plot::PlotTransform, rect: egui::Rect, gate_x: Option<(f64, f64)>) {
+    let Some((a, b)) = gate_x else { return };
+    let x_of = |x: f64| transform.position_from_point(&egui_plot::PlotPoint::new(x, 0.0)).x;
+    let (xa, xb) = (x_of(a), x_of(b));
+    let painter = ui.painter().with_clip_rect(rect);
+    let band = egui::Rect::from_min_max(egui::pos2(xa.min(xb), rect.top()), egui::pos2(xa.max(xb), rect.bottom()));
+    painter.rect_filled(band, 0.0, Color32::from_rgba_unmultiplied(255, 150, 80, 22));
+    let stroke = egui::Stroke::new(1.5, GATE_COLOR);
+    painter.vline(xa, rect.y_range(), stroke);
+    painter.vline(xb, rect.y_range(), stroke);
 }
 
 fn nearest_index(freqs: &[u64], f: u64) -> usize {
