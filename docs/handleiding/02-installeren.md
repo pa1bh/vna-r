@@ -77,7 +77,9 @@ hangt die aan een release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, 
 handleiding en (op Linux) de udev-regel. Het zijn gewone dynamisch gelinkte binaries:
 op Linux moeten `libudev` en GTK 3 van de distributie aanwezig zijn, en op NixOS werken
 ze niet (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
-publiceert; bouw dan zelf uit de bron.
+publiceert; bouw dan zelf uit de bron. Wat er per versie veranderd is staat in
+`CHANGELOG.md`; welke versie je draait zie je onder **Help ▸ About** of met
+`vna-cli --version`.
 
 ## Aansluiten
 

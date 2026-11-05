@@ -1,7 +1,8 @@
 [package]
 name = "vna-cli"
-version = "0.1.0"
-description = "Proof-of-concept command line tool for the LiteVNA 67"
+version.workspace = true
+description = "Command line tool for LiteVNA and NanoVNA-F vector network analysers"
+build = "build.rs"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

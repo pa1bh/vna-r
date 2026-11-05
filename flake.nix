@@ -24,9 +24,13 @@
             libxi
             libxrandr
           ]);
+          # One version number for the whole workspace, read from Cargo.toml.
+          version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
           vna-r = pkgs.rustPlatform.buildRustPackage {
             pname = "vna-r";
-            version = "0.1.0";
+            inherit version;
+            # build.rs shows this in About and --version; the store copy has no .git.
+            VNA_R_GIT_REV = self.shortRev or self.dirtyShortRev or "unknown";
             # Only the git-tracked files, so a local target/ or cal/ never ends up in the store.
             src = self;
             cargoLock.lockFile = ./Cargo.lock;

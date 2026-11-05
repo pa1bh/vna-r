@@ -1,8 +1,25 @@
 # 3. De GUI
 
 Start met `cargo run --release -p vna-gui` of `target/release/vna-gui`. Het venster heeft een
-bovenbalk (poort, verbinding, Run), een linkerpaneel met instellingen en een
-hoofdgebied met vier grafieken.
+menubalk, een werkbalk (poort, verbinding, Run), een linkerpaneel met instellingen en een
+hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
+
+## Menubalk
+
+- **File**: Touchstone-bestanden openen als trace of referentie, opslaan als .s2p,
+  calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
+- **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
+  en een schermafbeelding van het apparaat.
+- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, en de schakelaar
+  **Developer tools**.
+- **Help**: de handleiding en de probleemmelder op GitHub, en **About vna-r** met versie,
+  build-revisie, auteur en de link naar het project.
+
+**Developer tools** staat normaal uit. Aan zet het een menu **Developer** erbij met een
+logvenster (verbindingen, fouten, bestandsbewerkingen en, zolang het venster open is,
+elke sweep met puntenaantal en duur) en **Copy diagnostics**: dat zet versie, apparaat,
+sweep-instellingen, calibratie, de laatste fout en het log als tekst op het klembord. Plak
+dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
 
 ![Weergaven, markers en een gecalibreerde meting van een kabel met load](../images/gui-load-rx.webp)
 

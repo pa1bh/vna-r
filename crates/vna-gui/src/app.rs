@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
@@ -18,6 +18,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::smith::SmithChart;
 use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
+
+/// Version of the workspace (one number for library, CLI and GUI).
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Git revision recorded by build.rs ("unknown" in a build without git).
+pub const GIT_REV: &str = env!("VNA_R_GIT_REV");
+const REPO_URL: &str = "https://github.com/pa1bh/vna-r";
+const MANUAL_URL: &str = "https://github.com/pa1bh/vna-r/blob/main/docs/handleiding/README.md";
+const ISSUES_URL: &str = "https://github.com/pa1bh/vna-r/issues";
+/// Lines kept in the developer log.
+const LOG_LINES: usize = 400;
 
 const S11_COLOR: Color32 = Color32::from_rgb(255, 204, 0);
 const S21_COLOR: Color32 = Color32::from_rgb(80, 220, 120);
@@ -73,6 +83,8 @@ struct Settings {
     sweep_avg: usize,
     /// Segments beyond the primary one (start/stop/points/calibration file).
     extra_segments: Vec<SegmentSettings>,
+    /// Developer menu and log window (off for normal use).
+    dev_tools: bool,
 }
 
 /// One extra sweep segment. The primary segment is the Start/Stop/Points of
@@ -114,6 +126,7 @@ impl Default for Settings {
             gate_notch: false,
             sweep_avg: 1,
             extra_segments: Vec::new(),
+            dev_tools: false,
         }
     }
 }
@@ -281,6 +294,14 @@ pub struct App {
     /// (sweep number, vf, window) the cached result belongs to.
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
+
+    show_about: bool,
+    /// Developer menu visible (View ▸ Developer tools).
+    dev_tools: bool,
+    show_log: bool,
+    /// Developer log: connection events, errors, file operations, sweeps while the window is open.
+    log: VecDeque<String>,
+    started: Instant,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -349,7 +370,17 @@ impl App {
             file_trace: None,
             file_message: None,
             tdr_cache: None,
+            show_about: false,
+            dev_tools: false,
+            show_log: false,
+            log: VecDeque::new(),
+            started: Instant::now(),
         };
+        app.log(format!(
+            "vna-r {VERSION} ({GIT_REV}) on {} {}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
         app.refresh_ports();
         if let Some(storage) = cc.storage {
             if let Some(settings) = eframe::get_value::<Settings>(storage, eframe::APP_KEY) {
@@ -391,6 +422,7 @@ impl App {
         self.gate_notch = s.gate_notch;
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.extra_segments = s.extra_segments;
+        self.dev_tools = s.dev_tools;
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -436,7 +468,81 @@ impl App {
             gate_notch: self.gate_notch,
             sweep_avg: self.sweep_avg,
             extra_segments: self.extra_segments.clone(),
+            dev_tools: self.dev_tools,
         }
+    }
+
+    /// Append a line to the developer log, stamped with seconds since start.
+    fn log(&mut self, msg: impl Into<String>) {
+        let t = self.started.elapsed().as_secs_f64();
+        self.log.push_back(format!("{t:8.1}  {}", msg.into()));
+        while self.log.len() > LOG_LINES {
+            self.log.pop_front();
+        }
+    }
+
+    /// Everything a bug report needs, as plain text for the clipboard.
+    fn diagnostics(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!(
+            "vna-r {VERSION} ({GIT_REV}), {} {}\n",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
+        match &self.connection {
+            Connection::Connected { port, info, battery_mv } => {
+                out.push_str(&format!("device: {} on {port}", info.summary()));
+                if let Some(mv) = battery_mv {
+                    out.push_str(&format!(", battery {:.2} V", *mv as f64 / 1000.0));
+                }
+                out.push_str(&format!("\n{}\n", info.detail));
+            }
+            Connection::Connecting(p) => out.push_str(&format!("device: connecting to {p}\n")),
+            Connection::Disconnected => out.push_str("device: not connected\n"),
+        }
+        out.push_str(&format!(
+            "sweep: {} – {}, {} points, average {}, sweep avg {}, {} extra segment(s)\n",
+            self.start,
+            self.stop,
+            self.points,
+            self.average,
+            self.sweep_avg,
+            self.extra_segments.len()
+        ));
+        if let Some(raw) = &self.raw {
+            out.push_str(&format!(
+                "last sweep: {} points in {} ms, #{}\n",
+                raw.freqs_hz.len(),
+                raw.elapsed.as_millis(),
+                self.sweep_count
+            ));
+        }
+        out.push_str(&format!(
+            "calibration: {}{}\n",
+            match &self.cal.set {
+                Some(set) => format!(
+                    "{} points, {} – {}",
+                    set.freqs_hz.len(),
+                    format_hz(set.freqs_hz[0]),
+                    format_hz(*set.freqs_hz.last().unwrap())
+                ),
+                None => "none".to_string(),
+            },
+            self.cal
+                .file
+                .as_ref()
+                .map(|f| format!(", file {}", f.display()))
+                .unwrap_or_default()
+        ));
+        if let Some(e) = &self.error {
+            out.push_str(&format!("last error: {e}\n"));
+        }
+        out.push_str("\nlog:\n");
+        for line in &self.log {
+            out.push_str(line);
+            out.push('\n');
+        }
+        out
     }
 
     fn refresh_ports(&mut self) {
@@ -616,10 +722,12 @@ impl App {
         while let Ok(evt) = self.worker.rx.try_recv() {
             match evt {
                 Event::Connected { port, info, battery_mv } => {
+                    self.log(format!("connected: {} on {port}", info.summary()));
                     self.connection = Connection::Connected { port, info, battery_mv };
                     self.error = None;
                 }
                 Event::Disconnected => {
+                    self.log("disconnected");
                     self.connection = Connection::Disconnected;
                     self.running = false;
                 }
@@ -641,6 +749,14 @@ impl App {
                                 self.markers[k] = f.map(|f| nearest_index(&result.freqs_hz, f));
                             }
                         }
+                        if self.show_log {
+                            self.log(format!(
+                                "sweep #{}: {} points in {} ms",
+                                self.sweep_count,
+                                result.freqs_hz.len(),
+                                result.elapsed.as_millis()
+                            ));
+                        }
                         self.raw = Some(result);
                     }
                     Purpose::Standard(std) => {
@@ -657,6 +773,7 @@ impl App {
                 }
                 Event::Error(msg) => {
                     eprintln!("[gui] worker error: {msg}");
+                    self.log(format!("error: {msg}"));
                     self.error = Some(msg);
                     self.running = false;
                     self.cal.pending = None;
@@ -857,8 +974,6 @@ impl App {
             }
         }
         ui.horizontal(|ui| {
-            ui.heading("vna-r");
-            ui.separator();
             ui.add_enabled_ui(!connected, |ui| {
                 let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
                 egui::ComboBox::from_id_salt("port")
@@ -939,6 +1054,249 @@ impl App {
                 }
             });
         });
+    }
+
+    fn menu_bar(&mut self, ui: &mut egui::Ui) {
+        let connected = self.connected();
+        let ctx = ui.ctx().clone();
+        egui::MenuBar::new().ui(ui, |ui| {
+            ui.menu_button("File", |ui| {
+                if ui.button("Open as trace…").clicked() {
+                    ui.close();
+                    self.open_touchstone(false);
+                }
+                if ui
+                    .add_enabled(self.references.len() < MAX_REFS, egui::Button::new("Open as reference…"))
+                    .clicked()
+                {
+                    ui.close();
+                    self.open_touchstone(true);
+                }
+                if ui
+                    .add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)…"))
+                    .clicked()
+                {
+                    ui.close();
+                    self.save_s2p();
+                }
+                ui.separator();
+                if ui.button("Load calibration…").clicked() {
+                    ui.close();
+                    self.load_cal();
+                }
+                if ui
+                    .add_enabled(self.cal.set.is_some(), egui::Button::new("Save calibration…"))
+                    .clicked()
+                {
+                    ui.close();
+                    self.save_cal();
+                }
+                ui.separator();
+                if ui.button("Quit").clicked() {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+            ui.menu_button("Device", |ui| {
+                if connected {
+                    if ui.button("Disconnect").clicked() {
+                        ui.close();
+                        self.running = false;
+                        self.send(Cmd::Disconnect);
+                    }
+                } else if ui
+                    .add_enabled(
+                        self.selected_port.is_some() && !matches!(self.connection, Connection::Connecting(_)),
+                        egui::Button::new("Connect"),
+                    )
+                    .clicked()
+                {
+                    ui.close();
+                    let port = self.selected_port.clone().unwrap();
+                    self.connection = Connection::Connecting(port.clone());
+                    self.send(Cmd::Connect(port));
+                }
+                if ui.button("Rescan ports").clicked() {
+                    ui.close();
+                    self.refresh_ports();
+                }
+                ui.separator();
+                ui.add_enabled_ui(connected, |ui| {
+                    if self.running {
+                        if ui.button("Stop").clicked() {
+                            ui.close();
+                            self.stop_sweep();
+                        }
+                    } else if ui.button("Run").clicked() {
+                        ui.close();
+                        self.start_sweep(true);
+                    }
+                    if ui.add_enabled(!self.running, egui::Button::new("Single sweep")).clicked() {
+                        ui.close();
+                        self.start_sweep(false);
+                    }
+                    if ui.button("Device screenshot").clicked() {
+                        ui.close();
+                        self.send(Cmd::Screenshot);
+                    }
+                });
+            });
+            ui.menu_button("View", |ui| {
+                if ui.radio(self.view == View::Frequency, "Frequency domain").clicked() {
+                    self.view = View::Frequency;
+                }
+                if ui.radio(self.view == View::Tdr, "Time domain (TDR)").clicked() {
+                    self.view = View::Tdr;
+                }
+                ui.separator();
+                ui.checkbox(&mut self.show_s11, "S11");
+                ui.checkbox(&mut self.show_s21, "S21");
+                ui.separator();
+                if ui
+                    .checkbox(&mut self.dev_tools, "Developer tools")
+                    .on_hover_text("adds a Developer menu with the log window and diagnostics for bug reports")
+                    .changed()
+                    && !self.dev_tools
+                {
+                    self.show_log = false;
+                }
+            });
+            if self.dev_tools {
+                ui.menu_button("Developer", |ui| {
+                    ui.checkbox(&mut self.show_log, "Log window");
+                    if ui
+                        .button("Copy diagnostics")
+                        .on_hover_text("version, device, sweep, calibration and the log, for a bug report")
+                        .clicked()
+                    {
+                        ui.close();
+                        ctx.copy_text(self.diagnostics());
+                        self.file_message = Some("diagnostics copied to the clipboard".into());
+                    }
+                    if ui.button("Clear log").clicked() {
+                        self.log.clear();
+                    }
+                });
+            }
+            ui.menu_button("Help", |ui| {
+                if ui.button("Manual (GitHub)").clicked() {
+                    ui.close();
+                    ctx.open_url(egui::OpenUrl::new_tab(MANUAL_URL));
+                }
+                if ui.button("Report a problem…").clicked() {
+                    ui.close();
+                    ctx.open_url(egui::OpenUrl::new_tab(ISSUES_URL));
+                }
+                ui.separator();
+                if ui.button("About vna-r").clicked() {
+                    ui.close();
+                    self.show_about = true;
+                }
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.weak(format!("vna-r {VERSION}"));
+            });
+        });
+    }
+
+    fn about_window(&mut self, ctx: &egui::Context) {
+        if !self.show_about {
+            return;
+        }
+        let mut open = self.show_about;
+        egui::Window::new("About vna-r")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(6.0);
+                    ui.label(RichText::new("vna-r").size(28.0).strong());
+                    ui.label(format!("version {VERSION}"));
+                    ui.weak(format!("build {GIT_REV}"));
+                    ui.add_space(10.0);
+                    ui.label("Desktop software for LiteVNA and NanoVNA vector network analysers:");
+                    ui.label("sweeps, calibration, Smith chart, TDR, gating, references and Touchstone files.");
+                    ui.add_space(10.0);
+                    ui.label(RichText::new("Bas Hendriks, PA1BH").strong());
+                    ui.hyperlink_to(REPO_URL, REPO_URL);
+                    ui.add_space(10.0);
+                    ui.weak("MIT licence. Written in Rust with egui.");
+                    ui.add_space(6.0);
+                    if ui.button("Close").clicked() {
+                        self.show_about = false;
+                    }
+                    ui.add_space(4.0);
+                });
+            });
+        self.show_about &= open;
+    }
+
+    fn log_window(&mut self, ctx: &egui::Context) {
+        if !self.show_log {
+            return;
+        }
+        let mut open = self.show_log;
+        let mut copy = false;
+        egui::Window::new("Developer log")
+            .open(&mut open)
+            .resizable(true)
+            .default_size([640.0, 320.0])
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    if let Some(name) = &self.file_trace {
+                        if let Some(raw) = &self.raw {
+                            ui.small(format!(
+                                "file {name}: {} → {} in {} points",
+                                format_hz(raw.freqs_hz[0]),
+                                format_hz(*raw.freqs_hz.last().unwrap()),
+                                raw.freqs_hz.len()
+                            ));
+                        }
+                    } else if let (Some(raw), false) = (&self.raw, self.last_plan.is_empty()) {
+                        let segs = if self.last_plan.len() > 1 {
+                            format!(" in {} segments", self.last_plan.len())
+                        } else {
+                            String::new()
+                        };
+                        ui.small(format!(
+                            "last sweep: {} → {} in {} points{}, {} ms, sweep #{}{}",
+                            format_hz(raw.freqs_hz[0]),
+                            format_hz(*raw.freqs_hz.last().unwrap()),
+                            raw.freqs_hz.len(),
+                            segs,
+                            raw.elapsed.as_millis(),
+                            self.sweep_count,
+                            if self.sweep_avg > 1 {
+                                format!(", avg {}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg)
+                            } else {
+                                String::new()
+                            }
+                        ));
+                    } else {
+                        ui.small("no sweep yet");
+                    }
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.small_button("clear").clicked() {
+                            self.log.clear();
+                        }
+                        if ui.small_button("copy diagnostics").clicked() {
+                            copy = true;
+                        }
+                    });
+                });
+                ui.separator();
+                egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
+                    for line in &self.log {
+                        ui.monospace(line);
+                    }
+                });
+            });
+        if copy {
+            ctx.copy_text(self.diagnostics());
+            self.log("diagnostics copied to the clipboard");
+        }
+        self.show_log = open;
     }
 
     fn side_panel(&mut self, ui: &mut egui::Ui) {
@@ -1137,24 +1495,6 @@ impl App {
                 ui.small(m);
             }
 
-            ui.add_space(12.0);
-            if let Some(name) = &self.file_trace {
-                if let Some(raw) = &self.raw {
-                    ui.small(format!("file {name}: {} → {} in {} points", format_hz(raw.freqs_hz[0]), format_hz(*raw.freqs_hz.last().unwrap()), raw.freqs_hz.len()));
-                }
-            } else if let (Some(raw), false) = (&self.raw, self.last_plan.is_empty()) {
-                let segs = if self.last_plan.len() > 1 { format!(" in {} segments", self.last_plan.len()) } else { String::new() };
-                ui.small(format!(
-                    "last sweep: {} → {} in {} points{}, {} ms, sweep #{}{}",
-                    format_hz(raw.freqs_hz[0]),
-                    format_hz(*raw.freqs_hz.last().unwrap()),
-                    raw.freqs_hz.len(),
-                    segs,
-                    self.raw.as_ref().map(|r| r.elapsed.as_millis()).unwrap_or(0),
-                    self.sweep_count,
-                    if self.sweep_avg > 1 { format!(", avg {}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg) } else { String::new() }
-                ));
-            }
         });
     }
 
@@ -1506,6 +1846,7 @@ impl App {
                 self.cal.fit = None;
                 self.cal.warning = None;
                 self.cal.message = Some("loaded".into());
+                self.log(format!("loaded calibration {}", path.display()));
                 if let Some(raw) = self.raw.clone() {
                     let corrected = self.corrected(&raw);
                     self.set_shown(corrected);
@@ -1530,6 +1871,7 @@ impl App {
             .and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string()))
         {
             Ok(()) => {
+                self.log(format!("saved calibration {}", path.display()));
                 self.cal.file = Some(path);
                 self.cal.message = Some("saved".into());
             }
@@ -1604,7 +1946,10 @@ impl App {
             gated
         );
         match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
-            Ok(()) => self.file_message = Some(format!("wrote {}", path.display())),
+            Ok(()) => {
+                self.log(format!("wrote {}", path.display()));
+                self.file_message = Some(format!("wrote {}", path.display()));
+            }
             Err(e) => self.error = Some(format!("saving s2p: {e}")),
         }
     }
@@ -2172,6 +2517,7 @@ impl eframe::App for App {
             // keep the UI alive while the worker streams sweeps
             ctx.request_repaint_after(Duration::from_millis(100));
         }
+        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui));
         egui::Panel::top("top").show(ui, |ui| self.top_bar(ui));
         egui::Panel::left("side")
             .resizable(true)
@@ -2179,6 +2525,8 @@ impl eframe::App for App {
             .show(ui, |ui| self.side_panel(ui));
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.screenshot_window(&ctx);
+        self.about_window(&ctx);
+        self.log_window(&ctx);
     }
 }
 

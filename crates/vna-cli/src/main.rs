@@ -15,8 +15,11 @@ use litevna::timedomain::{gate as compute_gate, tdr as compute_tdr, Gate, GateKi
 use litevna::touchstone::{db, swr, write_csv, write_s2p};
 use litevna::{SweepConfig, SweepResult, Vna};
 
+/// `vna-cli 0.2.0 (abc1234)`: workspace version plus the git revision from build.rs.
+const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), " (", env!("VNA_R_GIT_REV"), ")");
+
 #[derive(Parser)]
-#[command(name = "vna-cli", version, about = "LiteVNA / NanoVNA command line (PA1BH)")]
+#[command(name = "vna-cli", version = VERSION, about = "LiteVNA / NanoVNA command line (PA1BH)")]
 struct Cli {
     /// Serial port, e.g. /dev/cu.usbmodemXXXX. Auto-detected when omitted.
     #[arg(short, long, global = true)]

@@ -226,3 +226,7 @@ Kleine dingen die tussendoor kunnen zonder een stap te zijn: apparaat-bandbreedt
 (register 0x40 kan niet teruggelezen worden, dus alleen schrijven met een eigen
 administratie), batterijindicator in de GUI, een `--json` export in de CLI, en een
 icoon voor de app-bundel.
+
+Gedaan voor de eerste testronde met anderen (0.2.0): één versienummer in de workspace
+met git-revisie, menubalk met About, Developer tools (log en diagnostiek) standaard uit,
+CHANGELOG met releaseprocedure en een tag-controle in de release-workflow.

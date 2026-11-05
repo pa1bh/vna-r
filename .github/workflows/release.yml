@@ -27,6 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check that the tag matches the workspace version
+        run: |
+          v=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match Cargo.toml version $v"; exit 1
+          fi
+
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
@@ -43,7 +50,7 @@ jobs:
         run: |
           name=vna-r-${GITHUB_REF_NAME}-${{ matrix.target }}
           mkdir -p "$name"
-          cp target/release/vna-cli target/release/vna-gui README.md "$name"/
+          cp target/release/vna-cli target/release/vna-gui README.md CHANGELOG.md LICENSE "$name"/
           cp -r docs/handleiding "$name"/handleiding
           if [ "${{ runner.os }}" = "Linux" ]; then cp linux/99-litevna.rules "$name"/; fi
           tar czf "$name.tar.gz" "$name"
@@ -60,11 +67,20 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
+      - name: Release notes from CHANGELOG.md
+        # The section for this version, up to the next "## " heading.
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          awk -v v="$v" '/^## /{p = index($0, "[" v "]") > 0} p' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Zie CHANGELOG.md." > notes.md
+          cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          body_path: notes.md
           generate_release_notes: true

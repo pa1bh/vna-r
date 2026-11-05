@@ -77,6 +77,15 @@ hoort te zijn: losse connector, verkeerde standaard, of stuk. Controleer en meet
 **De LiteVNA blijft in USB MODE**, of de NanoVNA-F blijft op het raster van de laatste
 meting staan. `vna-cli release`, of uit en aan.
 
+## Een probleem melden
+
+Meld fouten en wensen op <https://github.com/pa1bh/vna-r/issues> (**Help ▸ Report a
+problem…** in de GUI opent die pagina). Zet erbij welke versie je gebruikt (**Help ▸ About**
+of `vna-cli --version`), welk apparaat en welke firmware, en wat je deed. Het makkelijkst:
+zet **View ▸ Developer tools** aan en kies **Developer ▸ Copy diagnostics**; dat zet
+versie, apparaat, sweep-instellingen, calibratie, de laatste fout en het log op het
+klembord, klaar om te plakken. Bij een CLI-probleem helpt de uitvoer met `--trace`.
+
 ## Wat je kunt vertrouwen
 
 Een goede gewoonte is om na het calibreren en voor elke serieuze meting drie dingen te

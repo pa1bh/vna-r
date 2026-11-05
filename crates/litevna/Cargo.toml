@@ -1,6 +1,6 @@
 [package]
 name = "litevna"
-version = "0.1.0"
+version.workspace = true
 description = "Protocol and device driver for LiteVNA / NanoVNA V2 vector network analysers"
 edition.workspace = true
 license.workspace = true

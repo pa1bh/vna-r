@@ -12,8 +12,8 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
    impedantie, dB en fase, de Smith-chart, en hoe vna-r in elkaar zit.
 2. [Installeren en aansluiten](02-installeren.md). Bouwen op macOS en Linux, de USB-poort,
    het eerste contact, wat het scherm van het apparaat doet tijdens een meting.
-3. [De GUI](03-gui.md). Sweep, segmenten, weergaven, markers, middelen, instellingen die
-   bewaard blijven.
+3. [De GUI](03-gui.md). Menubalk, sweep, segmenten, weergaven, markers, middelen,
+   instellingen die bewaard blijven.
 4. [Calibreren](04-calibreren.md). Waarom het moet, open/short/load/through stap voor stap,
    bestanden, interpolatie naar een ander raster, de kit-fit boven 1 GHz, controles en
    valkuilen.
@@ -25,8 +25,8 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
    referenties, schermafbeeldingen.
 8. [Commandoregel: vna-cli](08-cli.md). Alle commando's en opties, met voorbeelden.
 9. [Apparaten, platform en problemen oplossen](09-apparaten-en-problemen.md). LiteVNA 64
-   en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, wat
-   je kunt vertrouwen.
+   en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, een
+   probleem melden, wat je kunt vertrouwen.
 
 Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/06` de onderzoeks- en
 ontwikkelnotities: het USB-protocol, het calibratiemodel met metingen, de TDR-wiskunde en

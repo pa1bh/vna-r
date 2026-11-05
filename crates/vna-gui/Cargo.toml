@@ -1,7 +1,8 @@
 [package]
 name = "vna-gui"
-version = "0.1.0"
-description = "Desktop GUI for the LiteVNA 67 (egui)"
+version.workspace = true
+description = "Desktop GUI for LiteVNA and NanoVNA-F vector network analysers (egui)"
+build = "build.rs"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -106,6 +106,26 @@ daarna `vna-cli sweep --cal x.json`. Een ander raster binnen het gecalibreerde b
 `vna-cli cal check --file x.json` laat zien wat de calibratie op een kabelmeting overlaat (ripple per band,
 near-end term, consistentie van de kit-fit).
 
+## Versies en releases
+
+Het versienummer staat één keer in `Cargo.toml` onder `[workspace.package]` en geldt voor de
+library, `vna-cli`, `vna-gui` en de flake. De GUI toont het in de titelbalk en onder **Help ▸ About**
+(met de git-revisie uit `build.rs`), de CLI met `vna-cli --version`. Wijzigingen staan in
+[CHANGELOG.md](CHANGELOG.md).
+
+Een release maken:
+
+1. Zet het nieuwe nummer in `Cargo.toml`, verplaats de punten onder *Unreleased* in `CHANGELOG.md`
+   naar een sectie `## [X.Y.Z] - datum` en commit.
+2. Tag en push:
+
+   ```bash
+   git tag -a v0.2.0 -m "vna-r 0.2.0" && git push origin main v0.2.0
+   ```
+
+3. De release-workflow controleert dat de tag bij het nummer in `Cargo.toml` past, bouwt de tarballs
+   en maakt de GitHub-release met de changelog-sectie als tekst.
+
 ## Apparaten
 
 Twee protocollen achter één `Vna`-handle, gekozen op USB-id:
@@ -134,7 +154,8 @@ Twee protocollen achter één `Vna`-handle, gekozen op USB-id:
 - **NixOS**: `nix run github:pa1bh/vna-r` (of `nix develop` en dan `cargo run`); de flake levert het pakket
   met udev-regel (`services.udev.packages = [ vna-r ];`).
 - **Releases**: een tag `v*` laat [release.yml](.github/workflows/release.yml) tarballs voor x86_64-Linux en
-  Apple Silicon aan een GitHub-release hangen. Daartussen publiceert de CI niets.
+  Apple Silicon aan een GitHub-release hangen, met de sectie uit [CHANGELOG.md](CHANGELOG.md) als
+  release-notes. Daartussen publiceert de CI niets.
 - **CI**: [.github/workflows/ci.yml](.github/workflows/ci.yml) bouwt en test op Ubuntu en macOS bij elke
   push. CLI en GUI zijn op een NixOS-laptop geverifieerd (LiteVNA 67 op `/dev/ttyACM0`, 329 punten/s,
   geen verloren punten, calibratie en markers als op de Mac).
