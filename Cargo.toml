@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/litevna", "crates/vna-cli", "crates/vna-gui"]
 
 [workspace.package]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/pa1bh/vna-r"
