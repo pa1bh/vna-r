@@ -1,5 +1,7 @@
 # vna-r handleiding
 
+*English version: [docs/manual](../manual/README.md).*
+
 Een vectornetwerkanalyzer (VNA) meet hoe een antenne, kabel, filter of ander
 RF-onderdeel zich gedraagt per frequentie. vna-r is een programma voor de macOS- en
 Linux-desktop dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, de metingen zelf calibreert en

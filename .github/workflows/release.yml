@@ -51,7 +51,8 @@ jobs:
           name=vna-r-${GITHUB_REF_NAME}-${{ matrix.target }}
           mkdir -p "$name"
           cp target/release/vna-cli target/release/vna-gui README.md CHANGELOG.md LICENSE "$name"/
-          cp -r docs/handleiding "$name"/handleiding
+          mkdir -p "$name"/docs
+          cp -r docs/manual docs/handleiding docs/images "$name"/docs/
           if [ "${{ runner.os }}" = "Linux" ]; then cp linux/99-litevna.rules "$name"/; fi
           tar czf "$name.tar.gz" "$name"
           shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"

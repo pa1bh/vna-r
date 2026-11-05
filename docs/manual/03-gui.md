@@ -1,0 +1,114 @@
+# 3. The GUI
+
+Start with `cargo run --release -p vna-gui` or `target/release/vna-gui`. The window has a
+menu bar, a toolbar (port, connection, Run), a left panel with settings and a main area
+with four charts. The title bar shows the version number.
+
+## Menu bar
+
+- **File**: open Touchstone files as a trace or as a reference, save as .s2p, load and
+  save a calibration, quit. The same buttons are also in the left panel.
+- **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
+  screenshot of the device.
+- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, and the
+  **Developer tools** toggle.
+- **Help**: the manual and the issue tracker on GitHub, and **About vna-r** with the
+  version, build revision, author and the link to the project.
+
+**Developer tools** is normally off. Switching it on adds a **Developer** menu with a log
+window (connections, errors, file operations and, as long as the window is open, every
+sweep with its number of points and duration) and **Copy diagnostics**: that puts the
+version, device, sweep settings, calibration, the last error and the log on the clipboard
+as text. Paste that into an issue report (chapter 9). The choice is remembered.
+
+![Views, markers and a calibrated measurement of a cable with a load](../images/gui-load-rx.webp)
+
+## Connecting and sweeping
+
+1. Choose the port in the drop-down list; a VNA has a star and is selected automatically.
+   The list is refreshed every two seconds as long as you are not connected, so a device
+   you plug in later appears by itself; **rescan** searches straight away.
+2. **Connect**. The top bar shows the model, firmware and battery voltage.
+3. **Run** starts continuous sweeping, **Single** does one sweep. Run again stops.
+
+Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Apply
+sweep**; during Run the sweep then restarts with the new settings. You type frequencies
+as `50k`, `14.2M`, `1.3G` or `6.3G` (a decimal comma is accepted too). The LiteVNA measures 50 kHz to 6.3 GHz; more points
+gives finer detail but takes longer (roughly 300 to 600 points per second).
+
+**Average** (LiteVNA only) is the bandwidth setting of the device itself (1 to 80): higher is
+quieter but slower, and the setting stays in the device. **Sweep avg** is something
+different: the program averages the last N sweeps as complex values. That suppresses noise
+at low levels without distorting the magnitude, and a counter shows how many sweeps are
+already included. If you change the grid, the averaging starts over.
+
+## Segments
+
+Under **Segments** you add extra frequency ranges that are swept after the first one and
+shown in a single trace. Each segment can have its own calibration file; without a file,
+the calibration of the panel is interpolated. The application par excellence is a fine HF
+segment with an HF calibration next to a wide segment up to 6.3 GHz, because a wide
+calibration is too coarse at the bottom end (chapter 4). Segments may touch each other but
+not overlap. TDR and gate work on the widest segment.
+
+![Two segments: 1–50 MHz with an HF calibration and 50 MHz–6.3 GHz with the wide one](../images/gui-segmenten.webp)
+
+## The four charts
+
+Top left is the Smith chart, always of S11. The three other charts choose in their header
+what they show:
+
+| view | unit | what you see |
+|---|---|---|
+| log mag | dB | \|S11\| and \|S21\| in dB; the default |
+| lin mag | – | \|S\| linear, 0 to 1 |
+| phase | ° | phase, −180 to +180 |
+| SWR | – | standing wave ratio, clipped at 20 |
+| R + jX | Ω | resistance (solid) and reactance (dotted) of the port impedance |
+| \|Z\| | Ω | modulus of the impedance |
+| group delay | ns | −dφ/dω over ±N points; N is set under Traces |
+
+SWR, R + jX and |Z| are about S11 only. Under **Traces** you switch S11 and S21 on or off;
+that applies to all charts. Double-clicking in a chart resets the scale to automatic;
+dragging and scrolling zoom.
+
+![Group delay of 53 cm of cable: flat at 2.5 ns](../images/gui-weergaven-groepsvertraging.webp)
+
+## Markers
+
+At the top are M1 to M4. The selected one is active: click in a chart or on the Smith
+chart to put it there, and move it with the arrow keys (with shift, ten points at a time).
+The table below shows for each marker the frequency, S11 in dB and degrees, Z, SWR and
+S21; if there are two, also the difference, handy for the bandwidth of a filter or the
+spacing between two resonances. The buttons **min SWR**, **max S21** and **min S21** jump
+the active marker to that point.
+
+Top right is a label that says what you are looking at: **CAL** (calibrated), **RAW**
+(uncorrected), **CAL\*** (some segments not calibrated), **GATED** (S11 is gated,
+chapter 5) or **FILE** (a file instead of the device, chapter 7).
+
+## References
+
+**Hold** in the marker bar freezes the trace as it is shown right now. Up to four
+references, each with a name and a colour, are listed under **Traces**; tick them on or
+off, rename them, or remove them. The **Δ** button next to a reference draws live minus
+reference in every chart, in the unit of that chart: dB, degrees, SWR, ohms or
+nanoseconds. That way you see immediately what a change to an antenna does. Note that a
+difference in dB becomes large where both traces are deep in a dip (two small numbers);
+look at the difference in SWR or |Z| there. Chapter 9 shows a comparison of two devices on
+the same antenna done this way. References disappear when you quit; save them as
+Touchstone and open them again later as a reference.
+
+## Screenshot of the device
+
+**Screenshot** fetches the contents of the LiteVNA's LCD and shows it in a window, with a
+button to save it as PNG. Handy for documenting what the device itself was showing.
+
+## What is remembered
+
+On quitting, the following are saved: port, start, stop, points, average, sweep avg,
+segments, the calibration file and whether it is applied, the view choices, TDR and gate
+settings, marker frequencies and the window size. At the next start that all comes back;
+the calibration file is loaded automatically and the markers are placed at the nearest
+frequency on the first sweep. Not saved are the measurement data themselves and the
+references.

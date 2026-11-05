@@ -14,8 +14,8 @@ Linux (NixOS). Changes per version are in [CHANGELOG.md](CHANGELOG.md).
 ## Getting it
 
 **Download.** Every release on the [Releases page](https://github.com/pa1bh/vna-r/releases) carries
-tarballs for Apple Silicon macOS and x86_64 Linux with `vna-cli`, `vna-gui`, the manual and a
-checksum. The binaries are dynamically linked: on Linux they need `libudev` and GTK 3 from your
+tarballs for Apple Silicon macOS and x86_64 Linux with `vna-cli`, `vna-gui`, the manual (English
+and Dutch) and a checksum. The binaries are dynamically linked: on Linux they need `libudev` and GTK 3 from your
 distribution. There is no code signing yet, so macOS may ask you to allow the app in
 *System Settings ▸ Privacy & Security* the first time.
 
@@ -136,10 +136,9 @@ Two protocols behind one `Vna` handle, chosen by USB id:
 
 ## Documentation
 
-- **Manual** (Dutch, for now): [docs/handleiding](docs/handleiding/README.md). What a VNA measures,
-  installing, the GUI, calibrating, TDR and gating, measurement recipes, files, the CLI, devices and
-  troubleshooting. Every GUI label in the manual is the English label you see on screen, so it is
-  usable with a translator.
+- **Manual**: [docs/manual](docs/manual/README.md) (English) or
+  [docs/handleiding](docs/handleiding/README.md) (Dutch). What a VNA measures, installing, the GUI,
+  calibrating, TDR and gating, measurement recipes, files, the CLI, devices and troubleshooting.
 - **Research notes** (Dutch): [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) (LiteVNA
   protocol as measured), [docs/06-nanovna-shell-protocol.md](docs/06-nanovna-shell-protocol.md)
   (NanoVNA-F shell), [docs/03-calibratie.md](docs/03-calibratie.md) (calibration model with

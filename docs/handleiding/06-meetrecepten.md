@@ -33,7 +33,8 @@ hoofdstuk 4. De vier markers staan in de SWR-dalen: 3,51 MHz (SWR 1,28), 6,78 MH
 en 28 MHz. Dat de resonanties in veelvouden van de laagste liggen is precies het idee van
 een OCF: door het voedingspunt uit het midden te leggen, is de impedantie daar op de
 meeste harmonischen bruikbaar, en de balun brengt die naar 50 Ω. Op 40 m zit hij iets te
-laag (6,78 in plaats van 7,1 MHz, X negatief: op de band is hij daar nog net te lang);
+laag (6,78 in plaats van 7,1 MHz, dus op de band is hij net te lang; het teken van X zegt
+hier weinig, want de voedingslijn draait het, de regel uit stap 3 geldt aan de antenne zelf);
 op 20 m staat hij precies goed. Wat ontbreekt is 30 m: rond 10,3 MHz staat de SWR op 6,5.
 Dat is geen meetfout maar de antenne zelf. Op de derde harmonische van 3,5 MHz is de
 draad anderhalve golflengte lang en heeft de stroomverdeling knopen op precies een derde

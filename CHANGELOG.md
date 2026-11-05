@@ -15,7 +15,11 @@ calibratiebestanden.
 
 ### Gewijzigd
 - README in het Engels, met downloadinstructies, snelstart en apparatentabel, voor testers
-  buiten Nederland. De handleiding is nog Nederlands.
+  buiten Nederland.
+
+### Toegevoegd
+- Engelse handleiding in `docs/manual`, naast de Nederlandse in `docs/handleiding`. De
+  release-tarball bevat nu beide, met de afbeeldingen.
 
 ## [0.2.0] - 2026-11-05
 
