@@ -77,13 +77,12 @@ reflecties. Wissel van window: echte reflecties blijven staan, zijlobben verande
 5. De hoogte van de eindpiek onder 0 dB is tweemaal het kabelverlies op die frequentie
    (heen en terug).
 
-![Een coaxkabel met open eind op een sweep van 1 MHz tot 1 GHz, VF 0,85: de eindpiek van −1,6 dB op 5,07 m, en de impedantie vlak op 50 Ω tot aan het eind](../images/gui-tdr-open-cable.webp)
+![Een coaxkabel met een short aan het eind op een sweep van 1 MHz tot 1 GHz, VF 0,85: de eindpiek van −1,8 dB op 5,1 m, en de impedantie vlak op 50 Ω tot aan het eind, dan duikend naar 0](../images/gui-tdr-short-cable.webp)
 
 Stap 1 tot 3 op een langere kabel: 1 MHz tot 1 GHz in 201 punten, op het raster van de
-1 GHz-calibratie, met een open aan het eind. De marker op de piek leest 5,07 m en
-39,79 ns bij VF 0,85; de −1,6 dB is tweemaal het kabelverlies. Daaronder ligt de
-impedantie vlak op 50 Ω tot aan het eind en schiet dan omhoog, zoals een open hoort te
-doen.
+1 GHz-calibratie, met een short aan het eind. De marker op de piek leest 5,1 m en 40 ns
+bij VF 0,85; de −1,8 dB is tweemaal het kabelverlies. Daaronder ligt de impedantie vlak
+op 50 Ω tot aan het eind en duikt dan naar 0, zoals een short hoort te doen.
 
 ## Gating: een reflectie uitsnijden
 

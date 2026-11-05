@@ -77,12 +77,12 @@ reflections. Switch windows: real reflections stay put, side lobes change.
 5. The height of the end peak below 0 dB is twice the cable loss at that frequency
    (there and back).
 
-![A coax cable with an open end on a 1 MHz–1 GHz sweep, VF 0.85: the end peak of −1.6 dB at 5.07 m, and the impedance flat at 50 Ω all the way up to it](../images/gui-tdr-open-cable.webp)
+![A coax cable with a short at the end on a 1 MHz–1 GHz sweep, VF 0.85: the end peak of −1.8 dB at 5.1 m, and the impedance flat at 50 Ω up to it, then diving to 0](../images/gui-tdr-short-cable.webp)
 
 Steps 1 to 3 on a longer cable: 1 MHz to 1 GHz in 201 points, on the grid of the 1 GHz
-calibration, with an open at the end. The marker on the peak reads 5.07 m and 39.79 ns
-at VF 0.85; the −1.6 dB is twice the loss of the cable. Below it the impedance lies flat
-at 50 Ω up to the end and then shoots up, which is what an open does.
+calibration, with a short at the end. The marker on the peak reads 5.1 m and 40 ns at
+VF 0.85; the −1.8 dB is twice the loss of the cable. Below it the impedance lies flat at
+50 Ω up to the end and then dives to 0, which is what a short does.
 
 ## Gating: cutting out a reflection
 

@@ -13,6 +13,11 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Documentatie
+- De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
+  duik naar 0 Ω blijft de 50 Ω-lijn leesbaar, bij de open zat die onderin een as tot
+  500 Ω.
+
 ## [0.2.5] - 2026-11-05
 
 TDR-impedantie bij lange kabels, en twee nieuwe schermafdrukken in de handleidingen.
