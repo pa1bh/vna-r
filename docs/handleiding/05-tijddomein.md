@@ -25,9 +25,10 @@ piek. Dit is het beeld om fouten te lokaliseren.
 alsof je een spanningssprong instuurt en kijkt welke impedantie het signaal onderweg
 tegenkomt. Een 50 Ω-kabel ligt vlak op 50, een stuk 75 Ω-kabel ertussen springt omhoog,
 een short duikt naar 0, een open naar oneindig. Dit is het beeld om te zien wát er zit,
-niet alleen waar. De absolute hoogte hangt af van de laagste frequenties van de sweep
-(het DC-punt wordt uit de onderste meetpunten geschat); zijn die slecht gecalibreerd, dan
-verschuift de hele lijn. Zie de waarschuwing over de onderkant in hoofdstuk 4.
+niet alleen waar. De ene waarde die een VNA niet kan meten, S11 op 0 Hz, wordt zo
+gekozen dat er vóór het referentievlak niets reflecteert. De laagste gemeten frequenties
+bepalen nog wel het trage deel van de stap, dus een slecht gecalibreerde onderkant (zie de
+waarschuwing in hoofdstuk 4) toont zich als een scheve lijn, niet als een verschoven lijn.
 
 ![TDR van 53 cm kabel met short: piek op 0,53 m, gate eromheen](../images/gui-tdr-gate.webp)
 
@@ -75,6 +76,14 @@ reflecties. Wissel van window: echte reflecties blijven staan, zijlobben verande
    soldering. De impedantiegrafiek zegt of het een hoog- of laagohmige fout is.
 5. De hoogte van de eindpiek onder 0 dB is tweemaal het kabelverlies op die frequentie
    (heen en terug).
+
+![Een coaxkabel met open eind op een sweep van 1 MHz tot 1 GHz, VF 0,85: de eindpiek van −1,6 dB op 5,07 m, en de impedantie vlak op 50 Ω tot aan het eind](../images/gui-tdr-open-cable.webp)
+
+Stap 1 tot 3 op een langere kabel: 1 MHz tot 1 GHz in 201 punten, op het raster van de
+1 GHz-calibratie, met een open aan het eind. De marker op de piek leest 5,07 m en
+39,79 ns bij VF 0,85; de −1,6 dB is tweemaal het kabelverlies. Daaronder ligt de
+impedantie vlak op 50 Ω tot aan het eind en schiet dan omhoog, zoals een open hoort te
+doen.
 
 ## Gating: een reflectie uitsnijden
 

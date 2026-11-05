@@ -13,9 +13,17 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Opgelost
+- TDR: de impedantie langs de lijn lag bij kabels van meer dan een paar meter te laag en
+  liep scheef (25 Ω voor een 50 Ω-kabel van 4 m). Het DC-punt van de stapresponsie werd
+  uit de laagste meetpunten geëxtrapoleerd, wat faalt zodra S11 daarbinnen een volle
+  cirkel draait; het volgt nu uit de eis dat er vóór het referentievlak niets reflecteert.
+  Bij het herbemonsteren wordt S11 bovendien in grootte en fase geïnterpoleerd, zodat de
+  eindpiek van een lange kabel niet meer te laag uitvalt.
+
 ### Documentatie
 - Schermafdruk van een S21-meting (FM-notchfilter FLT201A/N) bij het filterrecept in
-  beide handleidingen.
+  beide handleidingen, en een TDR van een 5 m kabel met open eind in hoofdstuk 5.
 
 ## [0.2.4] - 2026-11-05
 

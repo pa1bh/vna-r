@@ -25,9 +25,10 @@ gives no peak. This is the picture for locating faults.
 as if you send in a voltage step and watch which impedance the signal meets along the way.
 A 50 Ω cable lies flat at 50, a piece of 75 Ω cable in between jumps up, a short dives to
 0, an open to infinity. This is the picture for seeing *what* is there, not just where.
-The absolute height depends on the lowest frequencies of the sweep (the DC point is
-estimated from the lowest measurement points); if those are poorly calibrated, the whole
-line shifts. See the warning about the bottom end in chapter 4.
+The one value a VNA cannot measure, S11 at 0 Hz, is chosen so that nothing reflects
+before the reference plane. The lowest measured frequencies still shape the slow part of
+the step, so a poorly calibrated bottom end (see the warning in chapter 4) shows up as a
+tilt of the line rather than a shift.
 
 ![TDR of a 53 cm cable with a short: peak at 0.53 m, gate around it](../images/gui-tdr-gate.webp)
 
@@ -75,6 +76,13 @@ reflections. Switch windows: real reflections stay put, side lobes change.
    joint. The impedance graph tells you whether it is a high- or low-impedance fault.
 5. The height of the end peak below 0 dB is twice the cable loss at that frequency
    (there and back).
+
+![A coax cable with an open end on a 1 MHz–1 GHz sweep, VF 0.85: the end peak of −1.6 dB at 5.07 m, and the impedance flat at 50 Ω all the way up to it](../images/gui-tdr-open-cable.webp)
+
+Steps 1 to 3 on a longer cable: 1 MHz to 1 GHz in 201 points, on the grid of the 1 GHz
+calibration, with an open at the end. The marker on the peak reads 5.07 m and 39.79 ns
+at VF 0.85; the −1.6 dB is twice the loss of the cable. Below it the impedance lies flat
+at 50 Ω up to the end and then shoots up, which is what an open does.
 
 ## Gating: cutting out a reflection
 

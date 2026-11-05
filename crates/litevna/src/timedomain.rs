@@ -14,8 +14,10 @@
 //!   *where* reflections are;
 //! * the **low-pass step** Γ(t): the running sum of the real impulse of a
 //!   conjugate-symmetric spectrum. Needs the spectrum from DC, so the sweep
-//!   is resampled onto a harmonic grid and extrapolated to DC. Carries sign,
-//!   hence impedance along the line via Z = Z0·(1+Γ)/(1−Γ).
+//!   is resampled onto a harmonic grid; the DC term, which no VNA measures,
+//!   is the one value that makes the response vanish before the reference
+//!   plane (nothing can reflect at negative time). Carries sign, hence
+//!   impedance along the line via Z = Z0·(1+Γ)/(1−Γ).
 
 use std::f64::consts::PI;
 
@@ -186,27 +188,50 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
         let pos = (f - f0) / df;
         let i = pos.floor() as usize;
         let t = pos - i as f64;
-        s11[i] * (1.0 - t) + s11[(i + 1).min(n - 1)] * t
+        let (a, b) = (s11[i], s11[(i + 1).min(n - 1)]);
+        // Interpolate in polar form. A long line turns S11 by a good part of
+        // a circle between neighbouring points, and a straight line between
+        // two such phasors cuts the corner and shrinks the magnitude.
+        let mag = a.norm() * (1.0 - t) + b.norm() * t;
+        let mut dphi = b.arg() - a.arg();
+        if dphi > PI {
+            dphi -= 2.0 * PI;
+        } else if dphi < -PI {
+            dphi += 2.0 * PI;
+        }
+        Complex64::from_polar(mag, a.arg() + t * dphi)
     };
-    let dc = extrapolate_dc(freqs_hz, s11);
-    for k in 0..=m {
-        let f = k as f64 * df;
-        let v = if k == 0 { Complex64::new(dc, 0.0) } else { interp(f) };
-        let w = one_sided(k);
-        spec[k] = v * w;
-        if k > 0 && k < nfft - k {
-            spec[nfft - k] = (v * w).conj();
+    // Bin 0 (DC) is left empty here and solved for below.
+    for k in 1..=m {
+        let v = interp(k as f64 * df) * one_sided(k);
+        spec[k] = v;
+        if k < nfft - k {
+            spec[nfft - k] = v.conj();
         }
     }
     ifft.process(&mut spec);
     let scale = 1.0 / nfft as f64;
+    // The DC term. Extrapolating it from the lowest measured points fails as
+    // soon as the line is long enough for S11 to turn a full circle within
+    // those points (a few metres of cable on a 5 MHz step). Instead use the
+    // physics: nothing reflects before the reference plane, so h(t) must be
+    // zero at negative time, which the IFFT wraps to the upper half of the
+    // buffer. A DC value `dc` adds `dc/nfft` to every sample; pick the one that
+    // zeroes the mean of the far negative quarter, t ∈ [−T/2, −T/4), well
+    // away from the window kernel of a reflection at t = 0, and only
+    // disturbed by reflections beyond half the alias-free range, which would
+    // already be folded into the picture anyway.
+    let quiet = nfft / 2..3 * nfft / 4;
+    let quiet_mean = spec[quiet.clone()].iter().map(|c| c.re * scale).sum::<f64>() / quiet.len() as f64;
+    let dc = (-quiet_mean * nfft as f64).clamp(-1.0, 1.0);
+    let dc_per_sample = dc * scale;
     let mut step = Vec::with_capacity(nfft / 2);
     // A reflection at the reference plane has half its (windowed) impulse at
-    // negative time, which the IFFT wraps to the upper half of the buffer.
-    // Start the running sum there so the step is right from t = 0 on.
-    let mut acc: f64 = spec.iter().skip(nfft / 2).map(|c| c.re * scale).sum();
+    // negative time. Start the running sum over that half so the step is
+    // right from t = 0 on.
+    let mut acc: f64 = spec.iter().skip(nfft / 2).map(|c| c.re * scale + dc_per_sample).sum();
     for c in spec.iter().take(nfft / 2) {
-        acc += c.re * scale;
+        acc += c.re * scale + dc_per_sample;
         step.push(acc);
     }
     let impedance_ohm: Vec<f64> = step
@@ -233,8 +258,6 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
     })
 }
 
-/// Γ at DC must be real. Extrapolate the real part linearly from the lowest
-/// few points (a single lowest point is often the noisiest of the sweep).
 struct Grid {
     n: usize,
     df: f64,
@@ -423,21 +446,6 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
     })
 }
 
-fn extrapolate_dc(freqs_hz: &[u64], s11: &[Complex64]) -> f64 {
-    let k = (s11.len() / 20).clamp(2, 8);
-    let xs: Vec<f64> = freqs_hz[..k].iter().map(|f| *f as f64).collect();
-    let ys: Vec<f64> = s11[..k].iter().map(|s| s.re).collect();
-    let mx = xs.iter().sum::<f64>() / k as f64;
-    let my = ys.iter().sum::<f64>() / k as f64;
-    let sxx: f64 = xs.iter().map(|x| (x - mx).powi(2)).sum();
-    let slope = if sxx > 0.0 {
-        xs.iter().zip(&ys).map(|(x, y)| (x - mx) * (y - my)).sum::<f64>() / sxx
-    } else {
-        0.0
-    };
-    (my - slope * mx).clamp(-1.0, 1.0)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,6 +611,33 @@ mod tests {
         let (bin, mag) = r.peaks(1, 10)[0];
         assert!((mag - 0.2).abs() < 0.02);
         assert!((r.impedance_ohm[bin + 20] - 75.0).abs() < 3.0, "Z {}", r.impedance_ohm[bin + 20]);
+    }
+
+    /// A 4 m open cable on a 1 MHz..1 GHz, 201-point grid: S11 turns a full
+    /// circle every 25 MHz, so the DC term cannot come from a straight line
+    /// through the lowest points. The step must still read 50 Ω along the
+    /// cable and go to the open after it.
+    #[test]
+    fn long_open_cable_reads_fifty_ohm_along_the_line() {
+        let freqs: Vec<u64> = (0..201).map(|i| 1_000_000 + i * 4_995_000).collect();
+        let cfg = TdrConfig {
+            velocity_factor: 0.70,
+            ..Default::default()
+        };
+        let r = tdr(&freqs, &line(&freqs, 20.0e-9, Complex64::new(1.0, 0.0)), &cfg).unwrap();
+        let (bin, mag) = r.peaks(1, 10)[0];
+        assert!((r.distance_m[bin] - 4.2).abs() < 0.1, "peak at {} m", r.distance_m[bin]);
+        assert!((mag - 1.0).abs() < 0.05, "peak magnitude {mag}");
+        for i in [bin / 4, bin / 2, 3 * bin / 4] {
+            assert!(
+                r.step[i].abs() < 0.05,
+                "step before the open at bin {i}: {} (Z {} Ω)",
+                r.step[i],
+                r.impedance_ohm[i]
+            );
+        }
+        let after = bin + 20;
+        assert!(r.step[after] > 0.9, "step after the open {}", r.step[after]);
     }
 
     #[test]
