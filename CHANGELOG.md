@@ -13,6 +13,10 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-11-05
+
+Downloads voor meer platforms.
+
 ### Toegevoegd
 - Releases voor Intel-Mac (`x86_64-macos`) en Windows (`x86_64-windows`, zip) naast Apple
   Silicon en Linux; de CI bouwt en test nu ook op Windows. De Windows-build is nog niet
@@ -106,7 +110,8 @@ Interne versie: LiteVNA 64/67 via het binaire registerprotocol, SOLT-calibratie 
 kit-fit en interpolatie, Smith-chart en zeven weergaven, markers, referenties,
 segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functies.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
 [0.2.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.3
 [0.2.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.2
 [0.2.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.1
