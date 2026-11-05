@@ -13,6 +13,10 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Gewijzigd
+- README in het Engels, met downloadinstructies, snelstart en apparatentabel, voor testers
+  buiten Nederland. De handleiding is nog Nederlands.
+
 ## [0.2.0] - 2026-11-05
 
 Eerste versie die aan anderen gegeven wordt om te testen.
