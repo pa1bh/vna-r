@@ -17,6 +17,8 @@ calibratiebestanden.
 - De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
   duik naar 0 Ω blijft de 50 Ω-lijn leesbaar, bij de open zat die onderin een as tot
   500 Ω.
+- Schermafdruk van een weerstand van 25 Ω achter 5 m coax bij het kabelrecept in
+  hoofdstuk 6: de impedantiegrafiek stapt van 50 naar 26 Ω.
 
 ## [0.2.5] - 2026-11-05
 

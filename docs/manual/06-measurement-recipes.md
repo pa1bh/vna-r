@@ -72,6 +72,15 @@ VF = L/(c·τ). A 53 cm cable with 2.5 ns is VF 0.71.
 read off directly. Without a second port: short at the end and divide S11 in dB by two
 (there and back), with the caveat that a short itself is not perfect.
 
+**What is at the end.** The impedance graph of the TDR says what terminates the cable,
+not just where. Here a 25 Ω resistor sits behind 5 m of coax: the peak is −10.8 dB
+(a reflection of one third is −9.5 dB, plus 1.6 dB of cable loss there and back), and
+the impedance runs flat at 50 Ω up to the end and then drops to about 26 Ω. The marker
+sits on the slope and reads a value in between; a few centimetres further it reads the
+resistor.
+
+![A 25 Ω resistor behind 5 m of coax, VF 0.85: a peak of −10.8 dB at 5.2 m and the impedance stepping from 50 Ω down to about 26 Ω](../images/gui-tdr-25-ohm.webp)
+
 ## Filter
 
 Cable from port 1 to the input, output to port 2, through calibration with both cables

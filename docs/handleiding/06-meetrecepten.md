@@ -72,6 +72,15 @@ VF = L/(c·τ). 53 cm kabel met 2,5 ns is VF 0,71.
 frequentie, direct af te lezen. Zonder tweede poort: short aan het eind en S11 in dB
 delen door twee (heen en terug), met de kanttekening dat een short zelf niet perfect is.
 
+**Wat er aan het eind zit.** De impedantiegrafiek van de TDR zegt waarmee de kabel is
+afgesloten, niet alleen waar. Hier zit een weerstand van 25 Ω achter 5 m coax: de piek is
+−10,8 dB (een reflectie van een derde is −9,5 dB, plus 1,6 dB kabelverlies heen en
+terug), en de impedantie loopt vlak op 50 Ω tot aan het eind en zakt dan naar ongeveer
+26 Ω. De marker staat op de flank en leest een waarde ertussenin; een paar centimeter
+verder leest hij de weerstand.
+
+![Een weerstand van 25 Ω achter 5 m coax, VF 0,85: een piek van −10,8 dB op 5,2 m en de impedantie die van 50 Ω naar ongeveer 26 Ω stapt](../images/gui-tdr-25-ohm.webp)
+
 ## Filter
 
 Kabel van poort 1 naar de ingang, uitgang naar poort 2, through-calibratie met beide
