@@ -24,7 +24,12 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Git revision recorded by build.rs ("unknown" in a build without git).
 pub const GIT_REV: &str = env!("VNA_R_GIT_REV");
 const REPO_URL: &str = "https://github.com/pa1bh/vna-r";
-const MANUAL_URL: &str = "https://github.com/pa1bh/vna-r/blob/main/docs/handleiding/README.md";
+/// The manual as published for this version: `docs/manual` (English) or
+/// `docs/handleiding` (Dutch) at the release tag, so the text matches the
+/// buttons of the program that is running.
+fn manual_url(dir: &str) -> String {
+    format!("{REPO_URL}/blob/v{VERSION}/docs/{dir}/README.md")
+}
 const ISSUES_URL: &str = "https://github.com/pa1bh/vna-r/issues";
 /// Lines kept in the developer log.
 const LOG_LINES: usize = 400;
@@ -1178,9 +1183,13 @@ impl App {
                 });
             }
             ui.menu_button("Help", |ui| {
-                if ui.button("Manual (GitHub)").clicked() {
+                if ui.button("Manual (English)").clicked() {
                     ui.close();
-                    ctx.open_url(egui::OpenUrl::new_tab(MANUAL_URL));
+                    ctx.open_url(egui::OpenUrl::new_tab(manual_url("manual")));
+                }
+                if ui.button("Handleiding (Nederlands)").clicked() {
+                    ui.close();
+                    ctx.open_url(egui::OpenUrl::new_tab(manual_url("handleiding")));
                 }
                 if ui.button("Report a problem…").clicked() {
                     ui.close();

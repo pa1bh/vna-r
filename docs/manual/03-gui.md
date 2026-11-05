@@ -12,8 +12,9 @@ with four charts. The title bar shows the version number.
   screenshot of the device.
 - **View**: frequency domain or time domain (TDR), S11 and S21 on or off, and the
   **Developer tools** toggle.
-- **Help**: the manual and the issue tracker on GitHub, and **About vna-r** with the
-  version, build revision, author and the link to the project.
+- **Help**: the manual on GitHub in English and in Dutch, as published for your version,
+  the issue tracker, and **About vna-r** with the version, build revision, author and the
+  link to the project.
 
 **Developer tools** is normally off. Switching it on adds a **Developer** menu with a log
 window (connections, errors, file operations and, as long as the window is open, every

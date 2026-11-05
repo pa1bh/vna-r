@@ -12,8 +12,9 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
   en een schermafbeelding van het apparaat.
 - **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, en de schakelaar
   **Developer tools**.
-- **Help**: de handleiding en de probleemmelder op GitHub, en **About vna-r** met versie,
-  build-revisie, auteur en de link naar het project.
+- **Help**: de handleiding op GitHub in het Engels en het Nederlands, zoals die bij jouw
+  versie hoort, de probleemmelder, en **About vna-r** met versie, build-revisie, auteur en
+  de link naar het project.
 
 **Developer tools** staat normaal uit. Aan zet het een menu **Developer** erbij met een
 logvenster (verbindingen, fouten, bestandsbewerkingen en, zolang het venster open is,

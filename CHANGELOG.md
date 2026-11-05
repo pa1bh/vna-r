@@ -20,6 +20,8 @@ calibratiebestanden.
 ### Toegevoegd
 - Engelse handleiding in `docs/manual`, naast de Nederlandse in `docs/handleiding`. De
   release-tarball bevat nu beide, met de afbeeldingen.
+- **Help** opent de Engelse of de Nederlandse handleiding op GitHub bij de tag van de
+  eigen versie, zodat de tekst bij de knoppen van het draaiende programma past.
 
 ## [0.2.0] - 2026-11-05
 
