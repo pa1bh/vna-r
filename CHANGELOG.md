@@ -13,6 +13,10 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-11-05
+
+TDR-impedantie bij lange kabels, en twee nieuwe schermafdrukken in de handleidingen.
+
 ### Opgelost
 - TDR: de impedantie langs de lijn lag bij kabels van meer dan een paar meter te laag en
   liep scheef (25 Ω voor een 50 Ω-kabel van 4 m). Het DC-punt van de stapresponsie werd
@@ -122,7 +126,8 @@ Interne versie: LiteVNA 64/67 via het binaire registerprotocol, SOLT-calibratie 
 kit-fit en interpolatie, Smith-chart en zeven weergaven, markers, referenties,
 segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functies.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
 [0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
 [0.2.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.3
 [0.2.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.2
