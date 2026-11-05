@@ -13,6 +13,11 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Toegevoegd
+- **About**, **Copy diagnostics** en het log tonen de tekenlaag (Vulkan/Metal/OpenGL, adapter,
+  driver, Wayland of X11); `RUST_LOG=info` laat de keuze van wgpu op de terminal zien.
+  Handleiding: wat te doen bij een haperende GUI op Linux.
+
 ## [0.2.1] - 2026-11-05
 
 Voor testers buiten Nederland: Engelse README en handleiding.

@@ -40,6 +40,15 @@ herhaalbaarheid na los- en vastdraaien ±0,01 dB en ±0,1°.
   Mac.
 - **Windows**: niet getest.
 
+**Trage of haperende GUI op Linux** (menu's die laat of soms niet reageren). De GUI tekent
+met wgpu, dat Vulkan probeert en anders op OpenGL terugvalt; zonder hardwareversnelling
+tekent de processor elk beeld en loopt alles achter. **Help ▸ About** toont welke tekenlaag
+in gebruik is; staat daar `Gl` of `llvmpipe`, installeer dan de Vulkan-loader
+(Fedora `sudo dnf install vulkan-loader`, Debian/Ubuntu `sudo apt-get install libvulkan1`)
+en start opnieuw. Helpt dat niet, probeer dan `WAYLAND_DISPLAY= ./vna-gui` (X11 in plaats
+van Wayland) of `WGPU_BACKEND=gl ./vna-gui`; `RUST_LOG=info ./vna-gui` laat op de
+terminal zien wat wgpu kiest. Meld wat hielp, met de regel uit About.
+
 ## Foutmeldingen
 
 **"no VNA found"** of de poort ontbreekt in de lijst. Datakabel? Staat het apparaat

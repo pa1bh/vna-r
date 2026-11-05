@@ -42,6 +42,11 @@ cargo build --release
 
 The binaries land in `target/release/`. `cargo run --release -p vna-gui` starts the GUI directly.
 
+**Graphics on Linux.** The GUI draws with wgpu (Vulkan, falling back to OpenGL). If menus feel
+sluggish, check the renderer line under **Help ▸ About** and install the Vulkan loader
+(`vulkan-loader` on Fedora, `libvulkan1` on Debian/Ubuntu); the manual's troubleshooting chapter
+has more.
+
 **Serial port access on Linux.** Copy [linux/99-litevna.rules](linux/99-litevna.rules) to
 `/etc/udev/rules.d/` and reload udev (instructions in the file), or add yourself to the `dialout`
 group. The port is `/dev/ttyACM*`; on macOS it is `/dev/cu.usbmodem…` and no driver is needed.

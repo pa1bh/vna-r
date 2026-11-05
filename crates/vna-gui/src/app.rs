@@ -300,6 +300,8 @@ pub struct App {
     /// Keyed on `shown_rev`, VF and window.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
 
+    /// Graphics backend and adapter wgpu picked (Vulkan, Metal, GL + driver), for About and bug reports.
+    renderer: String,
     show_about: bool,
     /// Developer menu visible (View ▸ Developer tools).
     dev_tools: bool,
@@ -375,6 +377,7 @@ impl App {
             file_trace: None,
             file_message: None,
             tdr_cache: None,
+            renderer: renderer_description(cc),
             show_about: false,
             dev_tools: false,
             show_log: false,
@@ -386,6 +389,8 @@ impl App {
             std::env::consts::OS,
             std::env::consts::ARCH
         ));
+        app.log(format!("renderer: {}{}", app.renderer, display_server()));
+        log::info!("renderer: {}{}", app.renderer, display_server());
         app.refresh_ports();
         if let Some(storage) = cc.storage {
             if let Some(settings) = eframe::get_value::<Settings>(storage, eframe::APP_KEY) {
@@ -494,6 +499,7 @@ impl App {
             std::env::consts::OS,
             std::env::consts::ARCH
         ));
+        out.push_str(&format!("renderer: {}{}\n", self.renderer, display_server()));
         match &self.connection {
             Connection::Connected { port, info, battery_mv } => {
                 out.push_str(&format!("device: {} on {port}", info.summary()));
@@ -1223,6 +1229,7 @@ impl App {
                     ui.label(RichText::new("vna-r").size(28.0).strong());
                     ui.label(format!("version {VERSION}"));
                     ui.weak(format!("build {GIT_REV}"));
+                    ui.weak(format!("renderer: {}{}", self.renderer, display_server()));
                     ui.add_space(10.0);
                     ui.label("Desktop software for LiteVNA and NanoVNA vector network analysers:");
                     ui.label("sweeps, calibration, Smith chart, TDR, gating, references and Touchstone files.");
@@ -2617,6 +2624,39 @@ fn resample_complex(src_f: &[u64], s11: &[Complex64], s21: &[Complex64], dst_f: 
             .collect()
     };
     (one(s11), one(s21))
+}
+
+/// What draws the window: wgpu's backend and adapter, e.g. "Vulkan, Intel UHD Graphics
+/// (IntegratedGpu; Mesa 24.1)". Software rendering shows up here as "llvmpipe".
+fn renderer_description(cc: &eframe::CreationContext<'_>) -> String {
+    match &cc.wgpu_render_state {
+        Some(rs) => {
+            let i = rs.adapter.get_info();
+            let driver = [i.driver.as_str(), i.driver_info.as_str()]
+                .iter()
+                .filter(|s| !s.is_empty())
+                .copied()
+                .collect::<Vec<_>>()
+                .join(" ");
+            if driver.is_empty() {
+                format!("{:?}, {} ({:?})", i.backend, i.name, i.device_type)
+            } else {
+                format!("{:?}, {} ({:?}; {driver})", i.backend, i.name, i.device_type)
+            }
+        }
+        None => "OpenGL (glow)".to_string(),
+    }
+}
+
+/// ", on Wayland" / ", on X11" on Linux (from the environment winit uses to choose), empty elsewhere.
+fn display_server() -> &'static str {
+    if !cfg!(target_os = "linux") {
+        return "";
+    }
+    match std::env::var_os("WAYLAND_DISPLAY") {
+        Some(v) if !v.is_empty() => ", on Wayland",
+        _ => ", on X11",
+    }
 }
 
 fn nearest_index(freqs: &[u64], f: u64) -> usize {

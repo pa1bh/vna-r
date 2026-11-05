@@ -5,6 +5,8 @@ mod smith;
 mod worker;
 
 fn main() -> eframe::Result {
+    // `RUST_LOG=info` shows eframe's and wgpu's choices (adapter, backend) on stderr.
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn,vna_gui=info")).init();
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(format!("vna-r {}", app::VERSION))

@@ -40,6 +40,15 @@ repeatability after unscrewing and reconnecting ±0.01 dB and ±0.1°.
   Mac.
 - **Windows**: untested.
 
+**Slow or stuttering GUI on Linux** (menus that react late or sometimes not at all). The GUI
+draws with wgpu, which tries Vulkan and falls back to OpenGL; without hardware acceleration
+the CPU draws every frame and everything lags. **Help ▸ About** shows which renderer is in
+use; if it says `Gl` or `llvmpipe`, install the Vulkan loader (Fedora
+`sudo dnf install vulkan-loader`, Debian/Ubuntu `sudo apt-get install libvulkan1`) and start
+again. If that does not help, try `WAYLAND_DISPLAY= ./vna-gui` (X11 instead of Wayland) or
+`WGPU_BACKEND=gl ./vna-gui`; `RUST_LOG=info ./vna-gui` prints wgpu's choice on the
+terminal. Report what helped, with the line from About.
+
 ## Error messages
 
 **"no VNA found"** or the port is missing from the list. Data cable? Is the device
