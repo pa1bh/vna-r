@@ -13,6 +13,10 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-05
+
+Eerste terugkoppeling van een tester op Fedora verwerkt.
+
 ### Toegevoegd
 - **About**, **Copy diagnostics** en het log tonen de tekenlaag (Vulkan/Metal/OpenGL, adapter,
   driver, Wayland of X11); `RUST_LOG=info` laat de keuze van wgpu op de terminal zien.
@@ -73,7 +77,8 @@ Interne versie: LiteVNA 64/67 via het binaire registerprotocol, SOLT-calibratie 
 kit-fit en interpolatie, Smith-chart en zeven weergaven, markers, referenties,
 segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functies.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.2
 [0.2.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pa1bh/vna-r/commit/e7c82a4
