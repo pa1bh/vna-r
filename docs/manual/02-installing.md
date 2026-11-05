@@ -72,12 +72,32 @@ The flake has been built in CI on x86_64-linux and run on a NixOS laptop, CLI an
 
 ## Ready-made binaries
 
-On every tag `v*`, GitHub Actions builds tarballs for x86_64 Linux and Apple Silicon and
-attaches them to a release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, the
-manual and (on Linux) the udev rule. They are ordinary dynamically linked binaries:
-on Linux the distribution's `libudev` and GTK 3 must be present, and on NixOS they do not
-work (use the flake there). Between tags there is only the CI build, which publishes
-nothing; build from source yourself in that case. What has changed per version is listed in
+On every tag `v*`, GitHub Actions builds one archive per platform and attaches them to a
+release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, the manual (English and
+Dutch) and on Linux the udev rule: `aarch64-macos` (Apple Silicon), `x86_64-macos` (Intel
+Mac), `x86_64-linux` and `x86_64-windows` (zip). They are ordinary dynamically linked
+binaries: on Linux the distribution's `libudev` and GTK 3 must be present, and on NixOS
+they do not work (use the flake there). Between tags there is only the CI build, which
+publishes nothing; build from source yourself in that case.
+
+Nothing is code-signed. **macOS** therefore refuses a binary that was downloaded with a
+browser and unpacked with the Finder ("cannot be opened because the developer cannot be
+verified"). Unpack in the Terminal, which does not mark the files:
+
+```bash
+tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+```
+
+or remove the mark afterwards:
+
+```bash
+xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+```
+
+**Windows** shows a SmartScreen warning for the same reason; *More info ▸ Run anyway*
+starts the program. The Windows build compiles and passes CI but has not yet been tried
+with a device; reports are welcome. Ports are named `COM3` and the like; Windows 10 and
+later include the USB serial driver that the LiteVNA and the NanoVNA-F use. What has changed per version is listed in
 `CHANGELOG.md`; which version you are running is shown under **Help ▸ About** or with
 `vna-cli --version`.
 

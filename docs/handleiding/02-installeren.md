@@ -72,12 +72,34 @@ De flake is in CI gebouwd op x86_64-linux en op een NixOS-laptop gedraaid, CLI e
 
 ## Kant-en-klare binaries
 
-Bij elke tag `v*` bouwt GitHub Actions tarballs voor x86_64-Linux en Apple Silicon en
-hangt die aan een release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, de
-handleiding en (op Linux) de udev-regel. Het zijn gewone dynamisch gelinkte binaries:
-op Linux moeten `libudev` en GTK 3 van de distributie aanwezig zijn, en op NixOS werken
-ze niet (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
-publiceert; bouw dan zelf uit de bron. Wat er per versie veranderd is staat in
+Bij elke tag `v*` bouwt GitHub Actions een archief per platform en hangt die aan een
+release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, de handleiding (Engels en
+Nederlands) en op Linux de udev-regel: `aarch64-macos` (Apple Silicon), `x86_64-macos`
+(Intel-Mac), `x86_64-linux` en `x86_64-windows` (zip). Het zijn gewone dynamisch gelinkte
+binaries: op Linux moeten `libudev` en GTK 3 van de distributie aanwezig zijn, en op NixOS
+werken ze niet (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
+publiceert; bouw dan zelf uit de bron.
+
+Niets is gesigneerd. **macOS** weigert daarom een binary die met de browser is gedownload
+en met de Finder is uitgepakt ("kan niet worden geopend omdat de ontwikkelaar niet kan
+worden geverifieerd"). Pak uit in de Terminal, dan krijgen de bestanden die markering
+niet:
+
+```bash
+tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+```
+
+of haal de markering achteraf weg:
+
+```bash
+xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+```
+
+**Windows** toont om dezelfde reden een SmartScreen-waarschuwing; *Meer informatie ▸ Toch
+uitvoeren* start het programma. De Windows-build compileert en doorloopt de CI, maar is
+nog niet met een apparaat geprobeerd; meldingen zijn welkom. Poorten heten daar `COM3`
+en dergelijke; Windows 10 en later hebben het USB-seriële stuurprogramma voor de LiteVNA
+en de NanoVNA-F aan boord. Wat er per versie veranderd is staat in
 `CHANGELOG.md`; welke versie je draait zie je onder **Help ▸ About** of met
 `vna-cli --version`.
 

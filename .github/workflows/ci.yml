@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +42,7 @@ jobs:
         run: cargo test --workspace --release
 
       - name: CLI smoke test (no device)
+        shell: bash
         run: |
           ./target/release/vna-cli --help
           ./target/release/vna-cli list

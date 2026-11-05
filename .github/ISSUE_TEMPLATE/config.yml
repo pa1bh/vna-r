@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Manual (English)
+    url: https://github.com/pa1bh/vna-r/blob/main/docs/manual/README.md
+    about: What a VNA measures, installing, the GUI, calibrating, TDR, files, the CLI, troubleshooting.
+  - name: Handleiding (Nederlands)
+    url: https://github.com/pa1bh/vna-r/blob/main/docs/handleiding/README.md
+    about: Dezelfde handleiding in het Nederlands.

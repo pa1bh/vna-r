@@ -13,6 +13,14 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Toegevoegd
+- Releases voor Intel-Mac (`x86_64-macos`) en Windows (`x86_64-windows`, zip) naast Apple
+  Silicon en Linux; de CI bouwt en test nu ook op Windows. De Windows-build is nog niet
+  met een apparaat geprobeerd. Op Windows opent de GUI geen consolevenster meer.
+- README en handleiding leggen uit hoe je op macOS langs Gatekeeper komt (uitpakken in de
+  Terminal of `xattr -dr com.apple.quarantine`) en op Windows langs SmartScreen.
+- Issue-sjabloon op GitHub dat om de uitvoer van **Copy diagnostics** vraagt.
+
 ## [0.2.3] - 2026-11-05
 
 Zes punten uit een externe code-review, alle in de meetketen en het GUI-toestandsbeheer.

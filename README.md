@@ -14,10 +14,33 @@ Linux (NixOS). Changes per version are in [CHANGELOG.md](CHANGELOG.md).
 ## Getting it
 
 **Download.** Every release on the [Releases page](https://github.com/pa1bh/vna-r/releases) carries
-tarballs for Apple Silicon macOS and x86_64 Linux with `vna-cli`, `vna-gui`, the manual (English
-and Dutch) and a checksum. The binaries are dynamically linked: on Linux they need `libudev` and GTK 3 from your
-distribution. There is no code signing yet, so macOS may ask you to allow the app in
-*System Settings ▸ Privacy & Security* the first time.
+an archive per platform with `vna-cli`, `vna-gui`, the manual (English and Dutch) and a checksum:
+
+| Archive | For |
+|---|---|
+| `…-aarch64-macos.tar.gz` | Mac with Apple Silicon (M1 and later) |
+| `…-x86_64-macos.tar.gz` | Mac with an Intel processor |
+| `…-x86_64-linux.tar.gz` | Linux on x86_64; needs `libudev` and GTK 3 from your distribution (not NixOS, see below) |
+| `…-x86_64-windows.zip` | Windows 10 or 11 on x86_64 |
+
+Nothing is code-signed yet. **macOS** therefore refuses to start a binary that was downloaded with a
+browser and unpacked with the Finder ("cannot be opened because the developer cannot be verified").
+Either unpack in the Terminal, which does not mark the files:
+
+```bash
+tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+```
+
+or remove the mark after unpacking:
+
+```bash
+xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+```
+
+**Windows** shows a SmartScreen warning for the same reason; *More info ▸ Run anyway* starts it. The
+Windows build compiles and passes CI but has not yet been tried with a device; reports are welcome.
+Ports are `COM` ports; Windows 10 and later include the USB serial driver that the LiteVNA and
+NanoVNA-F use.
 
 **NixOS.** The repository is a flake:
 
@@ -165,8 +188,8 @@ and paste the result. For CLI problems, the output with `--trace` helps.
 | `crates/vna-cli` | Command line tool on top of the library. |
 | `crates/vna-gui` | Desktop GUI (egui/eframe). |
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) builds and tests on Ubuntu and macOS and builds
-the Nix flake on every push.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) builds and tests on Ubuntu, macOS and Windows
+and builds the Nix flake on every push.
 
 ## Versions and releases
 
@@ -185,8 +208,8 @@ To cut a release:
    ```
 
 3. [release.yml](.github/workflows/release.yml) checks that the tag matches the version in
-   `Cargo.toml`, builds the tarballs and creates the GitHub release with the changelog section as
-   its text.
+   `Cargo.toml`, builds the archives for Linux, both Macs and Windows, and creates the GitHub
+   release with the changelog section as its text.
 
 ## Licence
 

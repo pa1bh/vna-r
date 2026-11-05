@@ -1,5 +1,9 @@
 //! `vna-gui` — desktop front-end for LiteVNA and NanoVNA-F analysers, built on egui.
 
+// A release build on Windows is a GUI program without a console window
+// (debug builds keep it, for RUST_LOG output).
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod smith;
 mod worker;

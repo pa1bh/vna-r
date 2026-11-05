@@ -38,7 +38,8 @@ repeatability after unscrewing and reconnecting ±0.01 dB and ±0.1°.
   CLI and GUI have been verified on a NixOS laptop with the LiteVNA 67 on `/dev/ttyACM0`:
   same registers, 329 points/s, no lost points, calibration and markers as on the
   Mac.
-- **Windows**: untested.
+- **Windows**: the release carries an x86_64 zip built in CI, not yet tried with a device.
+  Ports are named `COM3` and the like; pick them in the GUI or pass `--port COM3`.
 
 **Slow or stuttering GUI on Linux** (menus that react late or sometimes not at all). The GUI
 draws with wgpu, which picks a graphics adapter at start: Vulkan when it can, otherwise

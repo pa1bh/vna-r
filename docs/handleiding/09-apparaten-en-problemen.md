@@ -38,7 +38,9 @@ herhaalbaarheid na los- en vastdraaien ±0,01 dB en ±0,1°.
   CLI en GUI zijn op een NixOS-laptop geverifieerd met de LiteVNA 67 op `/dev/ttyACM0`:
   zelfde registers, 329 punten/s, geen verloren punten, calibratie en markers als op de
   Mac.
-- **Windows**: niet getest.
+- **Windows**: de release bevat een zip voor x86_64 die in de CI wordt gebouwd, maar nog
+  niet met een apparaat is geprobeerd. Poorten heten `COM3` en dergelijke; kies ze in de
+  GUI of geef `--port COM3`.
 
 **Trage of haperende GUI op Linux** (menu's die laat of soms niet reageren). De GUI tekent
 met wgpu, dat per start een grafische adapter kiest: Vulkan als dat kan, anders OpenGL.
