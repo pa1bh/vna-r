@@ -17,7 +17,10 @@ weergaven, markers, TDR en gate werken erop, het label wordt **FILE**, en de cal
 wordt niet nog eens toegepast. De volgende sweep vervangt het. **Open as reference…**
 laadt het als referentie naast de live meting. De lezer begrijpt s1p en s2p in de
 formaten RI, MA en DB met eenheden Hz tot GHz, ook de bestanden die de LiteVNA zelf op
-zijn SD-kaart schrijft en de uitvoer van simulatieprogramma's. Met de CLI:
+zijn SD-kaart schrijft en de uitvoer van simulatieprogramma's. Een bestand met een andere
+referentie-impedantie dan 50 Ω (`R 75` in de optieregel) wordt voor S11 omgerekend naar
+50 Ω, zodat impedantie en SWR kloppen; S21 blijft zoals in het bestand, en de melding
+onder **Files** zegt het erbij. Met de CLI:
 `vna-cli tdr --from naam.s2p`.
 
 ## Calibratiebestanden (.cal.json)

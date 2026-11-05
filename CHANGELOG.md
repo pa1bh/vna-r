@@ -13,6 +13,25 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+Zes punten uit een externe code-review, alle in de meetketen en het GUI-toestandsbeheer.
+
+### Opgelost
+- Een LiteVNA-record met een foute checksum wordt niet meer als meetpunt gebruikt; het punt
+  blijft leeg en komt bij de volgende FIFO-doorgang opnieuw.
+- Crash bij een NanoVNA-F met meerdere segmenten en calibratie aan (de shell levert geen
+  ruwe records, het opdelen per segment ging daarvan uit).
+- Na **Clear** in het calibratiepaneel bleef het label CAL staan terwijl de data ruw waren.
+- De software-middeling (**Sweep avg**) wordt gewist bij verbinden en verbreken, zodat sweeps
+  van een vorig apparaat niet meetellen.
+- Calibratiebestanden worden bij het laden gecontroleerd (raster oplopend, minstens twee
+  punten, per standaard evenveel waarden als rasterpunten, eindige getallen); een kapot
+  bestand geeft een melding in plaats van een crash. Frequenties als `nan` of `inf`
+  worden geweigerd.
+- Touchstone-bestanden met een andere referentie-impedantie dan 50 Ω (`R 75`) worden
+  voor S11 omgerekend; voorheen werd de waarde genegeerd.
+- TDR weigert een sweep die te smal is voor zijn topfrequentie (FFT groter dan 4 Mi
+  punten) met een melding, in plaats van gigabytes te alloceren op de GUI-thread.
+
 ## [0.2.2] - 2026-11-05
 
 Eerste terugkoppeling van een tester op Fedora verwerkt.

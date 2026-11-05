@@ -10,7 +10,7 @@ use litevna::calibration::{plausibility_warning, CalKit, Calibration, Calibratio
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
-use litevna::touchstone::{db, read_touchstone_file, swr, write_s2p};
+use litevna::touchstone::{db, read_touchstone_file_full, swr, write_s2p};
 use litevna::traces::{self, impedance, Param, TraceKind};
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
@@ -736,11 +736,14 @@ impl App {
                     self.log(format!("connected: {} on {port}", info.summary()));
                     self.connection = Connection::Connected { port, info, battery_mv };
                     self.error = None;
+                    // Never average sweeps of this device with those of the previous one.
+                    self.avg_buf.clear();
                 }
                 Event::Disconnected => {
                     self.log("disconnected");
                     self.connection = Connection::Disconnected;
                     self.running = false;
+                    self.avg_buf.clear();
                 }
                 Event::SweepDone { cfgs, result, purpose } => match purpose {
                     Purpose::Display => {
@@ -1587,6 +1590,8 @@ impl App {
                     fit_as_delay: self.cal.fit_as_delay,
                     ..Default::default()
                 };
+                // The shown data is raw again, so the CAL tag must go too.
+                self.seg_calibrated.clear();
                 if let Some(raw) = self.raw.clone() {
                     self.set_shown(raw);
                 }
@@ -1900,10 +1905,16 @@ impl App {
             return;
         };
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        match read_touchstone_file(&path) {
-            Ok(sweep) => {
+        match read_touchstone_file_full(&path) {
+            Ok(file) => {
+                let note = if file.renormalised() {
+                    format!("; {} Ω file: S11 renormalised to 50 Ω, S21 as in the file", file.z0_ohm)
+                } else {
+                    String::new()
+                };
+                let sweep = file.sweep;
                 self.file_message = Some(format!(
-                    "opened {} as {}",
+                    "opened {} as {}{note}",
                     path.display(),
                     if as_reference { "reference" } else { "trace" }
                 ));

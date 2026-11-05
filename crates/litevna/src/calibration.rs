@@ -315,7 +315,46 @@ impl CalibrationSet {
     }
 
     pub fn from_json(text: &str) -> Result<Self> {
-        Ok(serde_json::from_str(text)?)
+        let set: Self = serde_json::from_str(text)?;
+        set.validate()?;
+        Ok(set)
+    }
+
+    /// Everything `solve` and `apply` index by position: a strictly increasing
+    /// grid of at least two points and, per stored standard, exactly one
+    /// finite S11 and S21 value per grid point.
+    pub fn validate(&self) -> Result<()> {
+        let n = self.freqs_hz.len();
+        if n < 2 {
+            return Err(Error::Calibration(format!("calibration grid has {n} points, needs at least 2")));
+        }
+        if self.freqs_hz.windows(2).any(|w| w[1] <= w[0]) {
+            return Err(Error::Calibration("calibration grid is not strictly increasing".into()));
+        }
+        let slots = [
+            (Standard::Open, &self.open),
+            (Standard::Short, &self.short),
+            (Standard::Load, &self.load),
+            (Standard::Through, &self.through),
+            (Standard::Isolation, &self.isolation),
+            (Standard::LineOpen, &self.line_open),
+            (Standard::LineShort, &self.line_short),
+        ];
+        for (standard, slot) in slots {
+            let Some(m) = slot else { continue };
+            if m.s11.len() != n || m.s21.len() != n {
+                return Err(Error::Calibration(format!(
+                    "{}: {} S11 and {} S21 values for a grid of {n} points",
+                    standard.name(),
+                    m.s11.len(),
+                    m.s21.len()
+                )));
+            }
+            if m.s11.iter().chain(m.s21.iter()).any(|c| !c.re.is_finite() || !c.im.is_finite()) {
+                return Err(Error::Calibration(format!("{}: non-finite value", standard.name())));
+            }
+        }
+        Ok(())
     }
 
     /// Solve the error terms. Needs open, short and load; through and
@@ -970,6 +1009,24 @@ impl Calibration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn json_with_wrong_lengths_is_rejected() {
+        // A hand-edited or truncated file must fail on load, not panic in solve().
+        let mut set = CalibrationSet::new(vec![1_000_000, 2_000_000], CalKit::ideal());
+        set.open = Some(StandardMeasurement {
+            s11: Vec::new(),
+            s21: Vec::new(),
+        });
+        let json = set.to_json().unwrap();
+        assert!(CalibrationSet::from_json(&json).is_err());
+
+        let one_point = CalibrationSet::new(vec![1_000_000], CalKit::ideal());
+        assert!(CalibrationSet::from_json(&one_point.to_json().unwrap()).is_err());
+
+        let good = CalibrationSet::new(vec![1_000_000, 2_000_000], CalKit::ideal());
+        assert!(CalibrationSet::from_json(&good.to_json().unwrap()).is_ok());
+    }
 
     /// Synthetic 50 kHz–6.3 GHz set: perfect instrument, ideal standards, and
     /// line measurements through a connector D = 0.03j in front of a lossy

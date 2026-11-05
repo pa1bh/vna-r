@@ -12,15 +12,40 @@ use num_complex::Complex64;
 use crate::device::SweepResult;
 use crate::error::{Error, Result};
 
+/// A Touchstone file as read: the sweep, referred to 50 Ω, and the reference
+/// impedance the file itself used.
+#[derive(Debug, Clone)]
+pub struct TouchstoneFile {
+    pub sweep: SweepResult,
+    /// The `R` value of the option line (50 when absent). S11 has been
+    /// renormalised to 50 Ω when this differs; S21 is left as in the file.
+    pub z0_ohm: f64,
+}
+
+impl TouchstoneFile {
+    /// True when the file used a reference other than 50 Ω.
+    pub fn renormalised(&self) -> bool {
+        (self.z0_ohm - 50.0).abs() > 1e-9
+    }
+}
+
+/// Read a Touchstone v1 file (`.s1p` or `.s2p`), see [`read_touchstone_full`].
+pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepResult> {
+    Ok(read_touchstone_full(r, ports)?.sweep)
+}
+
 /// Read a Touchstone v1 file (`.s1p` or `.s2p`). Handles the option line
 /// (`# <Hz|kHz|MHz|GHz> S <RI|MA|DB> R <z0>`, defaults GHz/MA/50), comments,
 /// values wrapped over several lines, and both column orders. S12/S22 of a
 /// two-port are ignored (the result only carries S11 and S21); a one-port
-/// gets S21 = 0. `ports` is a hint from the file name (1 or 2); with `None`
+/// gets S21 = 0. A reference impedance other than 50 Ω is honoured for S11
+/// (renormalised to 50 Ω, so impedance and SWR come out right); S21 is kept
+/// as written. `ports` is a hint from the file name (1 or 2); with `None`
 /// the number of values per frequency decides.
-pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepResult> {
+pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<TouchstoneFile> {
     let mut unit = 1e9;
     let mut format = Format::Ma;
+    let mut z0 = 50.0;
     let mut tokens: Vec<f64> = Vec::new();
     let mut saw_option = false;
     for (lineno, line) in r.lines().enumerate() {
@@ -51,7 +76,10 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
                     "MA" => format = Format::Ma,
                     "DB" => format = Format::Db,
                     "R" => {
-                        let _z0 = words.next(); // reference impedance; S-parameters are used as-is
+                        z0 = match words.next().map(|w| w.parse::<f64>()) {
+                            Some(Ok(v)) if v.is_finite() && v > 0.0 => v,
+                            _ => return Err(Error::InvalidArgument(format!("line {}: bad reference impedance", lineno + 1))),
+                        };
                     }
                     other => return Err(Error::InvalidArgument(format!("line {}: unknown option {other:?}", lineno + 1))),
                 }
@@ -115,27 +143,50 @@ pub fn read_touchstone<R: BufRead>(r: R, ports: Option<usize>) -> Result<SweepRe
     if freqs_hz.windows(2).any(|w| w[1] < w[0]) {
         return Err(Error::InvalidArgument("frequencies are not increasing".into()));
     }
-    Ok(SweepResult {
-        points: vec![None; n],
-        freqs_hz,
-        s11,
-        s21,
-        checksum_ok: 0,
-        checksum_bad: 0,
-        duplicates: 0,
-        elapsed: Duration::ZERO,
+    if (z0 - 50.0).abs() > 1e-9 {
+        for g in &mut s11 {
+            *g = renormalise_gamma(*g, z0, 50.0);
+        }
+    }
+    Ok(TouchstoneFile {
+        sweep: SweepResult {
+            points: vec![None; n],
+            freqs_hz,
+            s11,
+            s21,
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        },
+        z0_ohm: z0,
     })
+}
+
+/// A one-port reflection coefficient referred to `from` ohm, expressed against
+/// `to` ohm: the impedance Z = from·(1+Γ)/(1−Γ) is the same, so
+/// Γ' = (Z − to)/(Z + to), written without the division so Γ = 1 stays 1.
+pub fn renormalise_gamma(gamma: Complex64, from: f64, to: f64) -> Complex64 {
+    let one = Complex64::new(1.0, 0.0);
+    let num = from * (one + gamma) - to * (one - gamma);
+    let den = from * (one + gamma) + to * (one - gamma);
+    num / den
 }
 
 /// Read a Touchstone file by path; the extension (`.s1p` / `.s2p`) sets the port count.
 pub fn read_touchstone_file(path: &std::path::Path) -> Result<SweepResult> {
+    Ok(read_touchstone_file_full(path)?.sweep)
+}
+
+/// Like [`read_touchstone_file`], also returning the file's reference impedance.
+pub fn read_touchstone_file_full(path: &std::path::Path) -> Result<TouchstoneFile> {
     let ports = match path.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
         Some("s1p") => Some(1),
         Some("s2p") => Some(2),
         _ => None,
     };
     let f = std::fs::File::open(path)?;
-    read_touchstone(std::io::BufReader::new(f), ports)
+    read_touchstone_full(std::io::BufReader::new(f), ports)
 }
 
 /// With an ambiguous token count (a multiple of 9 is also a multiple of 3),
@@ -292,6 +343,20 @@ mod tests {
         assert!((r.s21[0] - Complex64::new(0.0, -0.5)).norm() < 1e-4);
         assert!((r.s11[1] - Complex64::new(-0.01, 0.0)).norm() < 1e-9);
         assert!((r.s21[1].norm() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn reference_impedance_is_honoured_for_s11() {
+        // Γ = 0 in a 75 Ω file is a 75 Ω load: against 50 Ω that is Γ = 0.2.
+        let s1p = "# MHz S RI R 75\n1 0 0\n2 1 0\n";
+        let f = read_touchstone_full(std::io::Cursor::new(s1p), Some(1)).unwrap();
+        assert!(f.renormalised());
+        assert!((f.sweep.s11[0].re - 0.2).abs() < 1e-12 && f.sweep.s11[0].im.abs() < 1e-12);
+        // An open stays an open.
+        assert!((f.sweep.s11[1] - Complex64::new(1.0, 0.0)).norm() < 1e-12);
+        let plain = read_touchstone_full(std::io::Cursor::new("# MHz S RI R 50\n1 0 0\n"), Some(1)).unwrap();
+        assert!(!plain.renormalised());
+        assert!(read_touchstone(std::io::Cursor::new("# MHz S RI R abc\n1 0 0\n"), Some(1)).is_err());
     }
 
     #[test]

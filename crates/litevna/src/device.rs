@@ -141,13 +141,19 @@ impl SweepResult {
         out
     }
 
-    /// The points `range` of this sweep as a sweep of its own.
+    /// The points `range` of this sweep as a sweep of its own. Sweeps from a
+    /// NanoVNA shell or a Touchstone file carry no raw FIFO records; the slice
+    /// then has none either.
     pub fn slice(&self, range: std::ops::Range<usize>) -> SweepResult {
         SweepResult {
             freqs_hz: self.freqs_hz[range.clone()].to_vec(),
             s11: self.s11[range.clone()].to_vec(),
             s21: self.s21[range.clone()].to_vec(),
-            points: self.points[range].to_vec(),
+            points: if self.points.len() == self.freqs_hz.len() {
+                self.points[range].to_vec()
+            } else {
+                Vec::new()
+            },
             checksum_ok: self.checksum_ok,
             checksum_bad: self.checksum_bad,
             duplicates: self.duplicates,
@@ -513,11 +519,14 @@ impl LiteVna {
             first = false;
             for r in records {
                 received += 1;
-                if r.checksum_ok {
-                    ok += 1
-                } else {
-                    bad += 1
+                if !r.checksum_ok {
+                    // Count it and leave the point empty: the device sweeps on and
+                    // delivers this index again on its next pass, so a corrupt record
+                    // never ends up in a measurement or a calibration.
+                    bad += 1;
+                    continue;
                 }
+                ok += 1;
                 let idx = r.freq_index as usize;
                 if idx >= n {
                     return Err(Error::protocol(format!("freq_index {idx} out of range for {n} points")));
@@ -596,4 +605,33 @@ impl Drop for LiteVna {
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sweep_without_records(n: usize) -> SweepResult {
+        SweepResult {
+            freqs_hz: (0..n as u64).map(|i| 1_000_000 + i * 1_000).collect(),
+            s11: vec![Complex64::new(0.1, 0.0); n],
+            s21: vec![Complex64::new(0.0, 0.0); n],
+            points: Vec::new(),
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        }
+    }
+
+    #[test]
+    fn slice_works_without_raw_records() {
+        // A NanoVNA shell sweep has no FIFO records; slicing it per segment must not panic.
+        let s = sweep_without_records(10);
+        let part = s.slice(4..10);
+        assert_eq!(part.freqs_hz.len(), 6);
+        assert_eq!(part.s11.len(), 6);
+        assert!(part.points.is_empty());
+        assert_eq!(part.freqs_hz[0], 1_004_000);
+    }
 }

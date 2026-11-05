@@ -24,6 +24,12 @@ use rustfft::FftPlanner;
 
 use crate::error::{Error, Result};
 
+/// Largest FFT we are willing to run (4 Mi complex values, 64 MiB). The size
+/// grows with top frequency / frequency step, so a narrow sweep high up
+/// (say 1 MHz wide at 1.4 GHz) would otherwise ask for gigabytes, on the GUI
+/// thread. Such a sweep has no useful range resolution anyway.
+pub const MAX_FFT_SIZE: usize = 1 << 22;
+
 /// Speed of light in vacuum, m/s.
 pub const C0: f64 = 299_792_458.0;
 pub const Z0: f64 = 50.0;
@@ -261,6 +267,12 @@ fn check_grid(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<Gr
     } else {
         (8 * (m + 1)).next_power_of_two()
     };
+    if nfft > MAX_FFT_SIZE {
+        return Err(Error::InvalidArgument(format!(
+            "sweep too narrow for TDR: top frequency / step = {m}, at most {} (widen the span or use fewer points)",
+            MAX_FFT_SIZE / 8
+        )));
+    }
     Ok(Grid {
         n,
         df,
@@ -614,5 +626,15 @@ mod tests {
         uneven[5] += 1;
         assert!(tdr(&uneven, &vec![Complex64::new(0.0, 0.0); uneven.len()], &TdrConfig::default()).is_err());
         assert!(Window::parse("hann") == Some(Window::Hann));
+    }
+
+    #[test]
+    fn narrow_sweep_high_up_is_refused_before_allocating() {
+        // 1 MHz wide at 1.4 GHz with 3201 points: fmax/Δf ≈ 4.5 million, an FFT of 2^26
+        // complex values (1 GiB). Must come back as an error, not an allocation.
+        let freqs: Vec<u64> = (0..3201).map(|i| 1_400_000_000 + i * 312).collect();
+        let s11 = vec![Complex64::new(0.0, 0.0); freqs.len()];
+        let err = tdr(&freqs, &s11, &TdrConfig::default()).unwrap_err().to_string();
+        assert!(err.contains("too narrow"), "{err}");
     }
 }

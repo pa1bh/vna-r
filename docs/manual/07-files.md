@@ -17,7 +17,10 @@ TDR and gate work on it, the label becomes **FILE**, and the calibration is not 
 a second time. The next sweep replaces it. **Open as reference…** loads it as a
 reference next to the live measurement. The reader understands s1p and s2p in the
 RI, MA and DB formats with units from Hz to GHz, including the files the LiteVNA itself
-writes to its SD card and the output of simulation programs. With the CLI:
+writes to its SD card and the output of simulation programs. A file with a reference
+impedance other than 50 Ω (`R 75` on the option line) has its S11 renormalised to 50 Ω,
+so impedance and SWR come out right; S21 stays as in the file, and the message under
+**Files** says so. With the CLI:
 `vna-cli tdr --from name.s2p`.
 
 ## Calibration files (.cal.json)

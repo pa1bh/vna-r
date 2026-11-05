@@ -21,10 +21,17 @@ pub fn parse_hz(text: &str) -> Result<u64> {
         .replace(',', ".")
         .parse()
         .map_err(|_| Error::InvalidArgument(format!("not a frequency: {text:?}")))?;
+    if !value.is_finite() {
+        return Err(Error::InvalidArgument(format!("not a frequency: {text:?}")));
+    }
     if value < 0.0 {
         return Err(Error::InvalidArgument(format!("negative frequency: {text:?}")));
     }
-    Ok((value * mult).round() as u64)
+    let hz = value * mult;
+    if hz > 1e13 {
+        return Err(Error::InvalidArgument(format!("frequency out of range: {text:?}")));
+    }
+    Ok(hz.round() as u64)
 }
 
 /// Format Hz compactly, e.g. `14.200 MHz`.
@@ -44,6 +51,13 @@ pub fn format_hz(hz: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_non_finite_and_absurd_values() {
+        for bad in ["nan", "inf", "-inf", "NaN", "1e30", "-1M", "abc"] {
+            assert!(parse_hz(bad).is_err(), "{bad} should be rejected");
+        }
+    }
 
     #[test]
     fn decimal_comma() {
