@@ -13,6 +13,10 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Documentatie
+- Schermafdruk van een S21-meting (FM-notchfilter FLT201A/N) bij het filterrecept in
+  beide handleidingen.
+
 ## [0.2.4] - 2026-11-05
 
 Downloads voor meer platforms.

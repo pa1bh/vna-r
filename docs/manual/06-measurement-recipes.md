@@ -80,6 +80,15 @@ connected together. **log mag** of S21 shows the passband and stopband; **min S2
 points give the bandwidth. **group delay** shows how the delay rises at the band edges; a
 filter for data or narrow digital modes wants that as flat as possible.
 
+![An FM broadcast notch filter (FLT201A/N), 50–150 MHz: M1 and M2 on the −3 dB points, 44.1 MHz apart, M3 on the deepest point at −45.6 dB; group delay and phase of S21 below](../images/gui-s21-fm-notch.webp)
+
+The screenshot shows a notch filter for the FM broadcast band, an FLT201A/N, swept from
+50 to 150 MHz. **min S21** put M3 on the deepest point, −45.6 dB at 90.8 MHz; M1 and M2
+sit on the −3 dB points and the Δ row reads 44.1 MHz between them. S11 at M3 is only
+−2.85 dB: a notch filter does not absorb the band it blocks, it reflects it, so the
+Smith chart runs out towards the edge there. The lower plots show the group delay and
+phase of S21, both at their wildest right in the notch.
+
 The dynamic range of the LiteVNA is about 90 dB on HF and 60 to 70 dB above 3 GHz; so a
 stopband of −100 dB is not something you can measure. Averaging (Sweep avg 16 or more)
 pulls another 10 dB or so out of the noise.

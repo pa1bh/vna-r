@@ -81,6 +81,15 @@ kabels aan elkaar. **log mag** van S21 toont doorlaatband en stopband; **min S21
 bandranden oploopt; een filter voor data of smalle digitale modes wil die zo vlak
 mogelijk.
 
+![Een notchfilter voor de FM-omroepband (FLT201A/N), 50–150 MHz: M1 en M2 op de −3 dB-punten, 44,1 MHz uit elkaar, M3 op het diepste punt op −45,6 dB; daaronder groepsvertraging en fase van S21](../images/gui-s21-fm-notch.webp)
+
+De schermafdruk toont een notchfilter voor de FM-omroepband, een FLT201A/N, van 50 tot
+150 MHz. **min S21** zette M3 op het diepste punt, −45,6 dB op 90,8 MHz; M1 en M2 staan
+op de −3 dB-punten en de Δ-regel geeft 44,1 MHz daartussen. S11 bij M3 is maar −2,85 dB:
+een notchfilter absorbeert de band die het tegenhoudt niet, het kaatst hem terug, en de
+Smith-chart loopt daar dan ook naar de rand. De onderste plots tonen groepsvertraging en
+fase van S21, allebei op hun wildst precies in de notch.
+
 De dynamiek van de LiteVNA is ongeveer 90 dB op HF en 60 tot 70 dB boven 3 GHz; een
 stopband van −100 dB meet je dus niet. Middelen (Sweep avg 16 of meer) haalt nog zo'n
 10 dB extra uit de ruis.
