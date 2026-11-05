@@ -18,6 +18,11 @@ calibratiebestanden.
   driver, Wayland of X11); `RUST_LOG=info` laat de keuze van wgpu op de terminal zien.
   Handleiding: wat te doen bij een haperende GUI op Linux.
 
+### Opgelost
+- Haperende menu's op een Fedora-werkstation met een oudere NVIDIA-kaart (nouveau): wgpu
+  koos daar de experimentele NVK-Vulkan-driver. De GUI kiest de adapter nu zelf en mijdt
+  NVK en software-rendering zodra er een alternatief is; `WGPU_BACKEND` dwingt nog steeds.
+
 ## [0.2.1] - 2026-11-05
 
 Voor testers buiten Nederland: Engelse README en handleiding.

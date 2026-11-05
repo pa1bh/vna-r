@@ -41,13 +41,15 @@ herhaalbaarheid na los- en vastdraaien ±0,01 dB en ±0,1°.
 - **Windows**: niet getest.
 
 **Trage of haperende GUI op Linux** (menu's die laat of soms niet reageren). De GUI tekent
-met wgpu, dat Vulkan probeert en anders op OpenGL terugvalt; zonder hardwareversnelling
-tekent de processor elk beeld en loopt alles achter. **Help ▸ About** toont welke tekenlaag
-in gebruik is; staat daar `Gl` of `llvmpipe`, installeer dan de Vulkan-loader
-(Fedora `sudo dnf install vulkan-loader`, Debian/Ubuntu `sudo apt-get install libvulkan1`)
-en start opnieuw. Helpt dat niet, probeer dan `WAYLAND_DISPLAY= ./vna-gui` (X11 in plaats
-van Wayland) of `WGPU_BACKEND=gl ./vna-gui`; `RUST_LOG=info ./vna-gui` laat op de
-terminal zien wat wgpu kiest. Meld wat hielp, met de regel uit About.
+met wgpu, dat per start een grafische adapter kiest: Vulkan als dat kan, anders OpenGL.
+Op een oudere NVIDIA-kaart met de open-source nouveau-driver (Kepler, GeForce 600/700)
+is Vulkan de experimentele NVK-driver en komen beelden te laat; vna-r herkent die en kiest
+daar zelf OpenGL, net als bij software-rendering (llvmpipe) zolang er een echte GPU is.
+**Help ▸ About** toont wat er gekozen is. Hapert het toch, start dan met
+`WGPU_BACKEND=gl ./vna-gui`; omgekeerd dwingt `WGPU_BACKEND=vulkan` Vulkan af.
+`WAYLAND_DISPLAY= ./vna-gui` probeert X11 in plaats van Wayland, en `RUST_LOG=info
+./vna-gui` laat op de terminal zien welke adapters er waren en welke is gekozen. Meld wat
+hielp, met de regel uit About.
 
 ## Foutmeldingen
 
