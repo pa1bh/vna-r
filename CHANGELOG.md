@@ -13,15 +13,21 @@ calibratiebestanden.
 
 ## [Unreleased]
 
-### Gewijzigd
-- README in het Engels, met downloadinstructies, snelstart en apparatentabel, voor testers
-  buiten Nederland.
+## [0.2.1] - 2026-11-05
+
+Voor testers buiten Nederland: Engelse README en handleiding.
 
 ### Toegevoegd
 - Engelse handleiding in `docs/manual`, naast de Nederlandse in `docs/handleiding`. De
   release-tarball bevat nu beide, met de afbeeldingen.
 - **Help** opent de Engelse of de Nederlandse handleiding op GitHub bij de tag van de
   eigen versie, zodat de tekst bij de knoppen van het draaiende programma past.
+
+### Gewijzigd
+- README in het Engels, met downloadinstructies, snelstart en apparatentabel.
+- Handleiding: de drempel voor een losse open of short is −8 dB (was −3 dB in de tekst);
+  de OCF-alinea koppelt het teken van X niet meer aan de lengte als je door de
+  voedingslijn meet.
 
 ## [0.2.0] - 2026-11-05
 
@@ -57,6 +63,7 @@ Interne versie: LiteVNA 64/67 via het binaire registerprotocol, SOLT-calibratie 
 kit-fit en interpolatie, Smith-chart en zeven weergaven, markers, referenties,
 segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functies.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.0
 [0.1.0]: https://github.com/pa1bh/vna-r/commit/e7c82a4
