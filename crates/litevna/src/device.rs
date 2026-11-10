@@ -263,7 +263,8 @@ impl Screenshot {
 }
 
 /// Time to allow per requested FIFO point, generous on purpose: the LiteVNA
-/// does >1600 points/s, NanoVNA-Saver budgets 35 ms/point for the old V2.
+/// measured 330 to 1100 points/s depending on channel selection and averaging
+/// (docs/01 §7 and §8), NanoVNA-Saver budgets 35 ms/point for the old V2.
 const PER_POINT_BUDGET: Duration = Duration::from_millis(20);
 const MIN_FIFO_TIMEOUT: Duration = Duration::from_secs(3);
 const REGISTER_TIMEOUT: Duration = Duration::from_secs(2);
@@ -397,10 +398,6 @@ impl LiteVna {
 
     pub fn write_u32(&mut self, addr: u8, value: u32) -> Result<()> {
         self.send(&proto::encode_write4(addr, value))
-    }
-
-    pub fn write_u64(&mut self, addr: u8, value: u64) -> Result<()> {
-        self.send(&proto::encode_write8(addr, value))
     }
 
     // ----- identity / housekeeping ---------------------------------------
@@ -626,7 +623,9 @@ impl LiteVna {
         })
     }
 
-    /// Opcode constants re-exported for callers that want to poke registers by hand.
+    /// Send arbitrary bytes and read `reply_len` bytes back: an escape hatch
+    /// for exploring opcodes this driver has no method for (build the bytes
+    /// with the encoders in [`crate::protocol`]). Not used by the CLI or GUI.
     pub fn raw_command(&mut self, bytes: &[u8], reply_len: usize) -> Result<Vec<u8>> {
         self.discard_input()?;
         self.send(bytes)?;

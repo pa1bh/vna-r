@@ -379,3 +379,15 @@ blijven met een verdwenen apparaat.
 **NanoVNA-F.** `vna-cli peek F0` geeft "peek needs a LiteVNA (register protocol); this is
 a NanoVNA" (zelfde tekst als voorheen, nu uit de library).
 
+## Punt 30 — Dode code en commentaren (L4, L6, L7)
+
+**Zonder apparaat.** `cargo build --workspace` en `cargo clippy` schoon; `cargo tree -p
+vna-gui --depth 1 | grep -c anyhow` geeft `0`. Device ▸ Device screenshot ▸ Save
+stelt `screenshot.png` voor (was `litevna.png`).
+
+**Met NanoVNA-F (optioneel).**
+```bash
+cargo run -p litevna --example probe_shell -- /dev/cu.usbmodemXXXX info version
+```
+Verwacht: de antwoorden van `info` en `version` zoals in docs/06.
+

@@ -15,7 +15,8 @@
 //! * [`discovery`] — find candidate USB serial ports and their protocol.
 //! * [`calibration`] — SOL(T) error-term calibration applied on the host.
 //! * [`timedomain`] — TDR: impulse/step response and impedance along a line from S11.
-//! * [`touchstone`] — export sweeps as Touchstone `.s2p` files.
+//! * [`touchstone`] — read Touchstone `.s1p`/`.s2p` files, write `.s2p` and CSV.
+//! * [`traces`] — derived quantities for display: dB, phase, SWR, impedance, group delay.
 //! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
 
 pub mod calibration;

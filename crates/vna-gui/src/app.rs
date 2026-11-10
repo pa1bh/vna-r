@@ -350,8 +350,8 @@ pub struct App {
     file_trace: Option<String>,
     /// Last file operation (saved/opened), shown under **Files**.
     file_message: Option<String>,
-    /// (sweep number, vf, window) the cached result belongs to.
-    /// Keyed on `shown_rev`, VF and window.
+    /// TDR of the shown sweep, with what it was computed for: (`shown_rev`,
+    /// velocity factor, window). Recomputed when any of the three differs.
     tdr_cache: Option<(u64, f64, Window, TdrResult)>,
 
     /// Graphics backend and adapter wgpu picked (Vulkan, Metal, GL + driver), for About and bug reports.
@@ -2660,13 +2660,13 @@ impl App {
         let Some((_, shot)) = &self.screenshot else { return };
         let Some(path) = rfd::FileDialog::new()
             .add_filter("PNG", &["png"])
-            .set_file_name("litevna.png")
+            .set_file_name("screenshot.png")
             .save_file()
         else {
             return;
         };
         let rgb = shot.to_rgb888();
-        let result = (|| -> anyhow::Result<()> {
+        let result = (|| -> Result<(), Box<dyn std::error::Error>> {
             let file = std::io::BufWriter::new(std::fs::File::create(&path)?);
             let mut enc = png::Encoder::new(file, shot.width as u32, shot.height as u32);
             enc.set_color(png::ColorType::Rgb);

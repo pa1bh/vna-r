@@ -140,7 +140,8 @@ pub fn encode_write8(addr: u8, value: u64) -> [u8; 10] {
 
 /// Checksum over the first 31 bytes of a FIFO record as implemented by
 /// NanoVNA-App (DiSlord). Not part of the official documentation, where byte
-/// 0x1F is "reserved"; whether the LiteVNA 67 fills it is something to verify.
+/// 0x1F is "reserved"; the LiteVNA 64 and 67 do fill it (docs/01 §7: correct
+/// on every one of more than 20 000 records).
 pub fn fifo_checksum(record: &[u8]) -> u8 {
     let mut c: u8 = 0x46;
     for &b in &record[..FIFO_POINT_SIZE - 1] {

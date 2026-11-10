@@ -38,6 +38,8 @@ things that are not backwards compatible, such as the format of the calibration 
   The release workflow builds the Linux tarball on Ubuntu 22.04 (glibc 2.35, so Debian 12
   works), keeps macOS `._*` files out of the archives and no longer appends auto-generated
   notes to the changelog text.
+- Removed an unused register writer and the GUI's `anyhow` dependency; corrected comments
+  that contradicted the measurements in docs/01 (FIFO checksum, points per second).
 
 ### Fixed
 - GUI: a USB cable pulled during a sweep is recognised as a disconnect also when the

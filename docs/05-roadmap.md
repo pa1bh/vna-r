@@ -281,7 +281,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 27 | Fouttype: `Parse { line }`, `NotConnected`, `Unsupported(Kind)`; "apparaat weg" ook bij `Timeout` | D7 | S | gedaan 2026-11-10 (`Parse`, `Unsupported`, poort-verdwenen-controle; geen `NotConnected`: de library kent geen verbindingsloze toestand) |
 | 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | |
 | 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache) |
-| 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | |
+| 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | gedaan 2026-11-10 (protocolfuncties zoals `set_power`, `set_bandwidth`, `pause` blijven als driver-API; `probe_shell` blijft bewust los van de driver, met uitleg) |
 | 31 | `Arc<SweepResult>` voor shown en referenties; statusstring cachen | D9 | S | |
 | 32 | Z0, SWR-clamp en dB-vloer op één plek | D8 | S | |
 | 33 | CONTRIBUTING of korte architectuurnotitie | D12 | S | |

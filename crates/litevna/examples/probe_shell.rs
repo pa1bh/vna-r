@@ -1,5 +1,13 @@
 //! Scratch probe for the NanoVNA text shell: send each argument as a command, read until the "ch> " prompt.
 //! Prefix a command with "raw:" to dump the reply as bytes (for scan_bin / capture).
+//!
+//! This is the tool for exploring a firmware the driver does not know yet
+//! (docs/06 §7): it talks to the port directly, on purpose without
+//! `NanoVnaShell`, so it also works when the driver's `open` or framing is
+//! what is under investigation. Keep the prompt and line ending in step with
+//! `shell.rs` (`PROMPT`, `\r`).
+//!
+//!     cargo run -p litevna --example probe_shell -- /dev/cu.usbmodemXXXX info version "raw:scan_bin 1000000 2000000 5 7"
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 

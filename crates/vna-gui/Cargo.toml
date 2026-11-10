@@ -17,7 +17,6 @@ workspace = true
 
 [dependencies]
 litevna = { path = "../litevna" }
-anyhow = { workspace = true }
 num-complex = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
