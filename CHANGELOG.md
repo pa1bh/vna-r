@@ -14,6 +14,10 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- Een onzinnige schermafdruk-header (van een apparaat dat geen LiteVNA is of een gestoorde
+  verbinding) kon tot 17 GB laten reserveren voordat er iets gelezen was; de afmetingen
+  zijn nu begrensd op 4096×4096 en alleen 16 bits per pixel wordt geaccepteerd, wat de
+  omzetting toch al aannam.
 - CLI: `vna-cli tdr --csv -` schrijft naar stdout zoals de handleiding zegt (er ontstond
   een bestand met de naam `-`); het commentaar in een .s2p van `sweep` noemt het echte
   model in plaats van altijd "LiteVNA" en zegt "host calibration per segment" bij

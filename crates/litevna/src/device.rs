@@ -567,7 +567,12 @@ impl LiteVna {
         let width = u16::from_le_bytes([header[0], header[1]]);
         let height = u16::from_le_bytes([header[2], header[3]]);
         let bpp = header[4];
-        if width == 0 || height == 0 || bpp % 8 != 0 || bpp > 32 {
+        // The LiteVNA family sends RGB565 (16 bpp) at 320×240 to 800×480; the
+        // conversion assumes 16 bpp. Bound the allocation by the header too: a
+        // garbage header (a non-LiteVNA answering the probe, a broken link)
+        // could otherwise ask for u16 × u16 × 4 bytes, 17 GB.
+        const MAX_SIDE: u16 = 4096;
+        if width == 0 || height == 0 || width > MAX_SIDE || height > MAX_SIDE || bpp != 16 {
             return Err(Error::protocol(format!("implausible screenshot header {header:02X?}")));
         }
         let size = width as usize * height as usize * (bpp as usize / 8);

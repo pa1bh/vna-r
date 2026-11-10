@@ -171,3 +171,10 @@ Verwacht: `0` (geen debugregel zonder `--trace`); de eerste regel noemt het mode
 segmentversie zegt `host calibration per segment`. Met `--trace` verschijnt de regel
 "first raw record" wel.
 
+## Punt 10 — Schermafdruk-header begrensd (B11)
+
+**Met apparaat.** `vna-cli screenshot --out /tmp/qc.png` op LiteVNA 64 en 67 en de GUI-knop
+**Screenshot**: werkt als voorheen (480×320 resp. 800×480, 16 bpp). Een negatieve test
+vraagt een apparaat dat een foute header stuurt; controleer anders de code: `bpp != 16`
+en `MAX_SIDE` in `device.rs::screenshot`.
+
