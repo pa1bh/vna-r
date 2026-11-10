@@ -2070,12 +2070,15 @@ impl App {
             None => Vec::new(),
         };
         let mhz: Vec<f64> = sweep.freqs_hz.iter().map(|f| *f as f64 / 1e6).collect();
-        // Arrow keys nudge the active marker (shift: 10 points).
+        // Arrow keys nudge the active marker (shift: 10 points), unless a text
+        // field has the keyboard: `key_pressed` sees the raw events, so without
+        // this check editing Start/Stop would move the marker too.
         let n_pts = sweep.freqs_hz.len();
+        let typing = ui.ctx().egui_wants_keyboard_input();
         let (left, right, shift) = ui.input(|i| {
             (
-                i.key_pressed(egui::Key::ArrowLeft),
-                i.key_pressed(egui::Key::ArrowRight),
+                !typing && i.key_pressed(egui::Key::ArrowLeft),
+                !typing && i.key_pressed(egui::Key::ArrowRight),
                 i.modifiers.shift,
             )
         });

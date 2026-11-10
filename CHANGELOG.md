@@ -14,6 +14,8 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: de pijltjestoetsen verplaatsten de actieve marker ook terwijl je in Start, Stop of
+  een referentienaam typte.
 - GUI: markers blijven op hun frequentie staan als het raster verandert (ander bereik,
   ander aantal punten, een geopend bestand); voorheen bleven ze op hetzelfde puntnummer
   staan en wezen daardoor een andere frequentie aan. Een marker buiten het nieuwe bereik

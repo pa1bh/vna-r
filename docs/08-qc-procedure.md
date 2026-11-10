@@ -145,3 +145,9 @@ Open een .s2p van 100 – 200 MHz: M1 is weg.
 op 14,2 MHz (vóór 0.2.6: 7,6 MHz, hetzelfde puntnummer). Apply met 1 – 60 MHz: M1 blijft
 op ~14,2 MHz.
 
+## Punt 8 — Pijltjestoetsen alleen buiten tekstvelden (B7)
+
+**Zonder apparaat.** Open een .s2p als trace, zet M1 en lees de frequentie af. Klik in het
+veld **Stop**, druk vijf keer ←: de cursor beweegt in het veld, M1 staat nog op dezelfde
+frequentie. Klik in de grafiek (buiten een tekstveld) en druk ←: M1 schuift één punt.
+
