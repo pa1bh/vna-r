@@ -370,9 +370,7 @@ fn open(conn: &Conn) -> Result<Vna> {
 
 /// The LiteVNA behind a handle, or a clear error for commands that need its registers.
 fn lite<'a>(dev: &'a mut Vna, what: &str) -> Result<&'a mut litevna::LiteVna> {
-    let kind = dev.kind();
-    dev.as_lite_mut()
-        .ok_or_else(|| anyhow::anyhow!("{what} needs a LiteVNA (register protocol); this is a {}", kind.name()))
+    Ok(dev.require_lite(what)?)
 }
 
 fn list() -> Result<()> {

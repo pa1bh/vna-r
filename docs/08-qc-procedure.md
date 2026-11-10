@@ -358,3 +358,24 @@ Verwacht: groen; de GUI-test leest een letterlijke instellingenregel van 0.2.5.
    `[…]` niet als array lezen en begint met standaardinstellingen. Dat is de enige
    onomkeerbare kant van deze wijziging; zet zo nodig `/tmp/app.ron.bak` terug.
 
+## Punt 27 — Fouttype en "apparaat weg" (D7)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna messages parse_errors_name_the_line
+printf '# MHz S RI R 50\n1 0.5 0.0\n2 0.5 oops\n' > /tmp/qc-bad.s1p
+cargo run -q --release -p vna-cli -- tdr --from /tmp/qc-bad.s1p
+```
+Verwacht: tests groen; de CLI meldt `… line 3: not a number: "oops"`. In de GUI geeft
+File ▸ Open as trace met hetzelfde bestand "opening /tmp/qc-bad.s1p: line 3: not a number:
+"oops"" in de topbalk.
+
+**Met apparaat.** Run (continu) en trek de USB-kabel los: binnen één sweep (LiteVNA:
+enkele seconden; de time-out is 3 s of meer) toont de topbalk de fout en staat de knop
+weer op **Connect**; de poort verdwijnt uit de lijst. Steek de kabel terug: de poort
+verschijnt binnen 2 s en Connect werkt. Vóór 0.3 kon de GUI bij een time-out "verbonden"
+blijven met een verdwenen apparaat.
+
+**NanoVNA-F.** `vna-cli peek F0` geeft "peek needs a LiteVNA (register protocol); this is
+a NanoVNA" (zelfde tekst als voorheen, nu uit de library).
+

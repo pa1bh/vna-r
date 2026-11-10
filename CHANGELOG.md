@@ -40,6 +40,11 @@ things that are not backwards compatible, such as the format of the calibration 
   notes to the changelog text.
 
 ### Fixed
+- GUI: a USB cable pulled during a sweep is recognised as a disconnect also when the
+  failure shows up as a timeout: the worker checks whether the port still exists. Before,
+  the GUI could stay "connected" to a device that was gone.
+- A Touchstone file that cannot be read now reports the line ("line 12: not a number:
+  …") as its own kind of error instead of "invalid argument".
 - Library: a sweep configuration with zero points, a non-increasing grid in the TDR and
   a zero or negative band in `check_lines` caused an arithmetic overflow or an endless
   loop; they now return an error.

@@ -107,6 +107,16 @@ impl Vna {
         }
     }
 
+    /// The LiteVNA behind this handle, or [`Error::Unsupported`] naming what
+    /// (`peek`, `--average`, …) needs its registers.
+    pub fn require_lite(&mut self, what: &str) -> Result<&mut LiteVna> {
+        let device = self.kind().name().to_string();
+        self.as_lite_mut().ok_or_else(|| Error::Unsupported {
+            what: what.to_string(),
+            device,
+        })
+    }
+
     pub fn as_shell_mut(&mut self) -> Option<&mut NanoVnaShell> {
         match self {
             Vna::Shell(d) => Some(d),

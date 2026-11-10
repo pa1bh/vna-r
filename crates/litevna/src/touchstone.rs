@@ -68,9 +68,10 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
                     "GHZ" => unit = 1e9,
                     "S" => {}
                     "Y" | "Z" | "G" | "H" => {
-                        return Err(Error::InvalidArgument(format!(
-                            "Touchstone parameter type {w} not supported (only S)"
-                        )))
+                        return Err(Error::parse(
+                            Some(lineno + 1),
+                            format!("Touchstone parameter type {w} not supported (only S)"),
+                        ))
                     }
                     "RI" => format = Format::Ri,
                     "MA" => format = Format::Ma,
@@ -78,49 +79,49 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
                     "R" => {
                         z0 = match words.next().map(|w| w.parse::<f64>()) {
                             Some(Ok(v)) if v.is_finite() && v > 0.0 => v,
-                            _ => return Err(Error::InvalidArgument(format!("line {}: bad reference impedance", lineno + 1))),
+                            _ => return Err(Error::parse(Some(lineno + 1), "bad reference impedance".into())),
                         };
                     }
-                    other => return Err(Error::InvalidArgument(format!("line {}: unknown option {other:?}", lineno + 1))),
+                    other => return Err(Error::parse(Some(lineno + 1), format!("unknown option {other:?}"))),
                 }
             }
             continue;
         }
         if body.starts_with('[') {
-            return Err(Error::InvalidArgument("Touchstone v2 ([Version] keywords) is not supported".into()));
+            return Err(Error::parse(
+                Some(lineno + 1),
+                "Touchstone v2 ([Version] keywords) is not supported".into(),
+            ));
         }
         for t in body.split_whitespace() {
             let v: f64 = t
                 .parse()
-                .map_err(|_| Error::InvalidArgument(format!("line {}: not a number: {t:?}", lineno + 1)))?;
+                .map_err(|_| Error::parse(Some(lineno + 1), format!("not a number: {t:?}")))?;
             tokens.push(v);
         }
     }
     if tokens.is_empty() {
-        return Err(Error::InvalidArgument("no data in Touchstone file".into()));
+        return Err(Error::parse(None, "no data in Touchstone file".into()));
     }
     let per = match ports {
         Some(1) => 3,
         Some(2) => 9,
-        Some(n) => return Err(Error::InvalidArgument(format!("{n}-port files are not supported"))),
+        Some(n) => return Err(Error::parse(None, format!("{n}-port files are not supported"))),
         None => {
             if tokens.len().is_multiple_of(9) && tokens.len().is_multiple_of(3) && looks_like_two_port(&tokens) {
                 9
             } else if tokens.len().is_multiple_of(3) {
                 3
             } else {
-                return Err(Error::InvalidArgument(format!(
-                    "{} values do not form 1-port (3) or 2-port (9) records",
-                    tokens.len()
-                )));
+                return Err(Error::parse(
+                    None,
+                    format!("{} values do not form 1-port (3) or 2-port (9) records", tokens.len()),
+                ));
             }
         }
     };
     if !tokens.len().is_multiple_of(per) {
-        return Err(Error::InvalidArgument(format!(
-            "{} values do not form records of {per}",
-            tokens.len()
-        )));
+        return Err(Error::parse(None, format!("{} values do not form records of {per}", tokens.len())));
     }
     let n = tokens.len() / per;
     let mut freqs_hz = Vec::with_capacity(n);
@@ -129,7 +130,7 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
     for rec in tokens.chunks(per) {
         let f = rec[0] * unit;
         if !(f >= 0.0) || f > 1e13 {
-            return Err(Error::InvalidArgument(format!("frequency out of range: {}", rec[0])));
+            return Err(Error::parse(None, format!("frequency out of range: {}", rec[0])));
         }
         freqs_hz.push(f.round() as u64);
         s11.push(format.to_complex(rec[1], rec[2]));
@@ -141,7 +142,7 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
         });
     }
     if freqs_hz.windows(2).any(|w| w[1] < w[0]) {
-        return Err(Error::InvalidArgument("frequencies are not increasing".into()));
+        return Err(Error::parse(None, "frequencies are not increasing".into()));
     }
     if (z0 - 50.0).abs() > 1e-9 {
         for g in &mut s11 {
@@ -290,6 +291,18 @@ pub fn swr(gamma_mag: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_errors_name_the_line() {
+        let text = "# MHz S RI R 50\n1 0.5 0.0\n2 0.5 oops\n";
+        let err = read_touchstone(text.as_bytes(), Some(1)).unwrap_err();
+        assert!(matches!(err, Error::Parse { line: Some(3), .. }), "{err:?}");
+        assert_eq!(err.to_string(), "line 3: not a number: \"oops\"");
+        let err = read_touchstone("[Version] 2.0\n".as_bytes(), None).unwrap_err();
+        assert!(matches!(err, Error::Parse { line: Some(1), .. }), "{err:?}");
+        let err = read_touchstone("! only a comment\n".as_bytes(), None).unwrap_err();
+        assert!(matches!(err, Error::Parse { line: None, .. }), "{err:?}");
+    }
 
     fn sample() -> SweepResult {
         let freqs_hz: Vec<u64> = (1..=5).map(|k| k * 10_000_000).collect();

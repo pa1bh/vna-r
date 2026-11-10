@@ -79,6 +79,8 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
 
 struct Worker {
     dev: Option<Vna>,
+    /// Path of the open port, to check whether it still exists after an error.
+    port: Option<String>,
     continuous: Option<(Vec<SweepConfig>, Purpose, usize)>,
     events: Sender<Event>,
     ctx: egui::Context,
@@ -87,6 +89,7 @@ struct Worker {
 fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
     let mut w = Worker {
         dev: None,
+        port: None,
         continuous: None,
         events,
         ctx,
@@ -132,6 +135,14 @@ impl Worker {
         });
     }
 
+    /// The port we opened is no longer among the serial ports of the system.
+    fn port_vanished(&self) -> bool {
+        match (&self.port, litevna::discovery::list_ports()) {
+            (Some(path), Ok(ports)) => !ports.iter().any(|p| &p.path == path),
+            _ => false,
+        }
+    }
+
     /// A failure of a side action; a running sweep carries on.
     fn warn(&mut self, context: &str, err: impl std::fmt::Display) {
         self.emit(Event::Error {
@@ -153,6 +164,7 @@ impl Worker {
                 }) {
                     Ok((d, info, battery_mv)) => {
                         self.dev = Some(d);
+                        self.port = Some(port.clone());
                         self.emit(Event::Connected { port, info, battery_mv });
                     }
                     Err(e) => self.fail(&format!("connecting to {port}"), e),
@@ -161,6 +173,7 @@ impl Worker {
             Cmd::Disconnect => {
                 self.continuous = None;
                 self.dev = None;
+                self.port = None;
                 self.emit(Event::Disconnected);
             }
             Cmd::Sweep {
@@ -221,9 +234,12 @@ impl Worker {
                     Ok(r) => parts.push(r),
                     Err(e) => {
                         let msg = e.to_string();
-                        // A broken pipe means the cable went; forget the device.
-                        if matches!(e, litevna::Error::Io(_) | litevna::Error::Serial(_)) {
+                        // The cable went: the port reports an error, or (a pulled
+                        // cable can also look like a timeout) the port is no
+                        // longer there. Forget the device.
+                        if e.is_link_failure() || self.port_vanished() {
                             self.dev = None;
+                            self.port = None;
                             self.continuous = None;
                             self.emit(Event::Disconnected);
                         }
