@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
-use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
+use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
@@ -2611,30 +2611,15 @@ fn draw_gate(ui: &egui::Ui, transform: &egui_plot::PlotTransform, rect: egui::Re
     painter.vline(xb, rect.y_range(), stroke);
 }
 
-/// Linear complex interpolation of a reference onto another grid (held at
-/// the ends outside the reference span).
+/// Interpolation of a reference onto another grid (held at the ends outside
+/// the reference span), polar like the calibration (see
+/// `litevna::calibration::interpolate_complex`).
 fn resample_complex(src_f: &[u64], s11: &[Complex64], s21: &[Complex64], dst_f: &[u64]) -> (Vec<Complex64>, Vec<Complex64>) {
-    let one = |v: &[Complex64]| -> Vec<Complex64> {
-        dst_f
-            .iter()
-            .map(|&f| {
-                if src_f.is_empty() {
-                    return Complex64::new(0.0, 0.0);
-                }
-                match src_f.binary_search(&f) {
-                    Ok(i) => v[i],
-                    Err(0) => v[0],
-                    Err(i) if i >= src_f.len() => v[src_f.len() - 1],
-                    Err(i) => {
-                        let (f0, f1) = (src_f[i - 1] as f64, src_f[i] as f64);
-                        let t = (f as f64 - f0) / (f1 - f0);
-                        v[i - 1] * (1.0 - t) + v[i] * t
-                    }
-                }
-            })
-            .collect()
-    };
-    (one(s11), one(s21))
+    if src_f.is_empty() {
+        let zeros = vec![Complex64::new(0.0, 0.0); dst_f.len()];
+        return (zeros.clone(), zeros);
+    }
+    (interpolate_complex(src_f, s11, dst_f), interpolate_complex(src_f, s21, dst_f))
 }
 
 /// What draws the window: wgpu's backend and adapter, e.g. "Vulkan, Intel UHD Graphics

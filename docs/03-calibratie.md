@@ -168,8 +168,11 @@ de library correct opving.
 
 De fouttermen veranderen glad met de frequentie, dus tussen twee calibratiepunten kun je ze
 schatten. De library interpoleert niet de fouttermen zelf maar de **ruwe metingen van de
-standaarden** (complex, lineair in reëel en imaginair deel) naar het nieuwe raster en lost daarna
-opnieuw op. Voordelen: het JSON-bestand blijft de enige bron van waarheid, en een through of
+standaarden** naar het nieuwe raster en lost daarna opnieuw op. Dat gebeurt polair: grootte en
+fase apart, de fase langs de kortste boog. Lineair in reëel en imaginair deel (zoals tot 0.2.5)
+snijdt de hoek tussen twee fasoren af: het midden van een koorde over θ heeft grootte cos(θ/2),
+−0,13 dB bij 20° en −3 dB bij 90°. Omdat alle standaarden evenveel krimpen wordt de
+trackingterm te klein en komt elke gecorrigeerde |Γ| te hoog uit. Voordelen: het JSON-bestand blijft de enige bron van waarheid, en een through of
 isolation die later wordt toegevoegd doet automatisch mee.
 
 Twee grenzen:
@@ -177,13 +180,16 @@ Twee grenzen:
 1. **Bereik.** Buiten het gecalibreerde bereik is er niets om tussen te interpoleren; dat wordt
    geweigerd. Calibreer dus liever één keer breed (bijvoorbeeld 50 kHz – 1 GHz met 401 punten) en
    zoom daarna in.
-2. **Fasedraaiing per stap.** Lineair interpoleren in re/im gaat mis zodra de fase tussen twee
-   buurpunten meer dan ~90° draait; dan is onduidelijk welke kant op. De library meet de grootste
-   fasestap van de Open en weigert boven 90°. Vuistregel: hoe langer de kabel tussen VNA en
-   referentievlak, hoe sneller de fase draait en hoe meer calibratiepunten je nodig hebt.
+2. **Fasedraaiing per stap.** De kortste boog is pas dubbelzinnig bij 180° per stap; de library
+   meet de grootste fasestap van open, short, through (S21), line open en line short en weigert
+   boven 135°, zodat ruis op de fase de richting niet kan omkeren. Load en isolation tellen niet
+   mee, hun fase is ruis. Vuistregel: hoe langer de kabel tussen VNA en referentievlak, hoe
+   sneller de fase draait en hoe meer calibratiepunten je nodig hebt.
 
-Synthetische test: 101 calibratiepunten over 10 MHz – 1 GHz, geïnterpoleerd naar 401 punten die
-er precies tussenin liggen, geeft een restfout kleiner dan 2·10⁻⁴ op |Γ| = 0,4.
+Synthetische tests: 101 calibratiepunten over 10 MHz – 1 GHz, geïnterpoleerd naar 401 punten die
+er precies tussenin liggen, geeft een restfout kleiner dan 2·10⁻⁴ op |Γ| = 0,4. Met 11 punten over
+100 MHz – 1 GHz en fouttermen die 62° per stap draaien (lange kabel) blijft de fout op |Γ| onder
+0,01; de re/im-interpolatie van vóór 0.2.6 gaf hier 0,17 (+1,3 dB).
 
 **Gemeten op de LiteVNA 67** met de calibratie van §6 (201 punten, 1 MHz – 1 GHz) en de Open nog
 aangesloten:

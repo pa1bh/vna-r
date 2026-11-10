@@ -76,14 +76,15 @@ raster binnen het gecalibreerde bereik wordt geïnterpoleerd.
 
 ## Interpolatie naar een ander raster
 
-De opgeslagen standaardmetingen worden lineair complex geïnterpoleerd naar het nieuwe
-raster en de fouttermen opnieuw opgelost. Dat werkt goed zolang de fouttermen tussen de
+De opgeslagen standaardmetingen worden geïnterpoleerd naar het nieuwe raster (grootte en
+fase apart, zodat een snel draaiende fase de grootte niet aantast) en de fouttermen
+opnieuw opgelost. Dat werkt goed zolang de fouttermen tussen de
 calibratiepunten glad verlopen, en het programma weigert als dat niet zo is:
 
 - **Buiten het bereik** van de calibratie: foutmelding, geen correctie.
-- **Te grof raster bij hoge frequentie**: als de fase van de open meer dan 90° draait
-  tussen twee calibratiepunten, is interpoleren dubbelzinnig. Calibreer dan met meer
-  punten.
+- **Te grof raster bij hoge frequentie**: als de fase van de open, short of through
+  meer dan 135° draait tussen twee calibratiepunten, is de draairichting dubbelzinnig.
+  Calibreer dan met meer punten.
 - **Te grof raster aan de onderkant**: een waarschuwing wanneer de sweep punten heeft
   tussen de eerste twee calibratiepunten terwijl het tweede meer dan tweemaal zo hoog ligt
   als het eerste. Een calibratie 50 kHz tot 6,3 GHz in 1001 punten heeft zijn tweede punt

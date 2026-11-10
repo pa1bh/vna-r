@@ -75,15 +75,16 @@ within the calibrated range it is interpolated.
 
 ## Interpolation to a different grid
 
-The stored standard measurements are interpolated linearly as complex values to the new
-grid and the error terms are solved again. That works well as long as the error terms run
+The stored standard measurements are interpolated to the new grid (magnitude and phase
+separately, so a fast-turning phase does not eat into the magnitude) and the error terms
+are solved again. That works well as long as the error terms run
 smoothly between the calibration points, and the program refuses when that is not the
 case:
 
 - **Outside the range** of the calibration: error message, no correction.
-- **Grid too coarse at high frequency**: if the phase of the open rotates more than 90°
-  between two calibration points, interpolating is ambiguous. Calibrate with more points
-  then.
+- **Grid too coarse at high frequency**: if the phase of the open, short or through
+  rotates more than 135° between two calibration points, the direction of rotation is
+  ambiguous. Calibrate with more points then.
 - **Grid too coarse at the bottom end**: a warning when the sweep has points between the
   first two calibration points while the second one is more than twice as high as the
   first. A calibration from 50 kHz to 6.3 GHz in 1001 points has its second point at

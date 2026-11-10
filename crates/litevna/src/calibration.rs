@@ -405,19 +405,24 @@ impl CalibrationSet {
     }
 }
 
-/// Largest phase step (radians) between adjacent points that linear
-/// interpolation in re/im can still follow without ambiguity.
-pub const MAX_INTERPOLATION_PHASE_STEP: f64 = PI / 2.0;
+/// Largest phase step (radians) between adjacent calibration points that
+/// [`interpolate_complex`] still follows. The interpolation takes the shorter
+/// arc, so it is exact for a smooth phase up to 180° per step; the margin
+/// below that absorbs noise on the measured phase.
+pub const MAX_INTERPOLATION_PHASE_STEP: f64 = 3.0 * PI / 4.0;
 /// See [`CalibrationSet::coarse_low_end_warning`].
 pub const COARSE_LOW_END_RATIO: f64 = 2.0;
 
 impl CalibrationSet {
     /// Resample every stored standard onto `freqs_hz` by linear interpolation
-    /// of the complex values (real and imaginary parts separately).
+    /// of magnitude and phase (see [`interpolate_complex`]).
     ///
     /// Fails when `freqs_hz` reaches outside the calibrated span, or when the
-    /// calibration grid is so coarse that the open's phase turns more than
-    /// 90° between neighbouring points (then the interpolation is ambiguous).
+    /// calibration grid is so coarse that the phase of a reflective standard
+    /// (open, short, line open, line short) or of the through turns more than
+    /// [`MAX_INTERPOLATION_PHASE_STEP`] between neighbouring points: then the
+    /// phase is undersampled and the direction of rotation is ambiguous. The
+    /// load and the isolation are not checked; their phase is noise.
     pub fn interpolate(&self, freqs_hz: &[u64]) -> Result<CalibrationSet> {
         if freqs_hz.is_empty() {
             return Err(Error::Calibration("empty target grid".into()));
@@ -430,11 +435,19 @@ impl CalibrationSet {
                 tlo, thi, lo, hi
             )));
         }
-        if let Some(open) = &self.open {
-            let step = max_phase_step(&open.s11);
+        let checked = [
+            ("open", self.open.as_ref().map(|m| &m.s11)),
+            ("short", self.short.as_ref().map(|m| &m.s11)),
+            ("through", self.through.as_ref().map(|m| &m.s21)),
+            ("line open", self.line_open.as_ref().map(|m| &m.s11)),
+            ("line short", self.line_short.as_ref().map(|m| &m.s11)),
+        ];
+        for (name, values) in checked {
+            let Some(values) = values else { continue };
+            let step = max_phase_step(values);
             if step > MAX_INTERPOLATION_PHASE_STEP {
                 return Err(Error::Calibration(format!(
-                    "calibration grid too coarse to interpolate: open phase jumps {:.0}° between points",
+                    "calibration grid too coarse to interpolate: {name} phase jumps {:.0}° between points",
                     step.to_degrees()
                 )));
             }
@@ -506,8 +519,17 @@ fn max_phase_step(values: &[C64]) -> f64 {
 }
 
 /// Piecewise-linear interpolation of complex samples `ys` at `xs` (sorted,
-/// strictly increasing) onto `targets` (each within `xs`' range).
-fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> {
+/// strictly increasing) onto `targets` (each within `xs`' range), in polar
+/// form: magnitude and phase are interpolated separately, the phase along the
+/// shorter arc.
+///
+/// Interpolating real and imaginary parts instead cuts the corner between two
+/// phasors: the midpoint of a chord spanning θ has magnitude cos(θ/2), which
+/// is −0.13 dB at 20° and −3 dB at 90°. A raw standard measured through the
+/// VNA's own test port turns by a few degrees per point on a dense grid, but
+/// tens of degrees on a coarse one or behind a cable, and the shrunken
+/// tracking term then makes every corrected |Γ| come out too high.
+pub fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> {
     targets
         .iter()
         .map(|&t| {
@@ -524,7 +546,15 @@ fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> {
             }
             let (x0, x1) = (xs[i - 1] as f64, xs[i] as f64);
             let w = (t as f64 - x0) / (x1 - x0);
-            ys[i - 1] * (1.0 - w) + ys[i] * w
+            let (a, b) = (ys[i - 1], ys[i]);
+            let mag = a.norm() * (1.0 - w) + b.norm() * w;
+            let mut dphi = b.arg() - a.arg();
+            if dphi > PI {
+                dphi -= 2.0 * PI;
+            } else if dphi < -PI {
+                dphi += 2.0 * PI;
+            }
+            C64::from_polar(mag, a.arg() + w * dphi)
         })
         .collect()
 }
@@ -1298,15 +1328,85 @@ mod tests {
         assert!(set.interpolate(&[1_500_000_000]).is_err());
         // Open phase turns 1.5 rad/GHz · 0.09 GHz ≈ 7.7° per step here: fine.
         assert!(set.interpolate(&[150_000_000, 500_000_000]).is_ok());
-        // A grid whose open phase jumps >90° per step must be refused.
+        // A grid whose open phase jumps more than 135° per step must be refused.
         let mut bad = set.clone();
         if let Some(open) = &mut bad.open {
             for (i, v) in open.s11.iter_mut().enumerate() {
-                *v = C64::from_polar(1.0, 2.0 * i as f64); // 115° per step
+                *v = C64::from_polar(1.0, 2.6 * i as f64); // 149° per step
             }
         }
         let err = bad.interpolate(&[150_000_000]).unwrap_err().to_string();
-        assert!(err.contains("too coarse"), "{err}");
+        assert!(err.contains("too coarse") && err.contains("open"), "{err}");
+        // The through behind a long cable turns just as fast and is checked too.
+        let mut bad = set.clone();
+        if let Some(through) = &mut bad.through {
+            for (i, v) in through.s21.iter_mut().enumerate() {
+                *v = C64::from_polar(0.9, -2.6 * i as f64);
+            }
+        }
+        let err = bad.interpolate(&[150_000_000]).unwrap_err().to_string();
+        assert!(err.contains("through"), "{err}");
+        // 115° per step is fine for the polar interpolation.
+        let mut ok = set.clone();
+        if let Some(open) = &mut ok.open {
+            for (i, v) in open.s11.iter_mut().enumerate() {
+                *v = C64::from_polar(1.0, 2.0 * i as f64);
+            }
+        }
+        assert!(ok.interpolate(&[150_000_000]).is_ok());
+    }
+
+    /// Error terms of a VNA with a long cable to the reference plane: the
+    /// tracking terms turn 12 rad/GHz, i.e. 62° per 90 MHz calibration step.
+    fn terms_long_cable(f: f64) -> ErrorTerms {
+        let g = f / 1e9;
+        ErrorTerms {
+            e00: C64::new(0.02, -0.015),
+            e11: C64::new(-0.03, 0.02),
+            e10e01: C64::from_polar(0.8 - 0.05 * g, -12.0 * g),
+            e30: C64::new(1e-4, -2e-4),
+            e10e32: Some(C64::from_polar(0.9 - 0.03 * g, -12.0 * g)),
+        }
+    }
+
+    #[test]
+    fn interpolation_keeps_magnitude_on_a_coarse_grid() {
+        // 11 points, 100 MHz..1 GHz, standards turning 62° per step. Interpolating
+        // the raw standards in re/im shrinks them all by cos(31°) = 0.857 at the
+        // midpoints, so a corrected |Γ| would come out 1/0.857 = +1.3 dB too high.
+        // Polar interpolation keeps the error at the level of the small e00/e11
+        // wobble on the magnitude.
+        let kit = CalKit::ideal();
+        let coarse: Vec<u64> = (0..=10).map(|i| 100_000_000 + i * 90_000_000).collect();
+        let mut set = CalibrationSet::new(coarse.clone(), kit.clone());
+        for std in Standard::ALL {
+            let (mut s11, mut s21) = (Vec::new(), Vec::new());
+            for &f in &coarse {
+                let fh = f as f64;
+                let (a11, a21) = match std {
+                    Standard::Open => (kit.open.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Short => (kit.short.gamma(fh), C64::new(0.0, 0.0)),
+                    Standard::Through => (C64::new(0.0, 0.0), kit.through_s21(fh)),
+                    _ => (kit.load.gamma(fh), C64::new(0.0, 0.0)),
+                };
+                let (m11, m21) = measure(&terms_long_cable(fh), a11, a21);
+                s11.push(m11);
+                s21.push(m21);
+            }
+            set.set(std, &sweep_from(&coarse, s11, s21)).unwrap();
+        }
+        // Midpoints of the coarse grid: the worst case for the chord.
+        let fine: Vec<u64> = (0..10).map(|i| 145_000_000 + i * 90_000_000).collect();
+        let cal = set.solve_for(&fine).unwrap();
+        let dut11 = C64::from_polar(1.0, 2.0); // a short behind some line
+        let dut21 = C64::from_polar(0.5, -1.0);
+        let mut worst = 0.0f64;
+        for (i, &f) in fine.iter().enumerate() {
+            let (m11, m21) = measure(&terms_long_cable(f as f64), dut11, dut21);
+            let (a11, a21) = cal.correct(i, m11, m21);
+            worst = worst.max((a11.norm() - 1.0).abs()).max((a21.norm() - 0.5).abs());
+        }
+        assert!(worst < 1e-2, "magnitude error {worst} (re/im interpolation gives about 0.16)");
     }
 
     #[test]

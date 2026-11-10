@@ -243,7 +243,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 
 | # | Werk | Code | Grootte | Status |
 |---|------|------|---------|--------|
-| 1 | Calibratie-interpolatie polair (grootte en fase), 90°-grens eruit, test met grof raster | B1 | S | |
+| 1 | Calibratie-interpolatie polair (grootte en fase), 90°-grens eruit, test met grof raster | B1 | S | gedaan 2026-11-10 (grens 135°, ook short/through/line) |
 | 2 | `max_time_s = 1/(2·df)`, test en GUI-label "alias-free range" mee | B2 | S | |
 | 3 | `NanoVnaShell::open`: `restore_on_drop` pas na geslaagde `sync` | B3 | S | |
 | 4 | Statusmelding ("measured …", "loaded", "save to keep it") scheiden van de solve-fout | B4, U2 | S | |

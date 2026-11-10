@@ -13,6 +13,16 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Opgelost
+- Calibratie-interpolatie naar een ander raster gebeurt nu polair (grootte en fase apart)
+  in plaats van lineair in reëel en imaginair deel. Dat laatste snijdt de hoek tussen twee
+  fasoren af en maakte alle standaarden kleiner met cos(θ/2) per fasestap θ, zodat elke
+  gecorrigeerde |Γ| te hoog uitkwam: verwaarloosbaar bij 1001 punten, maar +1,3 dB bij
+  11 punten met een lange kabel. De grens op de fasestap gaat van 90° naar 135° en geldt
+  nu ook voor short, through, line open en line short, niet alleen voor de open.
+- De Δ-trace tegen een referentie op een ander raster gebruikt dezelfde polaire
+  interpolatie.
+
 ### Documentatie
 - De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
   duik naar 0 Ω blijft de 50 Ω-lijn leesbaar, bij de open zat die onderin een as tot
