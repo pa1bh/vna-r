@@ -1,25 +1,110 @@
 # QC-procedure werklijst november 2026
 
-Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+Stand: 10 november 2026, 43 commits na v0.2.5 op `main`, niet gepusht, versienummer nog
+0.2.5. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
-is, hoe je het controleert en wat je moet zien. **Apparaat** zegt of er hardware voor
-nodig is. Voer eerst de algemene controle uit, dan de punten.
+is, hoe je het controleert en wat je moet zien.
 
-## Algemeen (zonder apparaat)
+Wat ik zelf al gecontroleerd heb: `cargo fmt`, `cargo clippy -D warnings` en alle tests
+(85 in de library, 4 in de GUI) na elk punt; de release-build; de CLI-voorbeelden die
+geen apparaat nodig hebben; en dat de GUI met jouw bestaande instellingen van 0.2.5
+start en tien seconden draait zonder fout. **Niet gecontroleerd**: alles met een
+apparaat, alles wat je moet zien (de GUI heb ik niet kunnen bekijken), Linux, Windows en
+de CI (er is niets gepusht).
+
+## Voorbereiding
 
 ```bash
-cargo fmt --all --check && cargo clippy --workspace --all-targets && cargo test --workspace
+cargo build --workspace --release
+export PATH="$PWD/target/release:$PATH"
+cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
-Verwacht: geen fmt-afwijking, alleen de bekende clippy-stijlmeldingen, alle tests groen.
+De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
+voorbeelden hieronder de nieuwe versie zijn; de derde bewaart je instellingen van 0.2.5
+(de nieuwe versie schrijft ze in een vorm die 0.2.5 niet meer leest, zie punt 25).
 
 ```bash
-cargo run --release -p vna-gui
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && ./scripts/check-manuals.sh
 ```
 
-Verwacht: GUI start, titelbalk toont de versie, Help ▸ About toont versie en git-revisie.
+Verwacht: geen uitvoer van fmt en clippy, alle tests groen, "manuals in step: 10 files
+each".
+
+```bash
+vna-gui
+```
+
+Verwacht: de GUI start met je oude instellingen, de titelbalk toont de versie, Help ▸
+About toont versie en git-revisie (`v0.2.5-43-g…`).
+
+## Volgorde: vier rondes
+
+Loop de punten niet op nummer af maar per opstelling. In de tabel staat per punt wat je
+ervoor nodig hebt; binnen een punt staan de stappen onder **Zonder apparaat**, **Met
+apparaat**, enzovoort.
+
+1. **Ronde A, zonder apparaat** (ongeveer een uur): van elk punt het deel "Zonder
+   apparaat". Dit zijn commando's met een verwachte uitvoer en handelingen in de GUI
+   met bestanden uit `cal/`.
+2. **Ronde B, LiteVNA met N-kit**: de delen "Met apparaat" en "Met LiteVNA".
+3. **Ronde C, NanoVNA-F**: de delen "Met NanoVNA-F"; de punten 11 en 22 zijn hier het
+   belangrijkst.
+4. **Ronde D, Linux en CI**: punt 15 en 16 op de NixOS-laptop, en na een push de CI
+   (punt 16 en 29).
+
+Sluit af met de **slotronde** onderaan: de hele GUI één keer van begin tot eind, omdat
+`app.rs` gesplitst is (punt 24) en veel punten dezelfde panelen raken.
+
+| Punt | Onderwerp | Zonder apparaat | LiteVNA | NanoVNA-F | Linux/CI |
+|---|---|---|---|---|---|
+| 1 | Polaire calibratie-interpolatie | test | ja, belangrijk | | |
+| 2 | TDR-bereik | ja | | | |
+| 3 | Shell-open wacht niet dubbel | code | | | andere seriële poort |
+| 4 | Calibratiemeldingen blijven staan | ja | ja | | |
+| 5 | Standaarden op het toegepaste raster | | ja, belangrijk | ja | |
+| 6 | Screenshot stopt de sweep niet | code | ja | | |
+| 7 | Markers op frequentie | ja | ja | | |
+| 8 | Pijltjestoetsen buiten tekstvelden | ja | | | |
+| 9 | CLI-uitvoer | ja | ja | ja | |
+| 10 | Schermafdruk-header begrensd | | ja | | |
+| 11 | Apparaatgrens in TDR-sweep en segmenten | | ja | ja, belangrijk | |
+| 12 | Geen ruwe records is een lege lijst | test | | | |
+| 13 | Gemiddelde standaarden, bestandslabels, instellingen clampen | ja | ja | | |
+| 14 | Underflow en eindeloze lus | test | | | |
+| 15 | udev-regel | | | | ja |
+| 16 | Documentatie en flake zonder GTK | ja | | | ja, CI |
+| 17 | CHANGELOG Engels | lezen | | | |
+| 18 | Ballast en UI-teksten | ja | | | |
+| 19 | Fabrikantbestanden uit git | ja | | | |
+| 20 | Git-revisie volgt commits | ja | | | |
+| 21 | Drivertests; `open` en sweep-lus aangeraakt | test | ja, regressie | ja, regressie | |
+| 22 | Stop per blok, voortgangsbalk | test | ja | ja, belangrijk | |
+| 23 | Gedeelde regels in de library | ja | ja | | |
+| 24 | `app.rs` gesplitst | ja | slotronde | | |
+| 25 | Formaatversies | ja, belangrijk | | | |
+| 26 | Meldingen op hun plek | ja | | | |
+| 27 | Fouttype, "apparaat weg" | ja | ja, kabel lostrekken | ja | |
+| 29 | CI, clippy, MSRV, handleidingcheck | ja | | | ja, CI |
+| 30 | Dode code en commentaren | ja | | optioneel | |
+| 31 | Minder werk per frame | ja | ja | | |
+| 32 | Eén Z0, dB-vloer, SWR-plafond | ja | | | |
+| 33 | CONTRIBUTING.md | lezen | | | |
+| 34 | `--json` | ja | ja | | |
+| 35 | Poortverlenging | ja | ja | | |
+| 36 | Referenties bewaard | ja | | | |
+| 38 | Sneltoetsen, batterij, verbinden bij start | ja | ja | | |
+| 40 | `.s1p` en CSV-kolommen | ja | ja | | |
+| 41 | `cal`-acties, completions | ja | ja | | |
+| 48 | Niet-eindige waarden, dubbele frequenties | ja | | | |
+| 49 | Return past toe, CLI weigert tegenstrijdige vlaggen | ja | ja | | |
+
+Niet gedaan en dus niet te controleren: 28 (wacht op een besluit, zie onderaan), 37, 39,
+42, 43, 44 en de meetpunten 45 tot 47; de reden staat per punt in de werklijst.
 
 ---
+
+# 0.2.6 — bugfixes
 
 ## Punt 1 — Polaire calibratie-interpolatie (B1)
 
@@ -61,9 +146,10 @@ en CLI-regel volgen; de gate-foutmelding noemt het bereik direct.
 cargo test -p litevna timedomain
 cargo run --release -p vna-cli -- tdr --from cal/sweep.s2p --vf 0.70
 ```
-Verwacht: tests groen; de regel "TDR: resolution … alias-free range X m (Y ns)" geeft voor
-`cal/sweep.s2p` (bekijk de stap Δf in het bestand) Y = 1/(2·Δf). Voor 50 kHz – 6,3 GHz in
-1001 punten (Δf = 6,3 MHz): 79 ns, 8,3 m bij VF 0,70.
+Verwacht: tests groen; voor `cal/sweep.s2p` (3 – 30 MHz, 1001 punten, Δf = 27 kHz) meldt
+de regel "alias-free range 1943.1 m (18519 ns)": dat is 1/(2·Δf). Vóór 0.2.6 stond daar
+het dubbele. Voor 50 kHz – 6,3 GHz in 1001 punten (Δf = 6,3 MHz) hoort er 79 ns, 8,3 m
+bij VF 0,70 te staan.
 
 **GUI.** Open `cal/sweep.s2p` als trace, kies TDR, zet Max distance op 1000 m: de x-as
 eindigt waar de laatste gegevens staan (geen lege rechterhelft), en het label
@@ -95,11 +181,13 @@ status in geel en een niet-toepasbare calibratie in oranje als "not applied: …
 short", "measured load". **Load…** een bestand: "loaded". Kit fit ▸ Apply to kit: "kit
 updated … save to keep it" blijft zichtbaar.
 
-**Zonder apparaat.** File ▸ Open as trace met een .s2p van 1 – 30 MHz, dan File ▸ Load
-calibration met `cal/n-6g3.cal.json` (50 kHz – 6,3 GHz, dat kan) en daarna een .s2p van
-0 – 10 kHz of boven 6,3 GHz als trace: verwacht geel "loaded" én oranje "not applied:
-target grid … lies outside the calibrated span …". Vóór 0.2.6 verdrong de tweede melding
-de eerste.
+**Zonder apparaat.** File ▸ Load calibration met `cal/n-6g3.cal.json`: onder de
+calibratieregels staat geel "loaded" en het blijft staan. (Op een geopend bestand wordt
+geen calibratie toegepast, dus de oranje regel hieronder zie je alleen met een apparaat.)
+
+**Niet toepasbaar (met apparaat).** Laad `cal/n-1g.cal.json` en sweep 1 M – 2 G: geel
+"loaded" blijft staan en daaronder oranje "not applied: target grid … lies outside the
+calibrated span …"; het label is RAW. Vóór 0.2.6 verdrong de tweede melding de eerste.
 
 ## Punt 5 — Standaarden en weergave op één raster (U1)
 
@@ -163,10 +251,10 @@ Verwacht: drie CSV-regels op stdout (kop `distance_m,time_ns,…`) en `ls: -: No
 **Met apparaat.**
 ```bash
 cargo run --release -p vna-cli -- sweep --start 1M --stop 30M --points 51 --s2p /tmp/qc.s2p 2>&1 | grep -c 'first raw record'
-head -1 /tmp/qc.s2p
-cargo run --release -p vna-cli -- sweep --segment 1M:30M:51@cal/n-hf.cal.json --s2p /tmp/qc-seg.s2p && head -1 /tmp/qc-seg.s2p
+sed -n 2p /tmp/qc.s2p
+cargo run --release -p vna-cli -- sweep --segment 1M:30M:51@cal/n-hf.cal.json --s2p /tmp/qc-seg.s2p && sed -n 2p /tmp/qc-seg.s2p
 ```
-Verwacht: `0` (geen debugregel zonder `--trace`); de eerste regel noemt het model
+Verwacht: `0` (geen debugregel zonder `--trace`); de tweede regel van het bestand noemt het model
 (`! LiteVNA sweep, 51 points, uncalibrated raw` of `! NanoVNA-F 4.3 sweep, …`); de
 segmentversie zegt `host calibration per segment`. Met `--trace` verschijnt de regel
 "first raw record" wel.
@@ -204,7 +292,7 @@ knop toont "load…" ongeveer acht sweeps lang en de melding luidt "measured loa
 8 sweeps)". Met Sweep avg 1: "measured load".
 
 **Bestandstrace (zonder apparaat).** Open een .s2p als trace, File ▸ Save Touchstone naar
-`/tmp/qc-file.s2p`; `head -1 /tmp/qc-file.s2p` toont `! vna-r, N points, from file
+`/tmp/qc-file.s2p`; `sed -n 2p /tmp/qc-file.s2p` toont `! vna-r, N points, from file
 <naam>`. **Hold** op dezelfde trace: de referentienaam eindigt niet op " raw".
 
 **Beschadigde instellingen (zonder apparaat).** Sluit de GUI. Zet in
@@ -277,8 +365,7 @@ volgende release moet de GitHub-releasetekst Engels zijn.
 voorgestelde naam is `sweep-1MHz-30MHz.s2p`. Laad `cal/n-6g3.cal.json` en kies Save…
 in het calibratiepaneel: voorgestelde naam `50kHz-6.3GHz.cal.json`. Onder **Traces**
 zonder referenties: "Hold (in the marker bar above the charts) keeps …"; met een
-referentie: "References are not saved; export one as .s2p and open it later with Open as
-reference…."
+referentie: "References are kept between sessions. …" (sinds punt 36).
 
 ```bash
 cargo tree -p vna-cli --depth 1 | grep -c num-complex
@@ -687,3 +774,67 @@ regel (geen tabel ervoor).
 51`, dan `short` en `load` zonder raster: werkt als voorheen; `vna-cli cal o --file …`
 (alias) ook.
 
+---
+
+# Slotronde: de hele GUI één keer door
+
+Met de LiteVNA en de N-kit, in deze volgorde. Elke stap is één regel; noteer wat afwijkt.
+
+1. Start `vna-gui`. Instellingen van de vorige keer staan er; de poortlijst toont de
+   LiteVNA met een ster.
+2. **Connect**: model, firmware en batterijspanning in de topbalk.
+3. Sweep 1 M – 30 M, 201 punten, **Apply sweep**, **Run**: vier grafieken lopen, label
+   RAW of CAL.
+4. Kies in elk van de drie grafieken een andere weergave (log mag, phase, SWR, R + jX,
+   |Z|, group delay, lin mag): alle zeven tekenen.
+5. Klik een marker in een grafiek en op de Smith-chart; ← →, shift ← →; **min SWR**,
+   **max S21**, **min S21**; tweede marker: de Δ-regel in de tabel verschijnt.
+6. Calibratie: **Clear**, meet **open**, **short**, **load** (melding na elk), label CAL;
+   **apply** uit en aan; **Save…**, **Load…**.
+7. Zet Sweep avg op 8: teller loopt op; **reset**; terug naar 1.
+8. **Hold**, verander iets aan de DUT, **Δ** bij de referentie: verschiltrace in elke
+   grafiek; referentie hernoemen, uitvinken, verwijderen.
+9. Segments: **+ segment** 30 M – 1 G, 401 punten, Apply: één trace over beide; kies een
+   calibratiebestand voor het tweede segment (`cal/n-1g.cal.json`), Apply: label CAL of
+   CAL* met uitleg in het segmentenpaneel. Verwijder het segment weer, Apply.
+10. Sweep 50 k – 6,3 G, 1001 punten, laad `cal/n-6g3.cal.json`: CAL. Sluit een kabel met
+    een short aan.
+11. **TDR**: impulsgrafiek met de piek van de short, impedantiegrafiek met de duik naar
+    0 Ω; verander velocity factor, window en Max distance; klik een marker, ← →.
+12. **Gate** aan: sleep de oranje lijnen; band pass en notch; terug naar Frequency: label
+    GATED en grijze randlijnen; Gate uit.
+13. Kit fit: klap uit, bekijk het paneel (meet line open en line short alleen als je de
+    kabel bij de hand hebt; anders alleen controleren dat het paneel er staat en **Fit
+    kit** uitgeschakeld is zonder de twee metingen).
+14. **Screenshot**: venster met het scherm van het apparaat, **Save…**.
+15. File ▸ Save Touchstone, Open as trace (label FILE), Open as reference.
+16. View ▸ Developer tools: Developer ▸ Log window, Copy diagnostics, Clear log.
+17. Help ▸ About; Help ▸ Manual opent GitHub (bij de tag van de versie: tot de release
+    bestaat die pagina voor deze versie nog niet, dat is verwacht).
+18. **Stop**, **Disconnect**: het apparaat toont zijn eigen scherm weer.
+19. File ▸ Quit; start opnieuw: alles staat zoals je het achterliet.
+
+Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
+
+---
+
+# Open vragen
+
+1. **Punt 28, Help lokaal openen.** Mijn eerdere advies klopte niet: de handleiding in
+   het release-archief is even oud als de tag, dus een correctie bereikt de gebruiker
+   daarmee net zo min zonder release, en het is markdown (een browser toont het als
+   platte tekst). Wat het doel wel dient: de Help-links naar `main` laten wijzen (altijd
+   de nieuwste tekst, met het risico dat die voorloopt op het programma), of naar de tag
+   blijven wijzen en documentatiecorrecties meenemen in de volgende release (zoals nu).
+   Ik heb niets veranderd; zeg welke je wilt.
+2. **Versienummer en release.** Alles staat onder *Unreleased*. Er is nieuw gedrag
+   (instellingenformaat, CLI weigert meer, nieuwe functies), dus 0.3.0 ligt meer voor de
+   hand dan 0.2.6. Pas na jouw QC: versie in `Cargo.toml`, de kop in `CHANGELOG.md`,
+   commit, tag, push.
+3. **Pushen.** De 43 commits staan lokaal. Pas na een push draait de CI, die de
+   Nix-build zonder GTK (punt 16) en de nieuwe stappen (punt 29) moet bevestigen.
+4. **Punt 42, kit-bestanden.** Welk formaat wil je kunnen lezen (NanoVNA-Saver, een
+   Keysight-achtige tabel, iets anders)? Zonder voorbeeldbestand bouw ik dat niet.
+5. **Dubbele frequenties in Touchstone (punt 48)** worden nu geweigerd. Kom je een
+   bestand van een ander programma tegen dat ze heeft en dat je wilt lezen, dan kan dat
+   soepeler.
