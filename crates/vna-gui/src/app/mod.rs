@@ -690,12 +690,17 @@ impl App {
     fn side_panel(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.heading("Sweep");
+            let mut apply_by_return = false;
             egui::Grid::new("sweep-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+                // Return in Start or Stop applies the sweep, like the button below.
+                let entered = |r: egui::Response, ui: &egui::Ui| r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 ui.label("Start");
-                ui.text_edit_singleline(&mut self.start);
+                let r = ui.text_edit_singleline(&mut self.start);
+                apply_by_return |= entered(r, ui);
                 ui.end_row();
                 ui.label("Stop");
-                ui.text_edit_singleline(&mut self.stop);
+                let r = ui.text_edit_singleline(&mut self.stop);
+                apply_by_return |= entered(r, ui);
                 ui.end_row();
                 ui.label("Points");
                 egui::ComboBox::from_id_salt("points").selected_text(self.points.to_string()).show_ui(ui, |ui| {
@@ -739,10 +744,14 @@ impl App {
             if let Some(e) = &self.sweep_error {
                 ui.colored_label(Color32::from_rgb(255, 110, 110), e);
             }
-            if ui.add_enabled(self.connected(), egui::Button::new("Apply sweep")).clicked() {
+            let apply = ui
+                .add_enabled(self.connected(), egui::Button::new("Apply sweep"))
+                .on_hover_text("use these settings and the segments below; restarts a running sweep, otherwise does one sweep")
+                .clicked();
+            if apply || (apply_by_return && self.connected()) {
                 self.start_sweep(self.running);
             }
-            ui.small("Frequencies: 50k, 14.2M, 1.3G. Applying while running restarts the sweep.");
+            ui.small("Frequencies: 50k, 14.2M, 1.3G. Return in Start or Stop applies. Applying while running restarts the sweep; segment changes need Apply too.");
             if let Some(l) = self.device_limits() {
                 let below = parse_hz(&self.start).is_ok_and(|f| f < l.min_hz);
                 let above = parse_hz(&self.stop).is_ok_and(|f| f > l.max_hz);

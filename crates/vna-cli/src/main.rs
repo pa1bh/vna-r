@@ -82,8 +82,8 @@ enum Cmd {
         vf: f64,
         /// Sweep several segments into one trace: `START:STOP:POINTS[@cal.json]`,
         /// repeatable, e.g. `--segment 100k:50M:1001@hf.json --segment 50M:6.3G:1001@n6g3.json`.
-        /// Replaces --start/--stop/--points/--cal; segments must not overlap.
-        #[arg(long, value_name = "START:STOP:POINTS[@CAL]")]
+        /// Used instead of --start/--stop/--points/--cal; segments must not overlap.
+        #[arg(long, value_name = "START:STOP:POINTS[@CAL]", conflicts_with_all = ["start", "stop", "points", "cal"])]
         segment: Vec<String>,
     },
     /// Measure a calibration standard into a calibration file, or inspect one.
@@ -142,11 +142,12 @@ enum Cmd {
         /// Only consider reflections up to this distance in metres (default: alias-free range).
         #[arg(long)]
         max_distance: Option<f64>,
-        /// Write distance/time/impulse/step/impedance as CSV.
+        /// Write distance/time/impulse/step/impedance as CSV ("-" for stdout).
         #[arg(long)]
         csv: Option<PathBuf>,
-        /// Read S11 from a Touchstone file (.s1p/.s2p) instead of sweeping.
-        #[arg(long, value_name = "FILE", conflicts_with = "cal")]
+        /// Read S11 from a Touchstone file (.s1p/.s2p) instead of sweeping; the
+        /// file has its own grid and needs no calibration.
+        #[arg(long, value_name = "FILE", conflicts_with_all = ["cal", "start", "stop", "points"])]
         from: Option<PathBuf>,
     },
     /// Grab the device screen as PNG.

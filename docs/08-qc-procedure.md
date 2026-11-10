@@ -549,3 +549,17 @@ Verwacht: acht bestanden, het grootste (`mod.rs`) rond 900 regels; drie tests gr
 Dit punt is de reden om na afloop **de hele GUI één keer door te lopen**; zie de
 slotronde onderaan dit document.
 
+## Punt 49 — Kleine UX-punten (U7, U9, U13)
+
+**Zonder apparaat.**
+```bash
+cargo run -q --release -p vna-cli -- sweep --segment 1M:30M:51 --start 2M 2>&1 | head -3
+cargo run -q --release -p vna-cli -- tdr --from cal/sweep.s2p --points 101 2>&1 | head -3
+```
+Verwacht: beide een clap-fout "the argument '--segment …' cannot be used with '--start
+<START>'" resp. "'--from <FILE>' cannot be used with '--points <POINTS>'".
+
+**Met apparaat.** Verbind, typ in Start `2M` en druk Return: de sweep wordt toegepast (de
+weergave begint bij 2 MHz) zonder de knop. Zonder verbinding doet Return niets. Hover
+boven **Apply sweep** en boven **Clear** in het calibratiepaneel toont de uitleg.
+

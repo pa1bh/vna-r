@@ -283,7 +283,11 @@ impl App {
             if ui.add_enabled(self.cal.set.is_some(), egui::Button::new("Save…")).clicked() {
                 self.save_cal();
             }
-            if ui.add_enabled(self.cal.set.is_some(), egui::Button::new("Clear")).clicked() {
+            if ui
+                .add_enabled(self.cal.set.is_some(), egui::Button::new("Clear"))
+                .on_hover_text("forget the standards in this panel; calibration files of extra segments stay in use")
+                .clicked()
+            {
                 self.cal = CalState {
                     apply: self.cal.apply,
                     fit_f_min: self.cal.fit_f_min.clone(),

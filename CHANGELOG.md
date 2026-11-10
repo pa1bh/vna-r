@@ -21,6 +21,10 @@ things that are not backwards compatible, such as the format of the calibration 
   and lets the caller cancel (`Error::Cancelled`).
 
 ### Changed
+- GUI: Return in **Start** or **Stop** applies the sweep.
+- CLI: `sweep --segment` together with `--start/--stop/--points/--cal`, and `tdr --from`
+  together with a grid or `--cal`, are now an error instead of silently ignoring the
+  latter.
 - The udev rule for Linux is now `linux/70-litevna.rules` and gives the port to the
   logged-in user (`uaccess`) and the group `dialout` (`0660`) instead of to everyone
   (`0666`). In the old 99- file the `uaccess` tag did nothing because it came after

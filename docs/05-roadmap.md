@@ -307,6 +307,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | # | Werk | Code | Grootte | Status |
 |---|------|------|---------|--------|
 | 48 | Niet-eindige waarden weigeren als standaard en in de kit-fit; Touchstone met `nan`/`inf` of dubbele frequentie weigeren | B21, B22 | S | gedaan 2026-11-10 |
+| 49 | Kleine UX-punten: Return past de sweep toe, hover bij Apply en Clear, CLI weigert tegenstrijdige vlaggen | U7, U9, U13 | S | gedaan 2026-11-10 |
 
 ## Meten
 
