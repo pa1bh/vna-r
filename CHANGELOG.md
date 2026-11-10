@@ -40,6 +40,8 @@ things that are not backwards compatible, such as the format of the calibration 
   of markers or plots no longer resets every setting.
 
 ### Development
+- GUI: one copy of the shown sweep per frame instead of three, without the raw records,
+  and the calibration status line no longer solves the calibration every frame.
 - Rules that the CLI and the GUI each had a copy of now live in the library with tests:
   ordering and overlap check of segments (`plan_segments`, `SweepConfig::parse_segment`),
   the segment TDR works on (`SweepResult::widest_segment`), distance to round-trip time

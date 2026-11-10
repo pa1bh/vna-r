@@ -522,3 +522,14 @@ gate als voorheen.
    rode fout rechtsboven; maak het venster smal: de tekst wordt afgekapt met "…" en de
    muis erboven toont de hele melding; × haalt hem weg.
 
+## Punt 31 — Minder werk per frame (D9)
+
+**Zonder apparaat.** Open een .s2p met 1001 of meer punten: markers plaatsen, **min SWR**,
+**max S21**, **Hold** en de markertabel werken als voorheen. Laad een calibratie met
+alleen open en short (of meet ze): het paneel zegt "incomplete: still to measure load";
+met alle drie "ready for S11", met through erbij "ready for S11 + S21".
+
+**Met apparaat.** 3201 punten continu, Sweep avg 16, vier referenties: de GUI blijft
+vloeiend (menu's openen direct). Activity Monitor: het CPU-gebruik van vna-gui in rust
+(geen sweep, muis stil) is vrijwel nul.
+

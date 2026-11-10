@@ -389,15 +389,21 @@ impl CalibrationSet {
 
     /// Solve the error terms. Needs open, short and load; through and
     /// isolation are optional (without a through, S21 is left uncorrected).
+    /// The standards a one-port calibration needs (open, short, load) that
+    /// have not been measured yet. Empty means [`CalibrationSet::solve`] has
+    /// what it needs; a cheap check for a status line, without solving.
+    pub fn missing_standards(&self) -> Vec<Standard> {
+        [Standard::Open, Standard::Short, Standard::Load]
+            .into_iter()
+            .filter(|s| !self.has(*s))
+            .collect()
+    }
+
     pub fn solve(&self) -> Result<Calibration> {
         let (open, short, load) = match (&self.open, &self.short, &self.load) {
             (Some(o), Some(s), Some(l)) => (o, s, l),
             _ => {
-                let missing: Vec<_> = [Standard::Open, Standard::Short, Standard::Load]
-                    .iter()
-                    .filter(|s| !self.has(**s))
-                    .map(|s| s.name())
-                    .collect();
+                let missing: Vec<_> = self.missing_standards().iter().map(|s| s.name()).collect();
                 return Err(Error::Calibration(format!("missing standards: {}", missing.join(", "))));
             }
         };

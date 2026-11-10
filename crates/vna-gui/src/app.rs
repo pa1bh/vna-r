@@ -983,12 +983,22 @@ impl App {
     }
 
     /// The sweep the frequency view works on: `shown`, with S11 gated when the gate is on.
+    /// What the frequency view shows: the shown sweep, with S11 time-gated
+    /// when the gate is on. A copy without the raw FIFO records, which no
+    /// view or export needs.
     fn freq_sweep(&mut self) -> Option<SweepResult> {
-        let mut sweep = self.shown.clone()?;
-        if let Some((s11, _)) = self.gated_s11() {
-            sweep.s11 = s11;
-        }
-        Some(sweep)
+        let gated = self.gated_s11().map(|(s11, _)| s11);
+        let shown = self.shown.as_ref()?;
+        Some(SweepResult {
+            freqs_hz: shown.freqs_hz.clone(),
+            s11: gated.unwrap_or_else(|| shown.s11.clone()),
+            s21: shown.s21.clone(),
+            points: Vec::new(),
+            checksum_ok: shown.checksum_ok,
+            checksum_bad: shown.checksum_bad,
+            duplicates: shown.duplicates,
+            elapsed: shown.elapsed,
+        })
     }
 
     fn gate_tag(&self, ui: &mut egui::Ui) {
@@ -1687,9 +1697,12 @@ impl App {
                     set.kit.open_c0() * 1e15,
                     set.kit.open.offset_delay_s * 1e12
                 ));
-                let status = match set.solve() {
-                    Ok(c) => format!("ready for S11{}", if c.has_through() { " + S21" } else { "" }),
-                    Err(_) => "incomplete (need open, short, load)".to_string(),
+                // Which standards are there, not a solve: this runs every frame.
+                let missing: Vec<&str> = set.missing_standards().iter().map(|s| s.name()).collect();
+                let status = if missing.is_empty() {
+                    format!("ready for S11{}", if set.has(Standard::Through) { " + S21" } else { "" })
+                } else {
+                    format!("incomplete: still to measure {}", missing.join(", "))
                 };
                 ui.label(status);
                 if let Some(f) = &self.cal.file {
@@ -1935,7 +1948,7 @@ impl App {
             .set
             .as_ref()
             .is_some_and(|s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
-        let solvable = self.cal.set.as_ref().is_some_and(|s| s.solve().is_ok());
+        let solvable = self.cal.set.as_ref().is_some_and(|s| s.missing_standards().is_empty());
         ui.small("With open, short and load done: put a cable (≥ 50 cm) on port 1 and measure it with an open and a short at the far end. The ripple difference gives the open/short asymmetry of the kit.");
         self.standard_buttons(ui, &Standard::LINE, connected);
         ui.horizontal(|ui| {
@@ -2179,10 +2192,12 @@ impl App {
             self.central_tdr(ui);
             return;
         }
-        self.marker_readout(ui);
+        // One copy of the shown sweep per frame, for the readout and the plots.
+        let sweep = self.freq_sweep();
+        self.marker_readout(ui, sweep.as_ref());
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
-        let Some(sweep) = self.freq_sweep() else {
+        let Some(sweep) = sweep else {
             ui.centered_and_justified(|ui| ui.label("Connect and press Run"));
             return;
         };
@@ -2591,7 +2606,7 @@ impl App {
         }
     }
 
-    fn marker_readout(&mut self, ui: &mut egui::Ui) {
+    fn marker_readout(&mut self, ui: &mut egui::Ui, sweep: Option<&SweepResult>) {
         ui.horizontal(|ui| {
             ui.label("Markers");
             for (k, color) in MARKER_COLORS.iter().enumerate() {
@@ -2621,7 +2636,7 @@ impl App {
                 self.hold_reference();
             }
             ui.separator();
-            if let Some(sweep) = self.freq_sweep() {
+            if let Some(sweep) = sweep {
                 let n = sweep.freqs_hz.len();
                 let argmin = |f: &dyn Fn(usize) -> f64| (0..n).min_by(|a, b| f(*a).total_cmp(&f(*b)));
                 if ui
@@ -2648,8 +2663,7 @@ impl App {
             });
         });
 
-        let Some(sweep_owned) = self.freq_sweep() else { return };
-        let sweep = &sweep_owned;
+        let Some(sweep) = sweep else { return };
         let placed: Vec<(usize, usize)> = self
             .markers
             .iter()
