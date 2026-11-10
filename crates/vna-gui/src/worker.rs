@@ -48,7 +48,13 @@ pub enum Event {
         purpose: Purpose,
     },
     Screenshot(Screenshot),
-    Error(String),
+    /// Something failed. `stops_sweep` says whether continuous sweeping ended
+    /// with it (a sweep or connection failure) or goes on (a screenshot, a
+    /// register write).
+    Error {
+        msg: String,
+        stops_sweep: bool,
+    },
 }
 
 pub struct WorkerHandle {
@@ -112,9 +118,21 @@ impl Worker {
         self.ctx.request_repaint();
     }
 
+    /// A failure that ends continuous sweeping (sweep, connect).
     fn fail(&mut self, context: &str, err: impl std::fmt::Display) {
         self.continuous = None;
-        self.emit(Event::Error(format!("{context}: {err}")));
+        self.emit(Event::Error {
+            msg: format!("{context}: {err}"),
+            stops_sweep: true,
+        });
+    }
+
+    /// A failure of a side action; a running sweep carries on.
+    fn warn(&mut self, context: &str, err: impl std::fmt::Display) {
+        self.emit(Event::Error {
+            msg: format!("{context}: {err}"),
+            stops_sweep: false,
+        });
     }
 
     fn handle(&mut self, cmd: Cmd) {
@@ -155,14 +173,14 @@ impl Worker {
                 self.continuous = None;
                 if let Some(d) = &mut self.dev {
                     if let Err(e) = d.release() {
-                        self.fail("releasing device UI", e);
+                        self.warn("releasing device UI", e);
                     }
                 }
             }
             Cmd::SetAverage(avg) => {
                 if let Some(d) = self.dev.as_mut().and_then(|d| d.as_lite_mut()) {
                     if let Err(e) = d.set_average(avg) {
-                        self.fail("setting average", e);
+                        self.warn("setting average", e);
                     }
                 }
             }
@@ -173,7 +191,7 @@ impl Worker {
                 };
                 match d.screenshot() {
                     Ok(shot) => self.emit(Event::Screenshot(shot)),
-                    Err(e) => self.fail("screenshot", e),
+                    Err(e) => self.warn("screenshot", e),
                 }
             }
         }

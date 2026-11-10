@@ -117,3 +117,17 @@ afwijken van de lopende sweep; het paneel toont een oranje regel zolang dat zo i
 Vóór 0.2.6 bleef de weergave op 1 – 30 MHz en werd de 50 MHz-calibratie stil
 geïnterpoleerd.
 
+## Punt 6 — Een mislukte schermafdruk stopt de sweep niet (B5)
+
+**Veranderd.** `Event::Error` draagt `stops_sweep`; screenshot, set average en release
+melden een fout zonder de sweep te stoppen.
+
+**Met apparaat.** Run (continu), dan **Screenshot** en trek binnen de seconde die de
+overdracht duurt de USB-kabel los en steek hem terug. Dit geeft een I/O-fout op de sweep
+zelf, dus geen goede test. Beter: NanoVNA-F, Run, en **set** bij Average drukken is daar
+uitgeschakeld. Praktisch controleerbaar scenario: LiteVNA, Run, Screenshot drie keer snel
+achter elkaar; als één capture time-out geeft, staat de fout rood in de topbalk en loopt
+de sweep door (Stop-knop blijft zichtbaar). Vóór 0.2.6 stond de sweep stil en moest Run
+opnieuw. Als geen enkele capture faalt, controleer de code: `warn` in `worker.rs` bij
+Screenshot en SetAverage, `fail` alleen bij Connect en in `sweep_once`.
+

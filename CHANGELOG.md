@@ -14,6 +14,8 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: een mislukte schermafdruk of een mislukte **set** van de middeling stopte de
+  lopende sweep; alleen een sweep- of verbindingsfout doet dat nog.
 - GUI: de knoppen open/short/load maten op het raster dat in Start/Stop/Points getypt
   stond, ook als dat nog niet met **Apply sweep** was toegepast; de weergave liep dan op
   het oude raster en de calibratie werd stil geïnterpoleerd. Een standaard meten past nu

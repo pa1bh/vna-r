@@ -798,12 +798,14 @@ impl App {
                     self.screenshot = Some((tex, shot));
                     self.show_screenshot = true;
                 }
-                Event::Error(msg) => {
-                    eprintln!("[gui] worker error: {msg}");
+                Event::Error { msg, stops_sweep } => {
+                    log::warn!("worker: {msg}");
                     self.log(format!("error: {msg}"));
                     self.error = Some(msg);
-                    self.running = false;
-                    self.cal.pending = None;
+                    if stops_sweep {
+                        self.running = false;
+                        self.cal.pending = None;
+                    }
                     if let Connection::Connecting(_) = self.connection {
                         self.connection = Connection::Disconnected;
                     }

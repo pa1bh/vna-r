@@ -248,7 +248,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 3 | `NanoVnaShell::open`: `restore_on_drop` pas na geslaagde `sync` | B3 | S | gedaan 2026-11-10 |
 | 4 | Statusmelding ("measured …", "loaded", "save to keep it") scheiden van de solve-fout | B4, U2 | S | gedaan 2026-11-10 |
 | 5 | Standaarden meten op het toegepaste raster, of waarschuwen bij afwijking van het getypte | U1 | S | gedaan 2026-11-10 (past getypte sweep eerst toe) |
-| 6 | `fail()` stopt de lus alleen bij sweep- en connect-fouten; screenshot en set average niet | B5 | S | |
+| 6 | `fail()` stopt de lus alleen bij sweep- en connect-fouten; screenshot en set average niet | B5 | S | gedaan 2026-11-10 |
 | 7 | Markers op frequentie: per sweep `nearest_index`, buiten bereik weg | B6, N1 | S | |
 | 8 | Pijltjestoetsen alleen zonder tekstfocus (`wants_keyboard_input`) | B7 | S | |
 | 9 | CLI: s2p-commentaar bij `--segment` en per apparaat, `tdr --csv -` naar stdout, debugregel achter `--trace` | B8, B9, U12 | S | |
