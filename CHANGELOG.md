@@ -38,6 +38,9 @@ things that are not backwards compatible, such as the format of the calibration 
   The release workflow builds the Linux tarball on Ubuntu 22.04 (glibc 2.35, so Debian 12
   works), keeps macOS `._*` files out of the archives and no longer appends auto-generated
   notes to the changelog text.
+- One definition each for the reference impedance (`litevna::Z0`), the dB floor
+  (−200 dB) and the SWR ceiling; `db` and `swr` moved to `litevna::traces` (still
+  re-exported from `touchstone`).
 - Removed an unused register writer and the GUI's `anyhow` dependency; corrected comments
   that contradicted the measurements in docs/01 (FIFO checksum, points per second).
 

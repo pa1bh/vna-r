@@ -270,23 +270,9 @@ pub fn write_csv<W: Write>(mut w: W, sweep: &SweepResult) -> std::io::Result<()>
     Ok(())
 }
 
-/// 20·log10 of a linear magnitude; `-inf` guarded to a floor.
-pub fn db(mag: f64) -> f64 {
-    if mag <= 0.0 {
-        -200.0
-    } else {
-        20.0 * mag.log10()
-    }
-}
-
-/// Standing wave ratio from |Γ|. Values ≥ 1 clamp to 999.
-pub fn swr(gamma_mag: f64) -> f64 {
-    if gamma_mag >= 1.0 {
-        999.0
-    } else {
-        (1.0 + gamma_mag) / (1.0 - gamma_mag)
-    }
-}
+// `db` and `swr` live in [`crate::traces`] with the other derived quantities;
+// re-exported here because the CSV writer uses them and callers imported them from this module.
+pub use crate::traces::{db, swr};
 
 #[cfg(test)]
 mod tests {

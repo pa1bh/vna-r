@@ -10,8 +10,8 @@ use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Ca
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
-use litevna::touchstone::{db, read_touchstone_file_full, swr, write_s2p};
-use litevna::traces::{self, impedance, Param, TraceKind};
+use litevna::touchstone::{read_touchstone_file_full, write_s2p};
+use litevna::traces::{self, db, impedance, swr, Param, TraceKind};
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};

@@ -12,7 +12,7 @@
 use num_complex::Complex64 as C64;
 use std::f64::consts::PI;
 
-use crate::calibration::Z0;
+use crate::Z0;
 
 /// Which S-parameter a trace is taken from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,6 +140,26 @@ pub fn impedance(gamma: C64) -> C64 {
     }
 }
 
+/// Lowest value [`db`] returns: the magnitude 0 has no logarithm.
+pub const DB_FLOOR: f64 = -200.0;
+/// What [`swr`] returns for total reflection (|Γ| ≥ 1), where SWR is infinite.
+pub const SWR_MAX: f64 = 999.0;
+
+/// 20·log10 of a linear magnitude, not below [`DB_FLOOR`].
+pub fn db(mag: f64) -> f64 {
+    if mag <= 0.0 {
+        DB_FLOOR
+    } else {
+        (20.0 * mag.log10()).max(DB_FLOOR)
+    }
+}
+
+/// Standing-wave ratio from |Γ| for tables and files; [`SWR_MAX`] at total
+/// reflection. Plots use [`swr_clamped`] with the lower [`SWR_CLAMP`].
+pub fn swr(gamma_mag: f64) -> f64 {
+    swr_clamped(gamma_mag, SWR_MAX)
+}
+
 /// Standing-wave ratio from |Γ|; saturates at `max` (|Γ| ≥ 1 is not physical
 /// but happens on a raw or badly calibrated open).
 pub fn swr_clamped(mag: f64, max: f64) -> f64 {
@@ -207,7 +227,7 @@ pub fn compute(kind: TraceKind, param: Param, freqs_hz: &[u64], s: &[C64], apert
     let name = param.name();
     let one = |label: String, values: Vec<f64>| vec![TraceSeries { label, values }];
     match kind {
-        TraceKind::LogMag => one(format!("{name} dB"), s.iter().map(|c| 20.0 * c.norm().max(1e-12).log10()).collect()),
+        TraceKind::LogMag => one(format!("{name} dB"), s.iter().map(|c| db(c.norm())).collect()),
         TraceKind::LinMag => one(format!("|{name}|"), s.iter().map(|c| c.norm()).collect()),
         TraceKind::Phase => one(format!("{name} °"), s.iter().map(|c| c.arg().to_degrees()).collect()),
         TraceKind::Swr => one("SWR".into(), s.iter().map(|c| swr_clamped(c.norm(), SWR_CLAMP)).collect()),
@@ -280,6 +300,18 @@ mod tests {
             assert!((w[1] - w[0]).abs() < PI);
         }
         assert!((u[1] - (2.0 * PI - 3.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn db_and_swr_conventions() {
+        assert_eq!(db(1.0), 0.0);
+        assert!((db(0.1) + 20.0).abs() < 1e-12);
+        assert_eq!(db(0.0), DB_FLOOR);
+        assert_eq!(db(1e-30), DB_FLOOR);
+        assert!((swr(1.0 / 3.0) - 2.0).abs() < 1e-12);
+        assert_eq!(swr(1.0), SWR_MAX);
+        assert_eq!(swr(1.2), SWR_MAX);
+        assert_eq!(swr_clamped(0.99, SWR_CLAMP), SWR_CLAMP);
     }
 
     #[test]

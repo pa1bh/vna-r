@@ -12,7 +12,8 @@ use litevna::discovery::Kind;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel};
 use litevna::timedomain::{gate as compute_gate, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
-use litevna::touchstone::{db, swr, write_csv, write_s2p};
+use litevna::touchstone::{write_csv, write_s2p};
+use litevna::traces::{db, swr};
 use litevna::{SweepConfig, SweepResult, Vna};
 
 /// `vna-cli 0.2.0 (abc1234)`: workspace version plus the git revision from build.rs.

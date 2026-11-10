@@ -22,8 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::device::SweepResult;
 use crate::error::{Error, Result};
 
-/// Reference impedance.
-pub const Z0: f64 = 50.0;
+pub use crate::Z0;
 
 /// The five things you can measure during a calibration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

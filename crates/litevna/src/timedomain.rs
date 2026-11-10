@@ -34,7 +34,7 @@ pub const MAX_FFT_SIZE: usize = 1 << 22;
 
 /// Speed of light in vacuum, m/s.
 pub const C0: f64 = 299_792_458.0;
-pub const Z0: f64 = 50.0;
+pub use crate::Z0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Window {

@@ -283,7 +283,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache) |
 | 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | gedaan 2026-11-10 (protocolfuncties zoals `set_power`, `set_bandwidth`, `pause` blijven als driver-API; `probe_shell` blijft bewust los van de driver, met uitleg) |
 | 31 | `Arc<SweepResult>` voor shown en referenties; statusstring cachen | D9 | S | |
-| 32 | Z0, SWR-clamp en dB-vloer op één plek | D8 | S | |
+| 32 | Z0, SWR-clamp en dB-vloer op één plek | D8 | S | gedaan 2026-11-10 |
 | 33 | CONTRIBUTING of korte architectuurnotitie | D12 | S | |
 
 ## Later — features

@@ -391,3 +391,14 @@ cargo run -p litevna --example probe_shell -- /dev/cu.usbmodemXXXX info version
 ```
 Verwacht: de antwoorden van `info` en `version` zoals in docs/06.
 
+## Punt 32 — Eén definitie voor Z0, dB-vloer en SWR-plafond (D8)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna db_and_swr_conventions
+grep -rn 'const Z0' crates/
+```
+Verwacht: test groen; precies één treffer (`crates/litevna/src/lib.rs`). In de GUI: een
+trace met een punt waar |S21| = 0 (bijvoorbeeld een .s1p, S21 is daar nul) tekent in
+log mag een vlakke lijn op −200 dB (was −240 dB); de markertabel toont −200.00.
+
