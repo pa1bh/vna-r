@@ -609,3 +609,17 @@ Verwacht: de CSV-kop eindigt op `…,s21_deg,r_ohm,x_ohm,z_mag_ohm,s21_group_del
 een 50 Ω-load op poort 1 staat `r_ohm` rond 50 en `x_ohm` rond 0 (na calibratie). Let op
 voor bestaande scripts: de eerste tien kolommen zijn ongewijzigd, er staan er vier achter.
 
+## Punt 38 — Sneltoetsen, batterij, verbinden bij start (N7–N9, N11)
+
+**Zonder apparaat.** Open een .s2p als trace en klik in een grafiek (zodat geen veld de
+focus heeft): `1`…`4` wisselen de actieve marker (vet in de markerbalk), `H` maakt een
+referentie, `G` zet Gate aan/uit (vinkje in het zijpaneel), `T` wisselt naar TDR en
+terug. In TDR: klik een marker en gebruik ← → (shift: tien stappen). Klik in het veld
+**Start** en typ `hgt1`: er gebeurt niets behalve dat de tekst in het veld komt.
+
+**Met apparaat.** Spatie start Run, nog een keer stopt; `S` doet één sweep (alleen als
+Run uit staat). Laat de GUI vijf minuten verbonden staan: de spanning in de topbalk
+verandert mee (vergelijk met `vna-cli info`). Zet View ▸ Connect at start aan, sluit af,
+start opnieuw met het apparaat aangesloten: verbindt vanzelf. Start zonder apparaat:
+geen foutmelding, de poortlijst wacht. Zet de optie weer uit als je hem niet wilt.
+

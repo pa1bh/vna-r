@@ -10,8 +10,9 @@ with four charts. The title bar shows the version number.
   save a calibration, quit. The same buttons are also in the left panel.
 - **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
   screenshot of the device.
-- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, and the
-  **Developer tools** toggle.
+- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Connect at
+  start** (connect by itself when the program starts and a VNA is plugged in; off by
+  default) and the **Developer tools** toggle.
 - **Help**: the manual on GitHub in English and in Dutch, as published for your version,
   the issue tracker, and **About vna-r** with the version, build revision, author and the
   link to the project.
@@ -35,6 +36,11 @@ as text. Paste that into an issue report (chapter 9). The choice is remembered.
    the points measured so far. **Stop**, **Disconnect** and **Apply sweep** do not wait
    for the sweep to finish: they take effect at the next block of data, within 255
    points on a LiteVNA and within 301 points (about three seconds) on a NanoVNA-F.
+
+Keys, as long as you are not typing in a field: space is Run or Stop, `S` a single
+sweep, `1` to `4` choose the active marker and the arrow keys move it, `H` holds the
+trace as a reference, `G` switches the gate, `T` switches between frequency and time
+domain. The battery voltage in the top bar is read again every minute.
 
 Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Apply
 sweep**; during Run the sweep then restarts with the new settings. You type frequencies

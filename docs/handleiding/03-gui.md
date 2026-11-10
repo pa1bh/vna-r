@@ -10,8 +10,9 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
   calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
 - **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
   en een schermafbeelding van het apparaat.
-- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, en de schakelaar
-  **Developer tools**.
+- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Connect at
+  start** (vanzelf verbinden als het programma start en er een VNA aangesloten is;
+  standaard uit) en de schakelaar **Developer tools**.
 - **Help**: de handleiding op GitHub in het Engels en het Nederlands, zoals die bij jouw
   versie hoort, de probleemmelder, en **About vna-r** met versie, build-revisie, auteur en
   de link naar het project.
@@ -35,6 +36,11 @@ dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
    met de punten die al gemeten zijn. **Stop**, **Disconnect** en **Apply sweep** wachten
    niet tot de sweep klaar is: ze werken bij het volgende blok gegevens, binnen 255
    punten op een LiteVNA en binnen 301 punten (ongeveer drie seconden) op een NanoVNA-F.
+
+Toetsen, zolang je niet in een veld typt: spatie is Run of Stop, `S` een enkele sweep,
+`1` tot `4` kiezen de actieve marker en de pijltjestoetsen verplaatsen hem, `H` houdt de
+trace vast als referentie, `G` schakelt de gate, `T` wisselt tussen frequentie- en
+tijddomein. De batterijspanning in de bovenbalk wordt elke minuut opnieuw gelezen.
 
 Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met **Apply
 sweep**; tijdens Run herstart de sweep dan met de nieuwe instellingen. Frequenties typ je

@@ -13,6 +13,10 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- GUI: keyboard shortcuts (space Run/Stop, `S` single sweep, `1`–`4` active marker, `H`
+  hold, `G` gate, `T` frequency/time domain; arrow keys now also move the TDR marker),
+  the battery voltage is read again every minute, and **View ▸ Connect at start**
+  connects by itself when a VNA is plugged in (off by default).
 - One-port Touchstone export: `vna-cli sweep --s1p file.s1p`, and in the GUI a file name
   ending in `.s1p` when saving. The sweep CSV has four more columns behind the existing
   ten: `r_ohm`, `x_ohm`, `z_mag_ohm` and `s21_group_delay_ns`.

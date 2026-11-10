@@ -382,7 +382,8 @@ impl App {
                     self.active_marker = k;
                 }
             }
-            ui.small("click in a plot places the active one; ← → nudge, shift for ×10");
+            ui.small("click in a plot places the active one (keys 1–4 choose it); ← → nudge, shift for ×10")
+                .on_hover_text("other keys: space Run/Stop, S single sweep, H hold, G gate on/off, T frequency/time domain");
             if ui.small_button("clear").clicked() {
                 self.markers[self.active_marker] = None;
             }

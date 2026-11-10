@@ -187,6 +187,12 @@ pub struct App {
     show_about: bool,
     /// Developer menu visible (View ▸ Developer tools).
     dev_tools: bool,
+    /// Connect at start when a VNA is plugged in (View ▸ Connect at start).
+    auto_connect: bool,
+    /// The connect-at-start attempt is made once, in the first frame.
+    auto_connect_tried: bool,
+    /// `ui.input().time` of the last battery reading asked for.
+    last_battery_poll: f64,
     show_log: bool,
     /// Developer log: connection events, errors, file operations, sweeps while the window is open.
     log: VecDeque<String>,
@@ -265,6 +271,9 @@ impl App {
             renderer: renderer_description(cc),
             show_about: false,
             dev_tools: false,
+            auto_connect: false,
+            auto_connect_tried: false,
+            last_battery_poll: 0.0,
             show_log: false,
             log: VecDeque::new(),
             started: Instant::now(),
@@ -283,6 +292,80 @@ impl App {
             }
         }
         app
+    }
+
+    /// Connect to the selected port, if there is one and nothing is connected yet.
+    fn connect_selected(&mut self) {
+        if !matches!(self.connection, Connection::Disconnected) {
+            return;
+        }
+        if let Some(port) = self.selected_port.clone() {
+            self.connection = Connection::Connecting(port.clone());
+            self.send(Cmd::Connect(port));
+        }
+    }
+
+    /// What happens without a click: connect at start when asked to, and a
+    /// fresh battery reading every minute while connected.
+    fn housekeeping(&mut self, ctx: &egui::Context) {
+        const BATTERY_INTERVAL: f64 = 60.0;
+        if !self.auto_connect_tried {
+            self.auto_connect_tried = true;
+            let selected_is_vna = self
+                .selected_port
+                .as_ref()
+                .is_some_and(|sel| self.ports.iter().any(|p| &p.path == sel && p.looks_like_vna()));
+            if self.auto_connect && selected_is_vna {
+                self.connect_selected();
+            }
+        }
+        if self.connected() {
+            let now = ctx.input(|i| i.time);
+            if now - self.last_battery_poll > BATTERY_INTERVAL {
+                self.last_battery_poll = now;
+                self.send(Cmd::Battery);
+            }
+            ctx.request_repaint_after(Duration::from_secs_f64(BATTERY_INTERVAL));
+        }
+    }
+
+    /// Keys that work when no text field or other widget has the keyboard:
+    /// space Run/Stop, S single sweep, 1–4 active marker, H hold, G gate,
+    /// T frequency/time domain. (The arrow keys for the markers are with the plots.)
+    fn shortcuts(&mut self, ctx: &egui::Context) {
+        if ctx.egui_wants_keyboard_input() || ctx.memory(|m| m.focused().is_some()) {
+            return;
+        }
+        let pressed = |key: egui::Key| ctx.input(|i| i.key_pressed(key) && i.modifiers.is_none());
+        if self.connected() {
+            if pressed(egui::Key::Space) {
+                if self.running {
+                    self.stop_sweep();
+                } else {
+                    self.start_sweep(true);
+                }
+            }
+            if pressed(egui::Key::S) && !self.running {
+                self.start_sweep(false);
+            }
+        }
+        for (k, key) in [egui::Key::Num1, egui::Key::Num2, egui::Key::Num3, egui::Key::Num4]
+            .into_iter()
+            .enumerate()
+        {
+            if pressed(key) {
+                self.active_marker = k;
+            }
+        }
+        if pressed(egui::Key::H) && self.shown.is_some() && self.references.len() < MAX_REFS {
+            self.hold_reference();
+        }
+        if pressed(egui::Key::G) {
+            self.gate_on = !self.gate_on;
+        }
+        if pressed(egui::Key::T) {
+            self.view = if self.view == View::Tdr { View::Frequency } else { View::Tdr };
+        }
     }
 
     fn refresh_ports(&mut self) {
@@ -324,6 +407,7 @@ impl App {
                 Event::Connected { port, info, battery_mv } => {
                     self.log(format!("connected: {} on {port}", info.summary()));
                     self.connection = Connection::Connected { port, info, battery_mv };
+                    self.last_battery_poll = ctx.input(|i| i.time);
                     self.error = None;
                     // Never average sweeps of this device with those of the previous one.
                     self.avg_buf.clear();
@@ -392,6 +476,11 @@ impl App {
                             self.cal.pending = None;
                             self.store_standard(std, &result, repeat);
                         }
+                    }
+                }
+                Event::Battery(mv) => {
+                    if let Connection::Connected { battery_mv, .. } = &mut self.connection {
+                        *battery_mv = Some(mv);
                     }
                 }
                 Event::Screenshot(shot) => {
@@ -466,9 +555,7 @@ impl App {
             match &self.connection {
                 Connection::Disconnected => {
                     if ui.add_enabled(self.selected_port.is_some(), egui::Button::new("Connect")).clicked() {
-                        let port = self.selected_port.clone().unwrap();
-                        self.connection = Connection::Connecting(port.clone());
-                        self.send(Cmd::Connect(port));
+                        self.connect_selected();
                     }
                 }
                 Connection::Connecting(p) => {
@@ -596,9 +683,7 @@ impl App {
                     .clicked()
                 {
                     ui.close();
-                    let port = self.selected_port.clone().unwrap();
-                    self.connection = Connection::Connecting(port.clone());
-                    self.send(Cmd::Connect(port));
+                    self.connect_selected();
                 }
                 if ui.button("Rescan ports").clicked() {
                     ui.close();
@@ -636,6 +721,8 @@ impl App {
                 ui.checkbox(&mut self.show_s11, "S11");
                 ui.checkbox(&mut self.show_s21, "S21");
                 ui.separator();
+                ui.checkbox(&mut self.auto_connect, "Connect at start")
+                    .on_hover_text("connect by itself when the program starts and a VNA is plugged in");
                 if ui
                     .checkbox(&mut self.dev_tools, "Developer tools")
                     .on_hover_text("adds a Developer menu with the log window and diagnostics for bug reports")
@@ -911,6 +998,8 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_events(&ctx);
+        self.housekeeping(&ctx);
+        self.shortcuts(&ctx);
         if self.running {
             // keep the UI alive while the worker streams sweeps
             ctx.request_repaint_after(Duration::from_millis(100));

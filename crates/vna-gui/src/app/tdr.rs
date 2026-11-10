@@ -193,7 +193,7 @@ impl App {
                     }
                 }
                 _ => {
-                    ui.small("Click in a plot to place a marker. Distances are one-way, using the velocity factor.");
+                    ui.small("Click in a plot to place a marker, ← → nudge it. Distances are one-way, using the velocity factor.");
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -222,6 +222,23 @@ impl App {
         let mut gate_events: Vec<GateEvent> = Vec::new();
         let n = t.distance_m.iter().position(|d| *d > limit).unwrap_or(t.distance_m.len());
         let dist = &t.distance_m[..n];
+        // Arrow keys nudge the TDR marker like the frequency markers (shift: ten bins).
+        if let Some(i) = self.tdr_marker.filter(|_| n > 0 && !ui.ctx().egui_wants_keyboard_input()) {
+            let (left, right, shift) = ui.input(|k| {
+                (
+                    k.key_pressed(egui::Key::ArrowLeft),
+                    k.key_pressed(egui::Key::ArrowRight),
+                    k.modifiers.shift,
+                )
+            });
+            let step = if shift { 10 } else { 1 };
+            if left {
+                self.tdr_marker = Some(i.saturating_sub(step));
+            }
+            if right {
+                self.tdr_marker = Some((i + step).min(n - 1));
+            }
+        }
         let marker_x = self.tdr_marker.and_then(|i| dist.get(i).copied());
         let mut clicked_x: Option<f64> = None;
 

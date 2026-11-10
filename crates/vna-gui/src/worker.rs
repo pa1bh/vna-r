@@ -41,6 +41,8 @@ pub enum Cmd {
     Stop,
     /// LiteVNA averaging register; ignored on devices without it.
     SetAverage(u8),
+    /// Read the battery voltage again (it is read once at connect).
+    Battery,
     Screenshot,
 }
 
@@ -70,6 +72,8 @@ pub enum Event {
         purpose: Purpose,
     },
     Screenshot(Screenshot),
+    /// The battery voltage, in answer to [`Cmd::Battery`].
+    Battery(u16),
     /// Something failed. `stops_sweep` says whether continuous sweeping ended
     /// with it (a sweep or connection failure) or goes on (a screenshot, a
     /// register write).
@@ -247,6 +251,12 @@ impl Worker {
                     if let Err(e) = d.set_average(avg) {
                         self.warn("setting average", e);
                     }
+                }
+            }
+            Cmd::Battery => {
+                // A device without a readable battery just gives no answer.
+                if let Some(Ok(mv)) = self.dev.as_mut().map(|d| d.battery_millivolts()) {
+                    self.emit(Event::Battery(mv));
                 }
             }
             Cmd::Screenshot => {

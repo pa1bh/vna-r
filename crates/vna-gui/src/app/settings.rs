@@ -75,6 +75,8 @@ pub(super) struct Settings {
     pub(super) extra_segments: Vec<SegmentSettings>,
     /// Developer menu and log window (off for normal use).
     pub(super) dev_tools: bool,
+    /// Connect to the VNA at start when one is plugged in (View ▸ Connect at start).
+    pub(super) auto_connect: bool,
 }
 
 /// One extra sweep segment. The primary segment is the Start/Stop/Points of
@@ -121,6 +123,7 @@ impl Default for Settings {
             sweep_avg: 1,
             extra_segments: Vec::new(),
             dev_tools: false,
+            auto_connect: false,
         }
     }
 }
@@ -181,6 +184,7 @@ impl App {
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.extra_segments = s.extra_segments;
         self.dev_tools = s.dev_tools;
+        self.auto_connect = s.auto_connect;
         if let Some(path) = s.cal_file {
             if path.exists() {
                 self.load_cal_from(&path);
@@ -224,6 +228,7 @@ impl App {
             sweep_avg: self.sweep_avg,
             extra_segments: self.extra_segments.clone(),
             dev_tools: self.dev_tools,
+            auto_connect: self.auto_connect,
         }
     }
 }
