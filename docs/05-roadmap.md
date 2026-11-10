@@ -266,7 +266,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 17 | CHANGELOG naar het Engels (besluit 2); `[0.1.0]`-link herstellen | L3 | S | gedaan 2026-11-10 |
 | 18 | `num-complex` uit vna-cli; verouderde UI-teksten (Hold, step 8, bestandsnamen) | L5, U10 | S | gedaan 2026-11-10 (bestandsnamen naar frequentiebereik) |
 | 19 | Firmware en PDF's uit git, links in docs/02 (besluit 1) | L1 | S | gedaan 2026-11-10 (bestanden blijven lokaal; nog in de geschiedenis) |
-| 20 | `build.rs`: ook `refs/heads/*` en `packed-refs` als rerun-trigger | B25 | S | |
+| 20 | `build.rs`: ook `refs/heads/*` en `packed-refs` als rerun-trigger | B25 | S | gedaan 2026-11-10 (één gedeeld script, ook `.git/index`) |
 
 ## 0.3 — structuur, vóór nieuwe features
 

@@ -78,6 +78,8 @@ things that are not backwards compatible, such as the format of the calibration 
 - TDR: the reported unambiguous range ("alias-free range") was 1/Δf, twice what the
   chart shows; the arrays and the gate already ran to 1/(2·Δf). The GUI label, the CLI
   line and the axis limit now use the right value, and the gate error names it directly.
+- The git revision in **About** and `vna-cli --version` was only refreshed on a branch
+  switch, so a build after a new commit on the same branch kept showing the old one.
 - A port without a recognisable USB id that turns out not to be a NanoVNA shell cost
   twice the command timeout when connecting (first waiting for the prompt, then sending
   a `resume` while cleaning up and waiting again); now once.

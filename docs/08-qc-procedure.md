@@ -297,3 +297,15 @@ Verwacht: alleen `assets/litevna-projects.txt` is getrackt; de drie PDF's en dri
 firmware-images staan nog op schijf; `git status` toont ze niet (genegeerd). Ze zitten
 nog wel in de git-geschiedenis: dat was het besluit (geen history rewrite).
 
+## Punt 20 — Git-revisie volgt nieuwe commits (B25)
+
+**Zonder apparaat.**
+```bash
+cargo build -q -p vna-cli && ./target/debug/vna-cli --version
+git commit -q --allow-empty -m "qc: empty commit" && cargo build -q -p vna-cli && ./target/debug/vna-cli --version
+git reset -q --hard HEAD~1
+```
+Verwacht: de tweede `--version` toont een andere revisie dan de eerste (de hash van de
+lege commit). Vóór 0.2.6 bleef de oude staan tot een branchwissel. De laatste regel haalt
+de testcommit weer weg; voer hem alleen uit op een schone werkboom.
+
