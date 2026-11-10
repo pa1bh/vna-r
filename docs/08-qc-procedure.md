@@ -151,3 +151,23 @@ op ~14,2 MHz.
 veld **Stop**, druk vijf keer ←: de cursor beweegt in het veld, M1 staat nog op dezelfde
 frequentie. Klik in de grafiek (buiten een tekstveld) en druk ←: M1 schuift één punt.
 
+## Punt 9 — CLI-uitvoer (B8, B9, U12)
+
+**Zonder apparaat.**
+```bash
+cargo run --release -p vna-cli -- tdr --from cal/sweep.s2p --csv - | head -3
+ls -- -
+```
+Verwacht: drie CSV-regels op stdout (kop `distance_m,time_ns,…`) en `ls: -: No such file`.
+
+**Met apparaat.**
+```bash
+cargo run --release -p vna-cli -- sweep --start 1M --stop 30M --points 51 --s2p /tmp/qc.s2p 2>&1 | grep -c 'first raw record'
+head -1 /tmp/qc.s2p
+cargo run --release -p vna-cli -- sweep --segment 1M:30M:51@cal/n-hf.cal.json --s2p /tmp/qc-seg.s2p && head -1 /tmp/qc-seg.s2p
+```
+Verwacht: `0` (geen debugregel zonder `--trace`); de eerste regel noemt het model
+(`! LiteVNA sweep, 51 points, uncalibrated raw` of `! NanoVNA-F 4.3 sweep, …`); de
+segmentversie zegt `host calibration per segment`. Met `--trace` verschijnt de regel
+"first raw record" wel.
+

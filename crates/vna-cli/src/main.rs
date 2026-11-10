@@ -544,6 +544,13 @@ struct Acquired {
     /// Calibrated when a calibration was given, otherwise the raw sweep.
     result: SweepResult,
     calibrated: bool,
+    /// Model line of the device that measured it, for file comments.
+    model: String,
+}
+
+/// The model for a file comment: `LiteVNA`, `NanoVNA-F 4.3`, or the protocol name.
+fn model_of(dev: &mut Vna) -> String {
+    dev.info().map(|i| i.model).unwrap_or_else(|_| dev.kind().name().to_string())
 }
 
 /// Resolve the grid (from args or the calibration file), sweep once and apply
@@ -625,6 +632,7 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
         });
         raws.push(raw);
     }
+    let model = model_of(&mut dev);
     if keep_usb_mode {
         dev.set_release_on_drop(false);
     } else {
@@ -636,6 +644,7 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
         raw: SweepResult::concat(&raws),
         calibrated,
         result: SweepResult::concat(&results),
+        model,
     })
 }
 
@@ -675,6 +684,7 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
 
     let mut dev = open(conn)?;
     let raw = measure(&mut dev, &cfg, m)?;
+    let model = model_of(&mut dev);
     if keep_usb_mode {
         dev.set_release_on_drop(false);
     } else {
@@ -689,6 +699,7 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
         raw,
         calibrated: calibration.is_some(),
         result,
+        model,
     })
 }
 
@@ -712,6 +723,7 @@ fn sweep(
         raw,
         mut result,
         calibrated,
+        model,
     } = if segments.is_empty() {
         acquire(conn, &grid, &m, cal_file.as_deref(), keep_usb_mode)?
     } else {
@@ -745,7 +757,7 @@ fn sweep(
     }
 
     print_table(&result, rows);
-    if let Some(p) = raw.points.iter().flatten().next() {
+    if let Some(p) = raw.points.iter().flatten().next().filter(|_| conn.trace) {
         eprintln!(
             "first raw record: fwd0=({},{}) rev0=({},{}) rev1=({},{}) reserved={:02X?} checksum=0x{:02X}",
             p.fwd0_re, p.fwd0_im, p.rev0_re, p.rev0_im, p.rev1_re, p.rev1_im, p.reserved, p.checksum
@@ -755,10 +767,11 @@ fn sweep(
     if let Some(path) = &s2p {
         let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
         let comment = format!(
-            "LiteVNA sweep, {} points, {}",
+            "{model} sweep, {} points, {}",
             result.freqs_hz.len(),
             match (calibrated, &cal_file, cfg.calibrated) {
                 (true, Some(c), _) => format!("host calibration {}", c.display()),
+                (true, None, _) => "host calibration per segment".to_string(),
                 (_, _, true) => "device calibrated".to_string(),
                 _ => "uncalibrated raw".to_string(),
             }
@@ -850,8 +863,15 @@ fn tdr_cmd(
         );
     }
     if let Some(path) = &csv {
-        let mut f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
         use std::io::Write;
+        // "-" is stdout, as for `sweep --csv -`.
+        let mut f: Box<dyn Write> = if path.as_os_str() == "-" {
+            Box::new(io::stdout().lock())
+        } else {
+            Box::new(BufWriter::new(
+                File::create(path).with_context(|| format!("creating {}", path.display()))?,
+            ))
+        };
         writeln!(f, "distance_m,time_ns,impulse_db,step,z_ohm")?;
         for i in 0..t.time_s.len() {
             if t.distance_m[i] > limit_m {
@@ -867,7 +887,10 @@ fn tdr_cmd(
                 t.impedance_ohm[i]
             )?;
         }
-        eprintln!("wrote {}", path.display());
+        f.flush()?;
+        if path.as_os_str() != "-" {
+            eprintln!("wrote {}", path.display());
+        }
     }
     Ok(())
 }

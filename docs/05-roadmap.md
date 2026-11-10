@@ -251,7 +251,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 6 | `fail()` stopt de lus alleen bij sweep- en connect-fouten; screenshot en set average niet | B5 | S | gedaan 2026-11-10 |
 | 7 | Markers op frequentie: per sweep `nearest_index`, buiten bereik weg | B6, N1 | S | gedaan 2026-11-10 |
 | 8 | Pijltjestoetsen alleen zonder tekstfocus (`wants_keyboard_input`) | B7 | S | gedaan 2026-11-10 |
-| 9 | CLI: s2p-commentaar bij `--segment` en per apparaat, `tdr --csv -` naar stdout, debugregel achter `--trace` | B8, B9, U12 | S | |
+| 9 | CLI: s2p-commentaar bij `--segment` en per apparaat, `tdr --csv -` naar stdout, debugregel achter `--trace` | B8, B9, U12 | S | gedaan 2026-11-10 |
 | 10 | Screenshot-header cappen (bijv. 4096×4096, alleen bpp 16) | B11, V2 | S | |
 | 11 | "Set sweep for TDR" en nieuwe segmenten uit `device_limits()` | U5, N19 | S | |
 | 12 | Eén encodering voor "geen ruwe records" in `SweepResult.points`; Touchstone-sweep als standaard mogelijk | B10 | S | |

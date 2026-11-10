@@ -14,6 +14,11 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- CLI: `vna-cli tdr --csv -` schrijft naar stdout zoals de handleiding zegt (er ontstond
+  een bestand met de naam `-`); het commentaar in een .s2p van `sweep` noemt het echte
+  model in plaats van altijd "LiteVNA" en zegt "host calibration per segment" bij
+  `--segment …@cal.json` in plaats van "uncalibrated raw"; de regel "first raw record: …"
+  verschijnt alleen nog met `--trace`.
 - GUI: de pijltjestoetsen verplaatsten de actieve marker ook terwijl je in Start, Stop of
   een referentienaam typte.
 - GUI: markers blijven op hun frequentie staan als het raster verandert (ander bereik,
