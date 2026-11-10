@@ -5,9 +5,11 @@
 Touchstone is the interchange format for S-parameters that every RF program reads:
 text, one line per frequency, with an option line that states the unit and the format.
 
-**Writing.** In the GUI, **Save Touchstone (.s2p)** under **Files**; with the CLI,
+**Writing.** In the GUI, **Save Touchstone…** under **Files**; with the CLI,
 `vna-cli sweep --s2p name.s2p`. vna-r writes Hz, real/imaginary, 50 Ω, with S12 and
-S22 as zero because the LiteVNA does not measure them. The comment lines state whether the
+S22 as zero because the LiteVNA does not measure them. For a one-port device such as an
+antenna, give the file the extension `.s1p` in the GUI or use `--s1p name.s1p`: that
+writes S11 only. The comment lines state whether the
 data was calibrated, gated or averaged. With the gate on, the gated S11 is written.
 For segments that touch each other, the shared point is written once, because
 Touchstone requires strictly increasing frequencies.
@@ -38,7 +40,8 @@ is meant for this and is listed in `.gitignore`.
 ## CSV
 
 `vna-cli sweep --csv name.csv` writes S11 and S21 per frequency as real/imaginary,
-dB, degrees and SWR; `--csv -` writes to standard output. `vna-cli tdr --csv`
+dB, degrees and SWR, followed by the impedance at port 1 (R, X and |Z| in ohm) and the
+group delay of S21 in nanoseconds; `--csv -` writes to standard output. `vna-cli tdr --csv`
 writes distance, time, impulse, step and impedance. For spreadsheets and your own scripts.
 
 ## References

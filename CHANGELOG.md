@@ -13,6 +13,9 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- One-port Touchstone export: `vna-cli sweep --s1p file.s1p`, and in the GUI a file name
+  ending in `.s1p` when saving. The sweep CSV has four more columns behind the existing
+  ten: `r_ohm`, `x_ohm`, `z_mag_ohm` and `s21_group_delay_ns`.
 - CLI: `--json` makes `list`, `info`, `sweep`, `tdr` and `cal show` print one JSON document
   on stdout instead of a table, for scripts.
 - GUI: **Stop**, **Disconnect** and **Apply sweep** no longer wait for a running sweep to

@@ -13,7 +13,7 @@ use litevna::discovery::Kind;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel};
 use litevna::timedomain::{gate as compute_gate, parse_distance_range, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
-use litevna::touchstone::{write_csv, write_s2p};
+use litevna::touchstone::{write_csv, write_s1p, write_s2p};
 use litevna::traces::{db, swr};
 use litevna::{SweepConfig, SweepResult, Vna};
 
@@ -66,6 +66,9 @@ enum Cmd {
         /// Write a Touchstone .s2p file.
         #[arg(long)]
         s2p: Option<PathBuf>,
+        /// Write a one-port Touchstone .s1p file (S11 only), e.g. for an antenna.
+        #[arg(long)]
+        s1p: Option<PathBuf>,
         /// Write a CSV file ("-" for stdout).
         #[arg(long)]
         csv: Option<PathBuf>,
@@ -316,6 +319,7 @@ fn main() -> Result<()> {
             measure,
             cal,
             s2p,
+            s1p,
             csv,
             rows,
             keep_usb_mode,
@@ -329,6 +333,7 @@ fn main() -> Result<()> {
             measure,
             cal,
             s2p,
+            s1p,
             csv,
             rows,
             keep_usb_mode,
@@ -749,6 +754,7 @@ fn sweep(
     m: MeasureArgs,
     cal_file: Option<PathBuf>,
     s2p: Option<PathBuf>,
+    s1p: Option<PathBuf>,
     csv: Option<PathBuf>,
     rows: usize,
     keep_usb_mode: bool,
@@ -832,6 +838,12 @@ fn sweep(
             }
         );
         write_s2p(f, &result, Some(&comment))?;
+        eprintln!("wrote {}", path.display());
+    }
+    if let Some(path) = &s1p {
+        let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
+        let comment = format!("{model} sweep, {} points, S11 only", result.freqs_hz.len());
+        write_s1p(f, &result, Some(&comment))?;
         eprintln!("wrote {}", path.display());
     }
     if let Some(path) = &csv {

@@ -51,7 +51,7 @@ One sweep, printed as a table and exported if desired.
 | `--start`, `--stop`, `--points` | the grid; default 1–30 MHz, 101 points, or the grid of `--cal` |
 | `--cal <file>` | apply a calibration; a different grid within the span is interpolated |
 | `--segment START:STOP:POINTS[@cal]` | several segments in one trace, repeatable; replaces start/stop/points/cal |
-| `--s2p <file>`, `--csv <file>` | export; `--csv -` to stdout |
+| `--s2p <file>`, `--s1p <file>`, `--csv <file>` | export (`--s1p` is S11 only); `--csv -` to stdout |
 | `--rows <n>` | number of table rows, 0 is all |
 | `--average <1..80>` | bandwidth of the device (stays set); LiteVNA only |
 | `--channel s11\|s21` | measure one channel; LiteVNA only |

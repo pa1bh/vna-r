@@ -589,3 +589,23 @@ Verwacht: `info` met `model`, `firmware`, `battery_mv`, `range_hz`; de sweep 11 
 `freq_hz`, `s11`, `s21`; de laatste regel weigert ("--json and --csv - both write to
 stdout").
 
+## Punt 40 — .s1p-export en CSV-kolommen (N15, N16)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna s1p_round_trip
+```
+GUI: open `cal/sweep.s2p` als trace, Save Touchstone…, geef de naam `/tmp/qc.s1p`:
+`head -4 /tmp/qc.s1p` toont de kop `# Hz S RI R 50` en regels met drie getallen. Open
+`/tmp/qc.s1p` weer als trace: S11 identiek, S21 leeg (−200 dB). Opslaan als `.s2p` geeft
+negen kolommen zoals voorheen.
+
+**Met apparaat.**
+```bash
+vna-cli sweep --start 1M --stop 30M --points 51 --s1p /tmp/qc-cli.s1p --csv /tmp/qc.csv
+head -1 /tmp/qc.csv
+```
+Verwacht: de CSV-kop eindigt op `…,s21_deg,r_ohm,x_ohm,z_mag_ohm,s21_group_delay_ns`; met
+een 50 Ω-load op poort 1 staat `r_ohm` rond 50 en `x_ohm` rond 0 (na calibratie). Let op
+voor bestaande scripts: de eerste tien kolommen zijn ongewijzigd, er staan er vier achter.
+

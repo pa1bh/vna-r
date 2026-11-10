@@ -255,14 +255,49 @@ pub fn write_s2p<W: Write>(mut w: W, sweep: &SweepResult, comment: Option<&str>)
     Ok(())
 }
 
+/// Write the reflection of a sweep as a one-port Touchstone file (`.s1p`):
+/// S11 only, Hz, real/imaginary, 50 Ω. For an antenna or another one-port
+/// device, where the zero columns of a `.s2p` are noise for other programs.
+pub fn write_s1p<W: Write>(mut w: W, sweep: &SweepResult, comment: Option<&str>) -> std::io::Result<()> {
+    writeln!(w, "! Exported by vna-r (litevna crate)")?;
+    if let Some(c) = comment {
+        for line in c.lines() {
+            writeln!(w, "! {line}")?;
+        }
+    }
+    writeln!(w, "# Hz S RI R 50")?;
+    for i in 0..sweep.freqs_hz.len() {
+        // As in `write_s2p`: touching segments share a point, written once.
+        if i > 0 && sweep.freqs_hz[i] == sweep.freqs_hz[i - 1] {
+            continue;
+        }
+        let s11 = sweep.s11[i];
+        writeln!(w, "{} {:.9e} {:.9e}", sweep.freqs_hz[i], s11.re, s11.im)?;
+    }
+    Ok(())
+}
+
+/// Half-width in points of the group-delay difference in the CSV export.
+pub const CSV_GROUP_DELAY_APERTURE: usize = 2;
+
+/// One row per frequency: S11 and S21 as real/imaginary, dB and degrees, the
+/// SWR, and behind those the quantities derived from them: the impedance at
+/// port 1 as R, X and |Z| (ohm) and the group delay of S21 (ns, over
+/// ±[`CSV_GROUP_DELAY_APERTURE`] points). The first ten columns are as they
+/// were before the derived ones were added.
 pub fn write_csv<W: Write>(mut w: W, sweep: &SweepResult) -> std::io::Result<()> {
-    writeln!(w, "freq_hz,s11_re,s11_im,s11_db,s11_deg,swr,s21_re,s21_im,s21_db,s21_deg")?;
+    writeln!(
+        w,
+        "freq_hz,s11_re,s11_im,s11_db,s11_deg,swr,s21_re,s21_im,s21_db,s21_deg,r_ohm,x_ohm,z_mag_ohm,s21_group_delay_ns"
+    )?;
+    let group_delay = crate::traces::group_delay(&sweep.freqs_hz, &sweep.s21, CSV_GROUP_DELAY_APERTURE);
     for i in 0..sweep.freqs_hz.len() {
         let s11 = sweep.s11[i];
         let s21 = sweep.s21[i];
+        let z = crate::traces::impedance(s11);
         writeln!(
             w,
-            "{},{:.9e},{:.9e},{:.3},{:.2},{:.3},{:.9e},{:.9e},{:.3},{:.2}",
+            "{},{:.9e},{:.9e},{:.3},{:.2},{:.3},{:.9e},{:.9e},{:.3},{:.2},{:.3},{:.3},{:.3},{:.4}",
             sweep.freqs_hz[i],
             s11.re,
             s11.im,
@@ -273,6 +308,10 @@ pub fn write_csv<W: Write>(mut w: W, sweep: &SweepResult) -> std::io::Result<()>
             s21.im,
             db(s21.norm()),
             s21.arg().to_degrees(),
+            z.re,
+            z.im,
+            z.norm(),
+            group_delay.get(i).copied().unwrap_or(0.0) * 1e9,
         )?;
     }
     Ok(())
@@ -285,6 +324,48 @@ pub use crate::traces::{db, swr};
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn s1p_round_trip_and_csv_columns() {
+        let freqs: Vec<u64> = (0..5).map(|i| 10_000_000 + i * 1_000_000).collect();
+        // Γ = 1/3 everywhere: 100 Ω, SWR 2. S21 a pure 5 ns delay.
+        let tau = 5e-9;
+        let sweep = SweepResult {
+            s11: vec![Complex64::new(1.0 / 3.0, 0.0); 5],
+            s21: freqs
+                .iter()
+                .map(|&f| Complex64::from_polar(0.5, -2.0 * std::f64::consts::PI * f as f64 * tau))
+                .collect(),
+            freqs_hz: freqs.clone(),
+            points: Vec::new(),
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: std::time::Duration::ZERO,
+        };
+        let mut s1p = Vec::new();
+        write_s1p(&mut s1p, &sweep, Some("an antenna")).unwrap();
+        let text = String::from_utf8(s1p.clone()).unwrap();
+        assert!(text.contains("! an antenna") && text.contains("# Hz S RI R 50"), "{text}");
+        let back = read_touchstone(&s1p[..], Some(1)).unwrap();
+        assert_eq!(back.freqs_hz, freqs);
+        assert!((back.s11[2] - sweep.s11[2]).norm() < 1e-9);
+        assert_eq!(back.s21[2], Complex64::new(0.0, 0.0));
+
+        let mut csv = Vec::new();
+        write_csv(&mut csv, &sweep).unwrap();
+        let csv = String::from_utf8(csv).unwrap();
+        let mut lines = csv.lines();
+        let header: Vec<&str> = lines.next().unwrap().split(',').collect();
+        assert_eq!(&header[..3], ["freq_hz", "s11_re", "s11_im"]);
+        assert_eq!(&header[10..], ["r_ohm", "x_ohm", "z_mag_ohm", "s21_group_delay_ns"]);
+        let row: Vec<f64> = lines.nth(2).unwrap().split(',').map(|v| v.parse().unwrap()).collect();
+        assert_eq!(row.len(), header.len());
+        assert_eq!(row[0], 12_000_000.0);
+        assert!((row[5] - 2.0).abs() < 1e-3, "SWR {}", row[5]);
+        assert!((row[10] - 100.0).abs() < 1e-2 && row[11].abs() < 1e-2 && (row[12] - 100.0).abs() < 1e-2);
+        assert!((row[13] - 5.0).abs() < 1e-3, "group delay {} ns", row[13]);
+    }
 
     #[test]
     fn non_finite_values_and_repeated_frequencies_are_refused() {

@@ -12,7 +12,7 @@ use litevna::device::plan_segments;
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, nearest_index, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
-use litevna::touchstone::{read_touchstone_file_full, write_s2p};
+use litevna::touchstone::{read_touchstone_file_full, write_s1p, write_s2p};
 use litevna::traces::{self, db, impedance, swr, Param, TraceKind};
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
@@ -558,7 +558,7 @@ impl App {
                     self.open_touchstone(true);
                 }
                 if ui
-                    .add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)…"))
+                    .add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p, .s1p)…"))
                     .clicked()
                 {
                     ui.close();
@@ -874,7 +874,9 @@ impl App {
 
             ui.add_space(12.0);
             ui.heading("Files");
-            if ui.add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone (.s2p)")).clicked() {
+            if ui.add_enabled(self.shown.is_some(), egui::Button::new("Save Touchstone…"))
+                .on_hover_text("as .s2p (S11 and S21), or give the name the extension .s1p for S11 only")
+                .clicked() {
                 self.save_s2p();
             }
             ui.horizontal(|ui| {

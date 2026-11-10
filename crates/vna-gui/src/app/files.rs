@@ -62,7 +62,7 @@ impl App {
     pub(super) fn save_s2p(&mut self) {
         let Some(sweep) = self.freq_sweep() else { return };
         let Some(path) = rfd::FileDialog::new()
-            .add_filter("Touchstone", &["s2p"])
+            .add_filter("Touchstone", &["s2p", "s1p"])
             .set_file_name(format!(
                 "sweep-{}-{}.s2p",
                 compact_hz(sweep.freqs_hz[0]),
@@ -93,7 +93,17 @@ impl App {
             },
             gated
         );
-        match std::fs::File::create(&path).and_then(|f| write_s2p(std::io::BufWriter::new(f), &sweep, Some(&comment))) {
+        // The extension decides: .s1p is S11 only, anything else the two-port file.
+        let one_port = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("s1p"));
+        let written = std::fs::File::create(&path).and_then(|f| {
+            let f = std::io::BufWriter::new(f);
+            if one_port {
+                write_s1p(f, &sweep, Some(&comment))
+            } else {
+                write_s2p(f, &sweep, Some(&comment))
+            }
+        });
+        match written {
             Ok(()) => {
                 self.log(format!("wrote {}", path.display()));
                 self.file_message = Some(format!("wrote {}", path.display()));

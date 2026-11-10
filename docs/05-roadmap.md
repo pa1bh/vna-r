@@ -296,7 +296,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 37 | Host-middeling via `valuesPerFrequency` | N6, F3 | S/M | |
 | 38 | Sneltoetsen, auto-connect, batterij verversen, TDR-marker nudgen | N7–N9, N11 | S | |
 | 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | |
-| 40 | CSV met afgeleide kolommen; `.s1p`-export; Touchstone v2 | N15, N16 | S | |
+| 40 | CSV met afgeleide kolommen; `.s1p`-export; Touchstone v2 | N15, N16 | S | gedaan 2026-11-10: `.s1p` en vier CSV-kolommen erbij. Niet gedaan: Touchstone v2 lezen (pas doen als er een bestand is dat het nodig heeft) |
 | 41 | `cal` als subcommando's met completions | N17 | M | |
 | 42 | Kit-bestanden lezen, load serie-L | N14 | S/M | |
 | 43 | Tekst-`scan` voor NanoVNA-H/H4 zonder `scan_bin` | N13 | M | alleen met hardware |
