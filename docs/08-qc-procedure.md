@@ -153,10 +153,25 @@ tweede punt ligt op 5,995 MHz. De regel "not applied" komt pas bij een sweep bui
 1 MHz–1 GHz; punt 4 hieronder beschrijft nu beide.
 
 Het logboek van de GUI toont om 16:15:53 "sweep: I/O error: Broken pipe" en twee seconden
-later een nieuwe Connect: nog na te vragen wat daar gebeurde.
+later een nieuwe Connect: PA1BH zat op dat moment aan de USB-kabel. Daarmee is punt 27
+ongepland gezien: fout in de topbalk, knop terug op Connect, opnieuw verbinden werkt.
 
-**Nog te doen, samen:** de rest van de GUI (grove calibratie, voortgangsbalk, kabel
-lostrekken, referenties, TDR, gate, bestanden) en de slotronde.
+3. *Geen Stop-knop bij een standaardmeting of enkele sweep als Run uit staat* (blok 3,
+   stap 5: short op 3201 punten met Sweep avg 8, de balk liep, maar er stond Run in
+   plaats van Stop). Afbreken kon alleen door Run te starten. Gerepareerd in commit
+   `ce59d33`: knop, Device-menu en spatiebalk kijken nu of er iets gemeten wordt. Nog door
+   PA1BH te bevestigen.
+4. *Geen fout, wel genoteerd*: met `n-6g3` (1001 punten, tweede punt op 6,35 MHz) en een
+   sweep van 3201 punten staat de short onder 6,35 MHz tot ongeveer +8 dB te hoog en
+   buiten de Smith-cirkel. De oranje waarschuwing zegt dat ook. Nagerekend met de dichte
+   HF-calibratie `n-hf` als waarheid: de ruwe short gaat tussen 50 kHz en 1 MHz van
+   0,22∠−70° naar 0,70∠−152°, dat volgt geen enkele interpolatie tussen twee punten
+   (polair tot +9,4 dB, cartesisch zoals in 0.2.5 tot +6,8 dB). Mogelijke verbetering
+   voor later: die sweeppunten niet tekenen, of een calibratieraster dat onderin dichter
+   is.
+
+**Nog te doen, samen:** de rest van blok 3 (uitkomst stap 1 tot 4, Stop opnieuw,
+screenshot, kabel lostrekken), daarna referenties, TDR, gate, bestanden en de slotronde.
 
 ---
 
@@ -608,7 +623,8 @@ Verwacht: twee tests groen (LiteVNA: 255, 510, 600 van 600; shell: 301, 602, 700
    vrij.
 
 **Met LiteVNA.** 201 punten continu: geen balk (te snel). 3201 punten met Sweep avg 8
-en een standaardmeting: balk loopt tot 25608 punten; Stop breekt binnen een seconde af.
+en een standaardmeting: balk loopt tot 25608 punten; Stop breekt binnen een seconde af,
+ook als Run uit staat (de knop Run is dan Stop zolang de meting loopt).
 Screenshot tijdens Run: de sweep loopt daarna door.
 
 ## Punt 48 — Niet-eindige waarden en dubbele frequenties (B21, B22)
