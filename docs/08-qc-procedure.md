@@ -505,3 +505,20 @@ de TDR-instellingen; Gate aan met 0,2 – 0,7 m: gedrag als in 0.2.5. CLI:
 `vna-cli sweep --start 50k --stop 3G --points 1001 --gate 0.2:0.7 --vf 0.7` meldt dezelfde
 gate als voorheen.
 
+## Punt 26 — Meldingen op hun plek (U6, U11)
+
+**Zonder apparaat.**
+1. Maak een .s1p met ongelijke stappen:
+   ```bash
+   printf '# MHz S RI R 50\n1 0.5 0\n2 0.5 0\n4 0.5 0\n8 0.5 0\n16 0.5 0\n32 0.5 0\n64 0.5 0\n128 0.5 0\n' > /tmp/qc-log.s1p
+   ```
+   File ▸ Open as trace, kies TDR: in het middenvlak staat oranje "No TDR for this sweep:
+   TDR needs a uniformly spaced sweep. …"; de topbalk blijft leeg. Terug naar Frequency:
+   de trace is gewoon zichtbaar.
+2. Open daarna een bestand met gelijke stappen: de TDR verschijnt weer.
+3. View ▸ Developer tools, Developer ▸ Copy diagnostics: rechts in de topbalk staat
+   ongeveer zes seconden groen "diagnostics copied to the clipboard" en verdwijnt dan.
+4. File ▸ Load calibration met een bestand dat geen calibratie is (bijv. `Cargo.toml`):
+   rode fout rechtsboven; maak het venster smal: de tekst wordt afgekapt met "…" en de
+   muis erboven toont de hele melding; × haalt hem weg.
+

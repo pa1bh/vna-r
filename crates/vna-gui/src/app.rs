@@ -266,6 +266,16 @@ struct Reference {
     visible: bool,
 }
 
+/// The TDR of the shown sweep and what it was computed for. A failure is
+/// cached like a result, so a sweep TDR cannot handle (a non-uniform grid, a
+/// span too narrow for its top frequency) is tried once, not every frame.
+struct TdrCache {
+    shown_rev: u64,
+    vf: f64,
+    window: Window,
+    result: Result<TdrResult, String>,
+}
+
 #[derive(Clone, Copy, PartialEq)]
 struct GateKey {
     shown_rev: u64,
@@ -354,9 +364,10 @@ pub struct App {
     file_trace: Option<String>,
     /// Last file operation (saved/opened), shown under **Files**.
     file_message: Option<String>,
-    /// TDR of the shown sweep, with what it was computed for: (`shown_rev`,
-    /// velocity factor, window). Recomputed when any of the three differs.
-    tdr_cache: Option<(u64, f64, Window, TdrResult)>,
+    /// TDR of the shown sweep, or why it cannot be computed; see [`TdrCache`].
+    tdr_cache: Option<TdrCache>,
+    /// A short confirmation in the top bar ("diagnostics copied"), and when it appeared.
+    notice: Option<(String, Instant)>,
 
     /// Graphics backend and adapter wgpu picked (Vulkan, Metal, GL + driver), for About and bug reports.
     renderer: String,
@@ -448,6 +459,7 @@ impl App {
             file_trace: None,
             file_message: None,
             tdr_cache: None,
+            notice: None,
             renderer: renderer_description(cc),
             show_about: false,
             dev_tools: false,
@@ -1181,10 +1193,21 @@ impl App {
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(err) = self.error.clone() {
-                    if ui.small_button("×").clicked() {
+                    if ui.small_button("×").on_hover_text("dismiss").clicked() {
                         self.error = None;
                     }
-                    ui.colored_label(Color32::from_rgb(255, 110, 110), err);
+                    // One line, cut off when the bar is too narrow; the full text is in the hover.
+                    ui.add(egui::Label::new(RichText::new(&err).color(Color32::from_rgb(255, 110, 110))).truncate())
+                        .on_hover_text(&err);
+                } else if let Some((text, since)) = &self.notice {
+                    const NOTICE_SECONDS: f32 = 6.0;
+                    let age = since.elapsed().as_secs_f32();
+                    if age < NOTICE_SECONDS {
+                        ui.add(egui::Label::new(RichText::new(text).color(Color32::from_rgb(150, 200, 150))).truncate());
+                        ui.ctx().request_repaint_after(Duration::from_secs_f32(NOTICE_SECONDS - age + 0.05));
+                    } else {
+                        self.notice = None;
+                    }
                 }
             });
         });
@@ -1304,7 +1327,7 @@ impl App {
                     {
                         ui.close();
                         ctx.copy_text(self.diagnostics());
-                        self.file_message = Some("diagnostics copied to the clipboard".into());
+                        self.notify("diagnostics copied to the clipboard");
                     }
                     if ui.button("Clear log").clicked() {
                         self.log.clear();
@@ -1434,6 +1457,7 @@ impl App {
         if copy {
             ctx.copy_text(self.diagnostics());
             self.log("diagnostics copied to the clipboard");
+            self.notify("diagnostics copied to the clipboard");
         }
         self.show_log = open;
     }
@@ -1545,7 +1569,7 @@ impl App {
                 ui.add(egui::DragValue::new(&mut self.tdr_max_m).range(0.1..=1000.0).speed(0.05).suffix(" m"));
                 ui.end_row();
             });
-            if let Some((_, _, _, t)) = &self.tdr_cache {
+            if let Some(t) = self.tdr_cached() {
                 let (res_m, range_m) = (t.resolution_m(), t.max_distance_m());
                 ui.small(format!("resolution {:.3} m, alias-free range {:.1} m", res_m, range_m));
                 // Resolution is 1/span: a narrow HF sweep smears a cable into one blob.
@@ -1598,8 +1622,8 @@ impl App {
                 if self.gate_stop_m <= self.gate_start_m {
                     self.gate_stop_m = self.gate_start_m + 0.01;
                 }
-                let res_m = self.tdr_cache.as_ref().map(|(_, _, _, t)| t.resolution_m());
-                let marker_d = self.tdr_marker.and_then(|i| self.tdr_cache.as_ref().and_then(|(_, _, _, t)| t.distance_m.get(i).copied()));
+                let res_m = self.tdr_cached().map(|t| t.resolution_m());
+                let marker_d = self.tdr_marker.and_then(|i| self.tdr_cached().and_then(|t| t.distance_m.get(i).copied()));
                 if let (Some(res), Some(d)) = (res_m, marker_d) {
                     if ui.small_button("Gate around TDR marker").on_hover_text("±3 resolutions around the marker").clicked() {
                         self.gate_start_m = d - 3.0 * res;
@@ -2401,27 +2425,50 @@ impl App {
     fn tdr_result(&mut self) -> Option<&TdrResult> {
         let range = self.tdr_range();
         let sweep = self.shown.as_ref()?;
-        let fresh = matches!(&self.tdr_cache, Some((n, vf, w, _)) if *n == self.shown_rev && *vf == self.tdr_vf && *w == self.tdr_window);
+        let fresh =
+            matches!(&self.tdr_cache, Some(c) if c.shown_rev == self.shown_rev && c.vf == self.tdr_vf && c.window == self.tdr_window);
         if !fresh {
             let cfg = TdrConfig {
                 window: self.tdr_window,
                 velocity_factor: self.tdr_vf,
                 fft_size: 0,
             };
-            match tdr(&sweep.freqs_hz[range.clone()], &sweep.s11[range], &cfg) {
-                Ok(t) => self.tdr_cache = Some((self.shown_rev, self.tdr_vf, self.tdr_window, t)),
-                Err(e) => {
-                    self.error = Some(format!("TDR: {e}"));
-                    self.tdr_cache = None;
-                }
-            }
+            let result = tdr(&sweep.freqs_hz[range.clone()], &sweep.s11[range], &cfg).map_err(|e| match e {
+                litevna::Error::InvalidArgument(msg) => msg,
+                e => e.to_string(),
+            });
+            self.tdr_cache = Some(TdrCache {
+                shown_rev: self.shown_rev,
+                vf: self.tdr_vf,
+                window: self.tdr_window,
+                result,
+            });
         }
-        self.tdr_cache.as_ref().map(|(_, _, _, t)| t)
+        self.tdr_cached()
+    }
+
+    /// The TDR last computed, if that worked (it may be of an older sweep;
+    /// `tdr_result` is what brings it up to date).
+    fn tdr_cached(&self) -> Option<&TdrResult> {
+        self.tdr_cache.as_ref().and_then(|c| c.result.as_ref().ok())
+    }
+
+    /// Show a short confirmation in the top bar for a few seconds.
+    fn notify(&mut self, text: impl Into<String>) {
+        self.notice = Some((text.into(), Instant::now()));
     }
 
     fn central_tdr(&mut self, ui: &mut egui::Ui) {
         let Some(t) = self.tdr_result().cloned() else {
-            ui.centered_and_justified(|ui| ui.label("Connect and press Run; TDR is computed from S11"));
+            // No sweep yet, or a sweep TDR cannot work with: say which.
+            let why = self.tdr_cache.as_ref().and_then(|c| c.result.as_ref().err().cloned());
+            ui.centered_and_justified(|ui| match (&self.shown, why) {
+                (Some(_), Some(why)) => ui.colored_label(
+                    Color32::from_rgb(230, 150, 80),
+                    format!("No TDR for this sweep: {why}.\nTDR needs evenly spaced points from a low start frequency to a high stop."),
+                ),
+                _ => ui.label("Connect and press Run; TDR is computed from S11"),
+            });
             return;
         };
         // readout

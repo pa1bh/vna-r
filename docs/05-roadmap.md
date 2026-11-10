@@ -277,7 +277,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | gedaan 2026-11-10, op de per-segment-correctie na: die is in de GUI verweven met het laden en cachen van bestanden en verhuist mee met punt 24 |
 | 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | |
 | 25 | Versieveld in bewaarde instellingen en calibratie-JSON; `Vec` in plaats van vaste arrays | D4 | S | gedaan 2026-11-10 (0.2.5-instellingen blijven leesbaar, getest) |
-| 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | |
+| 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | gedaan 2026-11-10 in beperkte vorm: TDR-fout bij de TDR, korte bevestiging in de topbalk, lange fout afgekapt met hover. Geen algemeen `Notice`-type: de vijf plekken hebben elk hun eigen paneel en dat werkt |
 | 27 | Fouttype: `Parse { line }`, `NotConnected`, `Unsupported(Kind)`; "apparaat weg" ook bij `Timeout` | D7 | S | gedaan 2026-11-10 (`Parse`, `Unsupported`, poort-verdwenen-controle; geen `NotConnected`: de library kent geen verbindingsloze toestand) |
 | 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | |
 | 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache) |

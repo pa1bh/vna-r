@@ -62,6 +62,13 @@ things that are not backwards compatible, such as the format of the calibration 
   that contradicted the measurements in docs/01 (FIFO checksum, points per second).
 
 ### Fixed
+- GUI: a sweep that TDR cannot work with (a file with unevenly spaced points, a span too
+  narrow for its top frequency) put an error in the top bar that came back every frame
+  and could not be dismissed, while the TDR view said "Connect and press Run". The TDR
+  view now says why there is no TDR, and the top bar is left alone.
+- GUI: a long error in the top bar is cut off with the full text in its hover instead of
+  running off the window; "diagnostics copied" appears there for a few seconds instead of
+  under **Files**.
 - LiteVNA: after a sweep that failed (a timeout, a record with an impossible index) the
   next sweep on the same grid did not reset the protocol and could stay out of step with
   the device's replies; a failed sweep now forces a reset and a fresh configuration.
