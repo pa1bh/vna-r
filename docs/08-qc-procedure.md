@@ -197,3 +197,19 @@ Verwacht: groen. De API heeft geen pad om een bestand als standaard in te lezen 
 `cal` meet altijd), dus dit is een library-eigenschap; hij komt van pas zodra de GUI of
 CLI standaarden uit .s1p-bestanden accepteert.
 
+## Punt 13 — Drie kleine GUI-punten (B12, B13, B14)
+
+**Standaarden gemiddeld (met apparaat).** Zet Sweep avg op 8, verbind, meet **load**: de
+knop toont "load…" ongeveer acht sweeps lang en de melding luidt "measured load (mean of
+8 sweeps)". Met Sweep avg 1: "measured load".
+
+**Bestandstrace (zonder apparaat).** Open een .s2p als trace, File ▸ Save Touchstone naar
+`/tmp/qc-file.s2p`; `head -1 /tmp/qc-file.s2p` toont `! vna-r, N points, from file
+<naam>`. **Hold** op dezelfde trace: de referentienaam eindigt niet op " raw".
+
+**Beschadigde instellingen (zonder apparaat).** Sluit de GUI. Zet in
+`~/Library/Application Support/vna-r/app.ron` (macOS) `tdr_vf:0.85` om in `tdr_vf:0.0`
+en `tdr_max_m:…` in `tdr_max_m:NaN`. Start de GUI, kies TDR: velocity factor staat op
+0,70 en Max distance op 2,0 m, geen foutmelding. Herstel het bestand daarna, of laat de
+GUI het bij afsluiten overschrijven.
+

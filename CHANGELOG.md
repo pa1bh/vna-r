@@ -14,6 +14,14 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: een calibratiestandaard wordt nu over evenveel sweeps gemiddeld als **Sweep avg**
+  aangeeft; voorheen was elke standaard één ruwe sweep onder een gemiddelde trace.
+- GUI: het commentaar in een opgeslagen .s2p en de naam van een vastgehouden referentie
+  zeiden "host calibrated" of "raw" over een geopend bestand, op grond van de laatste
+  apparaatsweep; voor een bestand staat er nu "from file …".
+- GUI: snelheidsfactor, maximale TDR-afstand en gate-grenzen uit een beschadigd
+  instellingenbestand worden begrensd; 0 of NaN leidde tot een deling door nul en een
+  fout die elk frame terugkwam.
 - Een sweep uit een Touchstone-bestand kon niet als calibratiestandaard dienen ("n points
   missing in sweep"): bestanden en NanoVNA-shell-sweeps codeerden "geen ruwe records"
   verschillend. Nu één afspraak: geen records is een lege lijst, en dat telt niet als

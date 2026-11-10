@@ -21,10 +21,13 @@ pub enum Cmd {
     Connect(String),
     Disconnect,
     /// One sweep over these segments (in order), or start sweeping them continuously.
+    /// `repeat` > 1 sweeps that many times and reports the complex mean (used
+    /// for calibration standards, so they get the same averaging as the display).
     Sweep {
         cfgs: Vec<SweepConfig>,
         purpose: Purpose,
         continuous: bool,
+        repeat: usize,
     },
     /// Stop continuous sweeping and hand the screen back to the device.
     Stop,
@@ -41,11 +44,13 @@ pub enum Event {
         battery_mv: Option<u16>,
     },
     Disconnected,
-    /// `result` is the concatenation of the segments in `cfgs`.
+    /// `result` is the concatenation of the segments in `cfgs`, averaged over
+    /// `repeat` sweeps.
     SweepDone {
         cfgs: Vec<SweepConfig>,
         result: SweepResult,
         purpose: Purpose,
+        repeat: usize,
     },
     Screenshot(Screenshot),
     /// Something failed. `stops_sweep` says whether continuous sweeping ended
@@ -74,7 +79,7 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
 
 struct Worker {
     dev: Option<Vna>,
-    continuous: Option<(Vec<SweepConfig>, Purpose)>,
+    continuous: Option<(Vec<SweepConfig>, Purpose, usize)>,
     events: Sender<Event>,
     ctx: egui::Context,
 }
@@ -103,8 +108,8 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
         match cmd {
             Some(cmd) => w.handle(cmd),
             None => {
-                if let Some((cfgs, purpose)) = w.continuous.clone() {
-                    w.sweep_once(cfgs, purpose);
+                if let Some((cfgs, purpose, repeat)) = w.continuous.clone() {
+                    w.sweep_once(cfgs, purpose, repeat);
                 }
             }
         }
@@ -158,15 +163,20 @@ impl Worker {
                 self.dev = None;
                 self.emit(Event::Disconnected);
             }
-            Cmd::Sweep { cfgs, purpose, continuous } => {
+            Cmd::Sweep {
+                cfgs,
+                purpose,
+                continuous,
+                repeat,
+            } => {
                 if self.dev.is_none() {
                     self.fail("sweep", "not connected");
                     return;
                 }
                 if continuous {
-                    self.continuous = Some((cfgs, purpose));
+                    self.continuous = Some((cfgs, purpose, repeat));
                 } else {
-                    self.sweep_once(cfgs, purpose);
+                    self.sweep_once(cfgs, purpose, repeat);
                 }
             }
             Cmd::Stop => {
@@ -197,33 +207,43 @@ impl Worker {
         }
     }
 
-    fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose) {
-        let Some(d) = &mut self.dev else {
-            self.fail("sweep", "not connected");
-            return;
-        };
-        let mut parts = Vec::with_capacity(cfgs.len());
-        for cfg in &cfgs {
-            match d.sweep(cfg, false) {
-                Ok(r) => parts.push(r),
-                Err(e) => {
-                    let msg = e.to_string();
-                    // A broken pipe means the cable went; forget the device.
-                    if matches!(e, litevna::Error::Io(_) | litevna::Error::Serial(_)) {
-                        self.dev = None;
-                        self.continuous = None;
-                        self.emit(Event::Disconnected);
+    fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose, repeat: usize) {
+        let repeat = repeat.max(1);
+        let mut passes: Vec<SweepResult> = Vec::with_capacity(repeat);
+        for _ in 0..repeat {
+            let Some(d) = &mut self.dev else {
+                self.fail("sweep", "not connected");
+                return;
+            };
+            let mut parts = Vec::with_capacity(cfgs.len());
+            for cfg in &cfgs {
+                match d.sweep(cfg, false) {
+                    Ok(r) => parts.push(r),
+                    Err(e) => {
+                        let msg = e.to_string();
+                        // A broken pipe means the cable went; forget the device.
+                        if matches!(e, litevna::Error::Io(_) | litevna::Error::Serial(_)) {
+                            self.dev = None;
+                            self.continuous = None;
+                            self.emit(Event::Disconnected);
+                        }
+                        self.fail("sweep", msg);
+                        return;
                     }
-                    self.fail("sweep", msg);
-                    return;
                 }
             }
+            passes.push(if parts.len() == 1 {
+                parts.pop().unwrap()
+            } else {
+                SweepResult::concat(&parts)
+            });
         }
-        let result = if parts.len() == 1 {
-            parts.pop().unwrap()
-        } else {
-            SweepResult::concat(&parts)
-        };
-        self.emit(Event::SweepDone { cfgs, result, purpose });
+        let result = SweepResult::average(&passes).expect("same grid every pass");
+        self.emit(Event::SweepDone {
+            cfgs,
+            result,
+            purpose,
+            repeat,
+        });
     }
 }

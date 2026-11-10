@@ -149,6 +149,35 @@ impl SweepResult {
         out
     }
 
+    /// The complex mean of several sweeps on the same grid, per point, for
+    /// both S11 and S21. Averaging the complex values lowers noise without the
+    /// bias that averaging magnitudes in dB has. Counts and times add up; the
+    /// raw records are those of the newest sweep. `None` for no sweeps or
+    /// sweeps on different grids.
+    pub fn average<'a>(sweeps: impl IntoIterator<Item = &'a SweepResult>) -> Option<SweepResult> {
+        let sweeps: Vec<&SweepResult> = sweeps.into_iter().collect();
+        let newest = *sweeps.last()?;
+        if sweeps.iter().any(|s| s.freqs_hz != newest.freqs_hz) {
+            return None;
+        }
+        let n = sweeps.len() as f64;
+        let mut out = newest.clone();
+        for (i, (a, b)) in out.s11.iter_mut().zip(out.s21.iter_mut()).enumerate() {
+            let (mut s1, mut s2) = (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0));
+            for sw in &sweeps {
+                s1 += sw.s11[i];
+                s2 += sw.s21[i];
+            }
+            *a = s1 / n;
+            *b = s2 / n;
+        }
+        out.checksum_ok = sweeps.iter().map(|s| s.checksum_ok).sum();
+        out.checksum_bad = sweeps.iter().map(|s| s.checksum_bad).sum();
+        out.duplicates = sweeps.iter().map(|s| s.duplicates).sum();
+        out.elapsed = sweeps.iter().map(|s| s.elapsed).sum();
+        Some(out)
+    }
+
     /// The points `range` of this sweep as a sweep of its own. Sweeps from a
     /// NanoVNA shell or a Touchstone file carry no raw FIFO records; the slice
     /// then has none either.

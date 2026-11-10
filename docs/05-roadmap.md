@@ -255,7 +255,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 10 | Screenshot-header cappen (bijv. 4096×4096, alleen bpp 16) | B11, V2 | S | gedaan 2026-11-10 |
 | 11 | "Set sweep for TDR" en nieuwe segmenten uit `device_limits()` | U5, N19 | S | gedaan 2026-11-10 |
 | 12 | Eén encodering voor "geen ruwe records" in `SweepResult.points`; Touchstone-sweep als standaard mogelijk | B10 | S | gedaan 2026-11-10 |
-| 13 | Export-commentaar en referentienaam bij bestandstrace; standaard-sweeps door de middeling; floats uit instellingen clampen | B12, B13, B14 | S | |
+| 13 | Export-commentaar en referentienaam bij bestandstrace; standaard-sweeps door de middeling; floats uit instellingen clampen | B12, B13, B14 | S | gedaan 2026-11-10 (`SweepResult::average` in de library) |
 | 14 | `points == 0` en u64-aftrekking afvangen; `check_lines` band ≤ 0 weigeren | B15, B16 | S | |
 | 15 | udev-regel: `70-litevna.rules` met uaccess, zonder 0666 | V1 | S | |
 | 16 | README/handleidingen: versie, archiefnamen, GTK-verwijzingen weg, xdg-portal noemen; docs/04 DC-term; roadmap-intro | L2, L3 | S | |

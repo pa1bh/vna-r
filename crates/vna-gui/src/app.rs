@@ -424,9 +424,12 @@ impl App {
         self.show_s11 = s.show_s11;
         self.show_s21 = s.show_s21;
         self.view = if s.view_tdr { View::Tdr } else { View::Frequency };
-        self.tdr_vf = s.tdr_vf;
+        // A hand-edited or future settings file may hold 0, NaN or nonsense;
+        // the DragValues only clamp on interaction.
+        let finite_or = |v: f64, lo: f64, hi: f64, default: f64| if v.is_finite() { v.clamp(lo, hi) } else { default };
+        self.tdr_vf = finite_or(s.tdr_vf, 0.3, 1.0, 0.70);
         self.tdr_window = Window::parse(&s.tdr_window).unwrap_or(Window::Hann);
-        self.tdr_max_m = s.tdr_max_m;
+        self.tdr_max_m = finite_or(s.tdr_max_m, 0.1, 1000.0, 2.0);
         self.pending_marker_freqs = Some(s.marker_freqs);
         self.cal.fit_f_min = s.fit_f_min;
         self.cal.fit_as_delay = s.fit_as_delay;
@@ -437,8 +440,11 @@ impl App {
         }
         self.gd_aperture = s.gd_aperture.clamp(1, 50);
         self.gate_on = s.gate_on;
-        self.gate_start_m = s.gate_start_m;
-        self.gate_stop_m = s.gate_stop_m;
+        self.gate_start_m = finite_or(s.gate_start_m, -1000.0, 1000.0, -0.1);
+        self.gate_stop_m = finite_or(s.gate_stop_m, -1000.0, 1000.0, 0.5);
+        if self.gate_stop_m <= self.gate_start_m {
+            self.gate_stop_m = self.gate_start_m + 0.01;
+        }
         self.gate_notch = s.gate_notch;
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.extra_segments = s.extra_segments;
@@ -662,6 +668,7 @@ impl App {
                 cfgs,
                 purpose: Purpose::Display,
                 continuous,
+                repeat: 1,
             });
         }
     }
@@ -763,7 +770,12 @@ impl App {
                     self.running = false;
                     self.avg_buf.clear();
                 }
-                Event::SweepDone { cfgs, result, purpose } => match purpose {
+                Event::SweepDone {
+                    cfgs,
+                    result,
+                    purpose,
+                    repeat,
+                } => match purpose {
                     Purpose::Display => {
                         self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() {
                             self.sent_plan_cals.clone()
@@ -796,7 +808,7 @@ impl App {
                     }
                     Purpose::Standard(std) => {
                         self.cal.pending = None;
-                        self.store_standard(std, &result);
+                        self.store_standard(std, &result, repeat);
                     }
                 },
                 Event::Screenshot(shot) => {
@@ -920,22 +932,7 @@ impl App {
         while self.avg_buf.len() > self.sweep_avg.max(1) {
             self.avg_buf.pop_front();
         }
-        let newest = self.avg_buf.back().unwrap();
-        if self.avg_buf.len() == 1 {
-            return newest.clone();
-        }
-        let n = self.avg_buf.len() as f64;
-        let mut out = newest.clone();
-        for (i, (a, b)) in out.s11.iter_mut().zip(out.s21.iter_mut()).enumerate() {
-            let (mut s1, mut s2) = (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0));
-            for sw in &self.avg_buf {
-                s1 += sw.s11[i];
-                s2 += sw.s21[i];
-            }
-            *a = s1 / n;
-            *b = s2 / n;
-        }
-        out
+        SweepResult::average(self.avg_buf.iter()).expect("buffer holds one grid")
     }
 
     fn corrected(&mut self, raw: &SweepResult) -> SweepResult {
@@ -985,7 +982,7 @@ impl App {
         SweepResult::concat(&parts)
     }
 
-    fn store_standard(&mut self, std: Standard, sweep: &SweepResult) {
+    fn store_standard(&mut self, std: Standard, sweep: &SweepResult, repeat: usize) {
         self.cal.warning = plausibility_warning(std, sweep);
         self.cal.fit = None;
         let needs_new = match &self.cal.set {
@@ -1001,7 +998,13 @@ impl App {
         }
         if let Some(set) = &mut self.cal.set {
             match set.set(std, sweep) {
-                Ok(()) => self.cal.message = Some(format!("measured {}", std.name())),
+                Ok(()) => {
+                    self.cal.message = Some(if repeat > 1 {
+                        format!("measured {} (mean of {repeat} sweeps)", std.name())
+                    } else {
+                        format!("measured {}", std.name())
+                    })
+                }
                 Err(e) => self.cal.message = Some(e.to_string()),
             }
         }
@@ -1715,7 +1718,12 @@ impl App {
             "ref {n}: {}–{}{}",
             format_hz(sweep.freqs_hz[0]).replace(' ', ""),
             format_hz(*sweep.freqs_hz.last().unwrap()).replace(' ', ""),
-            if self.is_calibrated() { "" } else { " raw" }
+            // A file trace is what it is; the calibration flags describe the last device sweep.
+            if self.file_trace.is_some() || self.is_calibrated() {
+                ""
+            } else {
+                " raw"
+            }
         );
         self.references.push(Reference {
             name,
@@ -1788,10 +1796,13 @@ impl App {
                             self.start_sweep(self.running);
                         }
                         self.cal.pending = Some(std);
+                        // The same averaging as the display, so a standard is
+                        // not one noisy sweep under an averaged trace.
                         self.send(Cmd::Sweep {
                             cfgs: vec![cfg],
                             purpose: Purpose::Standard(std),
                             continuous: false,
+                            repeat: self.sweep_avg.max(1),
                         });
                     }
                 }
@@ -2034,12 +2045,11 @@ impl App {
         let comment = format!(
             "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),
-            if self.is_calibrated() {
-                "host calibrated"
-            } else if self.is_partially_calibrated() {
-                "partly host calibrated (see segments)"
-            } else {
-                "uncalibrated raw"
+            match &self.file_trace {
+                Some(name) => format!("from file {name}"),
+                None if self.is_calibrated() => "host calibrated".to_string(),
+                None if self.is_partially_calibrated() => "partly host calibrated (see segments)".to_string(),
+                None => "uncalibrated raw".to_string(),
             },
             gated
         );
