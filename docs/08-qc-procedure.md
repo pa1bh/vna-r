@@ -1,6 +1,6 @@
 # QC-procedure werklijst november 2026
 
-Stand: 10 november 2026, 45 commits na v0.2.5 op `main`, waarvan 43 niet gepusht, versienummer nog
+Stand: 10 november 2026: ruim veertig commits op `main` die niet gepusht zijn (`git log --oneline origin/main..HEAD`), versienummer nog
 0.2.5. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
@@ -36,7 +36,7 @@ vna-gui
 ```
 
 Verwacht: de GUI start met je oude instellingen, de titelbalk toont de versie, Help ▸
-About toont versie en git-revisie (`v0.2.5-45-g…`).
+About toont versie en git-revisie (`v0.2.5-` gevolgd door het aantal commits sinds de tag en de hash).
 
 ## Volgorde: vier rondes
 
@@ -831,7 +831,7 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
    (instellingenformaat, CLI weigert meer, nieuwe functies), dus 0.3.0 ligt meer voor de
    hand dan 0.2.6. Pas na jouw QC: versie in `Cargo.toml`, de kop in `CHANGELOG.md`,
    commit, tag, push.
-3. **Pushen.** 43 commits staan alleen lokaal. Pas na een push draait de CI, die de
+3. **Pushen.** Al het werk van deze sessie staat alleen lokaal. Pas na een push draait de CI, die de
    Nix-build zonder GTK (punt 16) en de nieuwe stappen (punt 29) moet bevestigen.
 4. **Punt 42, kit-bestanden.** Welk formaat wil je kunnen lezen (NanoVNA-Saver, een
    Keysight-achtige tabel, iets anders)? Zonder voorbeeldbestand bouw ik dat niet.
