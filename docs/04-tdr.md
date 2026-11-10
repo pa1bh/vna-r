@@ -15,10 +15,12 @@ Twee getallen uit de sweep bepalen alles:
 | sweep-parameter | bepaalt | voorbeeld 50 kHz – 6,3 GHz, 1001 pt |
 |---|---|---|
 | **span** | resolutie ≈ 1/span | 159 ps ≈ 1,7 cm bij VF 0,70 |
-| **stap Δf** | eenduidig bereik ≈ 1/Δf | 159 ns ≈ 17 m |
+| **stap Δf** | eenduidig bereik = 1/(2·Δf) | 79 ns ≈ 8,3 m |
 
-Wil je verder kijken: meer punten (kleinere stap). Wil je fijner kijken: bredere span. Een reflectie
-voorbij het bereik "vouwt terug" op een verkeerde afstand (aliasing).
+Wil je verder kijken: meer punten (kleinere stap). Wil je fijner kijken: bredere span. De IFFT
+herhaalt zich elke 1/Δf in looptijd; de tweede helft van die periode is negatieve tijd, dus het
+bruikbare bereik is de helft. Een reflectie voorbij het bereik "vouwt terug" op een verkeerde
+afstand (aliasing). Tot 0.2.5 meldden GUI en CLI 1/Δf, het dubbele van wat de grafiek toont.
 
 ## 2. Twee weergaven
 

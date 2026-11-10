@@ -1,0 +1,72 @@
+# QC-procedure werklijst november 2026
+
+Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+[docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
+is, hoe je het controleert en wat je moet zien. **Apparaat** zegt of er hardware voor
+nodig is. Voer eerst de algemene controle uit, dan de punten.
+
+## Algemeen (zonder apparaat)
+
+```bash
+cargo fmt --all --check && cargo clippy --workspace --all-targets && cargo test --workspace
+```
+
+Verwacht: geen fmt-afwijking, alleen de bekende clippy-stijlmeldingen, alle tests groen.
+
+```bash
+cargo run --release -p vna-gui
+```
+
+Verwacht: GUI start, titelbalk toont de versie, Help ▸ About toont versie en git-revisie.
+
+---
+
+## Punt 1 — Polaire calibratie-interpolatie (B1)
+
+**Veranderd.** `calibration::interpolate_complex` interpoleert grootte en fase apart;
+fasegrens 135° op open, short, through (S21), line open, line short. GUI-resampler voor
+referenties gebruikt dezelfde functie.
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna interpolation
+```
+Verwacht: 3 tests groen, waaronder `interpolation_keeps_magnitude_on_a_coarse_grid`.
+
+**Met apparaat (LiteVNA, N-kit).**
+1. Calibreer 50 kHz – 6,3 GHz met **101** punten (open, short, load), sla op als `qc-grof.cal.json`.
+2. Sweep 50 kHz – 6,3 GHz met **1001** punten met deze calibratie en de **short** nog aangesloten.
+3. Lees |S11| af op de 1001-puntenweergave (logmag).
+
+Verwacht: |S11| ligt overal binnen ±0,2 dB van 0 dB. Vóór 0.2.6 lag de curve tussen de
+calibratiepunten tot +0,3 dB te hoog (bij 101 punten draait de open zo'n 20° per stap;
+bij een kabel tussen VNA en kit meer en dus erger).
+4. Herhaal met `cal/n-6g3.cal.json` (1001 punten) op een sweep van 1001 punten: moet
+   onveranderd zijn ten opzichte van 0.2.5 (eigen raster, geen interpolatie).
+5. Zet een through-meting van een 1 m kabel in een calibratie met 51 punten over
+   6,3 GHz en probeer te interpoleren: verwacht foutmelding "too coarse … through phase
+   jumps …°" (de fase draait daar meer dan 135° per stap).
+
+**Referenties.** Houd een trace vast (Hold) op 201 punten, sweep daarna op 401 punten,
+zet Δ aan: de Δ-trace mag geen periodieke bult vertonen op de posities tussen de oude
+rasterpunten.
+
+## Punt 2 — TDR-bereik (B2)
+
+**Veranderd.** `TdrResult::max_time_s` is 1/(2·Δf) in plaats van 1/Δf; GUI-label, as-limiet
+en CLI-regel volgen; de gate-foutmelding noemt het bereik direct.
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna timedomain
+cargo run --release -p vna-cli -- tdr --from cal/sweep.s2p --vf 0.70
+```
+Verwacht: tests groen; de regel "TDR: resolution … alias-free range X m (Y ns)" geeft voor
+`cal/sweep.s2p` (bekijk de stap Δf in het bestand) Y = 1/(2·Δf). Voor 50 kHz – 6,3 GHz in
+1001 punten (Δf = 6,3 MHz): 79 ns, 8,3 m bij VF 0,70.
+
+**GUI.** Open `cal/sweep.s2p` als trace, kies TDR, zet Max distance op 1000 m: de x-as
+eindigt waar de laatste gegevens staan (geen lege rechterhelft), en het label
+"alias-free range" onder de TDR-instellingen noemt dezelfde afstand als het einde van de as.
+Vóór 0.2.6 stond de as tot het dubbele en was de rechterhelft leeg.
+

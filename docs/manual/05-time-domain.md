@@ -41,9 +41,9 @@ Two numbers below the settings determine what you can see:
   1.7 cm. If you want detail, sweep wide. An HF sweep from 1 to 30 MHz has a resolution
   of 3.6 m and is useless for cables of a few metres; the panel warns and sets a suitable
   sweep with one button.
-- **alias-free range** = 1 / step. Reflections from further away fold back and appear
-  closer. A step of 1 MHz gives 1 µs, or 105 m at VF 0.70; if you want to measure a long
-  cable, take more points.
+- **alias-free range** = 1 / (2 · step). Reflections from further away fold back and
+  appear closer. A step of 1 MHz gives 0.5 µs, or 52 m at VF 0.70; if you want to measure
+  a long cable, take more points.
 
 The rule: sweep wide for detail, fine (many points) for range. 50 kHz to 6.3 GHz in
 1001 points does both reasonably: 1.7 cm resolution and 17 m range.

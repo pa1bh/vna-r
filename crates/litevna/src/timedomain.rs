@@ -105,7 +105,9 @@ pub struct TdrResult {
     pub impedance_ohm: Vec<f64>,
     /// ≈ 1/span: two reflections closer than this merge.
     pub resolution_s: f64,
-    /// 1/Δf: reflections beyond this round-trip time alias back.
+    /// 1/(2·Δf), the last bin of `time_s`: the IFFT repeats every 1/Δf, and
+    /// the second half of that period is negative time, so a reflection with
+    /// a longer round trip than this folds back to a wrong, shorter time.
     pub max_time_s: f64,
     pub velocity_factor: f64,
 }
@@ -253,7 +255,7 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
         step,
         impedance_ohm,
         resolution_s: 1.0 / span,
-        max_time_s: 1.0 / df,
+        max_time_s: 0.5 / df,
         velocity_factor: cfg.velocity_factor,
     })
 }
@@ -374,11 +376,11 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
     if !(g.stop_s > g.start_s) || !g.start_s.is_finite() || !g.stop_s.is_finite() {
         return Err(Error::InvalidArgument("gate stop must lie after gate start".into()));
     }
-    let max_t = 1.0 / df;
-    if g.stop_s > max_t / 2.0 || g.start_s < -max_t / 2.0 {
+    let max_t = 0.5 / df;
+    if g.stop_s > max_t || g.start_s < -max_t {
         return Err(Error::InvalidArgument(format!(
-            "gate must lie within ±{:.1} ns (half the alias-free range)",
-            max_t / 2.0 * 1e9
+            "gate must lie within ±{:.1} ns (the alias-free range)",
+            max_t * 1e9
         )));
     }
     let mut planner = FftPlanner::<f64>::new();
@@ -594,7 +596,9 @@ mod tests {
         assert!(r.step[before].abs() < 0.05, "step before {}", r.step[before]);
         assert!((r.impedance_ohm[before] - 50.0).abs() < 5.0);
         assert!((r.resolution_m() - 0.0167).abs() < 0.002);
-        assert!((r.max_distance_m() - 16.66).abs() < 0.1);
+        // 1/(2·Δf) = 83 ns round trip; the arrays end there.
+        assert!((r.max_distance_m() - 8.33).abs() < 0.05);
+        assert!((r.distance_m.last().unwrap() - r.max_distance_m()).abs() < 2.0 * (r.distance_m[1] - r.distance_m[0]));
     }
 
     #[test]

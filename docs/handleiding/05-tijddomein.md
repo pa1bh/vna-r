@@ -41,8 +41,8 @@ Twee getallen onder de instellingen bepalen wat je kunt zien:
   6,3 GHz geeft 0,16 ns, 1,7 cm. Wil je detail, sweep dan breed. Een HF-sweep van 1 tot
   30 MHz heeft een resolutie van 3,6 m en is voor kabels van een paar meter onbruikbaar;
   het paneel waarschuwt en zet met één knop een geschikte sweep.
-- **alias-free range** = 1 / stap. Reflecties van verder weg vouwen terug en lijken
-  dichterbij. Een stap van 1 MHz geeft 1 µs, ofwel 105 m bij VF 0,70; wil je een lange
+- **alias-free range** = 1 / (2 · stap). Reflecties van verder weg vouwen terug en lijken
+  dichterbij. Een stap van 1 MHz geeft 0,5 µs, ofwel 52 m bij VF 0,70; wil je een lange
   kabel meten, neem dan meer punten.
 
 De regel: breed sweepen voor detail, fijn (veel punten) voor bereik. 50 kHz tot 6,3 GHz in

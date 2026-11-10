@@ -22,6 +22,9 @@ calibratiebestanden.
   nu ook voor short, through, line open en line short, niet alleen voor de open.
 - De Δ-trace tegen een referentie op een ander raster gebruikt dezelfde polaire
   interpolatie.
+- TDR: het gemelde eenduidige bereik ("alias-free range") was 1/Δf, het dubbele van wat de
+  grafiek toont; de arrays en de gate liepen al tot 1/(2·Δf). GUI-label, CLI-regel en de
+  as-limiet gebruiken nu de juiste waarde, en de gate-foutmelding noemt die direct.
 
 ### Documentatie
 - De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
