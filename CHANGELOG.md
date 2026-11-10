@@ -14,6 +14,11 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: de knoppen open/short/load maten op het raster dat in Start/Stop/Points getypt
+  stond, ook als dat nog niet met **Apply sweep** was toegepast; de weergave liep dan op
+  het oude raster en de calibratie werd stil geïnterpoleerd. Een standaard meten past nu
+  eerst de getypte sweep toe, en het paneel waarschuwt zolang de velden afwijken van de
+  lopende sweep.
 - GUI: de statusregel van het calibratiepaneel ("measured open", "loaded", "kit updated …
   save to keep it") werd direct na elke actie overschreven door het opnieuw oplossen van
   de calibratie en was daardoor met **apply** aan nooit te zien. De reden waarom een

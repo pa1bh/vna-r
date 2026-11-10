@@ -253,6 +253,9 @@ pub struct App {
     last_plan: Vec<SweepConfig>,
     last_plan_cals: Vec<Option<PathBuf>>,
     sent_plan_cals: Vec<Option<PathBuf>>,
+    /// Primary segment of the last applied sweep: the grid the display runs
+    /// on and the grid calibration standards are measured on.
+    applied_primary: Option<SweepConfig>,
     extra_segments: Vec<SegmentSettings>,
     /// Per-segment calibration files, loaded on first use.
     seg_cals: HashMap<PathBuf, SegCal>,
@@ -344,6 +347,7 @@ impl App {
             last_plan: Vec::new(),
             last_plan_cals: Vec::new(),
             sent_plan_cals: Vec::new(),
+            applied_primary: None,
             extra_segments: Vec::new(),
             seg_cals: HashMap::new(),
             seg_calibrated: Vec::new(),
@@ -644,6 +648,9 @@ impl App {
     fn start_sweep(&mut self, continuous: bool) {
         if let Some(plan) = self.segment_plan() {
             self.running = continuous;
+            // The primary segment is the one without its own calibration file
+            // that came from the Sweep panel; `segment_plan` sorts, so find it.
+            self.applied_primary = self.current_config();
             self.sent_plan_cals = plan.iter().map(|(_, c)| c.clone()).collect();
             let cfgs = plan.into_iter().map(|(c, _)| c).collect();
             self.send(Cmd::Sweep {
@@ -1744,6 +1751,15 @@ impl App {
                     .clicked()
                 {
                     if let Some(cfg) = self.current_config() {
+                        // Display and calibration must share one grid. When
+                        // Start/Stop/Points were edited but not applied, apply
+                        // them first (as Apply sweep would), then measure.
+                        if self.applied_primary.is_some_and(|p| p != cfg) {
+                            if self.segment_plan().is_none() {
+                                return;
+                            }
+                            self.start_sweep(self.running);
+                        }
                         self.cal.pending = Some(std);
                         self.send(Cmd::Sweep {
                             cfgs: vec![cfg],
@@ -1754,6 +1770,21 @@ impl App {
                 }
             }
         });
+        if connected && self.grid_edited() {
+            ui.small(
+                RichText::new("Start/Stop/Points differ from the running sweep; measuring a standard applies them first.")
+                    .color(Color32::from_rgb(230, 150, 80)),
+            );
+        }
+    }
+
+    /// The typed Start/Stop/Points differ from the sweep that was last applied.
+    fn grid_edited(&self) -> bool {
+        let typed = parse_hz(&self.start)
+            .and_then(|s| parse_hz(&self.stop).map(|e| (s, e)))
+            .and_then(|(s, e)| SweepConfig::linear(s, e, self.points))
+            .ok();
+        matches!((typed, self.applied_primary), (Some(t), Some(a)) if t != a)
     }
 
     /// Kit fit from line-open / line-short measurements (see docs/03-calibratie.md §8).

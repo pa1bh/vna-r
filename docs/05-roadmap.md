@@ -247,7 +247,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 2 | `max_time_s = 1/(2·df)`, test en GUI-label "alias-free range" mee | B2 | S | gedaan 2026-11-10 |
 | 3 | `NanoVnaShell::open`: `restore_on_drop` pas na geslaagde `sync` | B3 | S | gedaan 2026-11-10 |
 | 4 | Statusmelding ("measured …", "loaded", "save to keep it") scheiden van de solve-fout | B4, U2 | S | gedaan 2026-11-10 |
-| 5 | Standaarden meten op het toegepaste raster, of waarschuwen bij afwijking van het getypte | U1 | S | |
+| 5 | Standaarden meten op het toegepaste raster, of waarschuwen bij afwijking van het getypte | U1 | S | gedaan 2026-11-10 (past getypte sweep eerst toe) |
 | 6 | `fail()` stopt de lus alleen bij sweep- en connect-fouten; screenshot en set average niet | B5 | S | |
 | 7 | Markers op frequentie: per sweep `nearest_index`, buiten bereik weg | B6, N1 | S | |
 | 8 | Pijltjestoetsen alleen zonder tekstfocus (`wants_keyboard_input`) | B7 | S | |

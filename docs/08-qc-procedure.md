@@ -101,3 +101,19 @@ calibration met `cal/n-6g3.cal.json` (50 kHz – 6,3 GHz, dat kan) en daarna een
 target grid … lies outside the calibrated span …". Vóór 0.2.6 verdrong de tweede melding
 de eerste.
 
+## Punt 5 — Standaarden en weergave op één raster (U1)
+
+**Veranderd.** Een standaardknop past eerst de getypte Start/Stop/Points toe als die
+afwijken van de lopende sweep; het paneel toont een oranje regel zolang dat zo is.
+
+**Met apparaat.**
+1. Verbind, zet 1 M – 30 M, 201 punten, **Apply sweep**, Run.
+2. Typ Stop = `50M` zonder Apply: onder de standaardknoppen verschijnt "Start/Stop/Points
+   differ from the running sweep; measuring a standard applies them first."
+3. Klik **open**: de weergave springt naar 1 – 50 MHz, de regel verdwijnt, daarna
+   "measured open" en de paneelregel "201 pts, 1.000 MHz → 50.000 MHz".
+4. Meet short en load: het label wordt CAL en de weergave blijft op 1 – 50 MHz.
+
+Vóór 0.2.6 bleef de weergave op 1 – 30 MHz en werd de 50 MHz-calibratie stil
+geïnterpoleerd.
+
