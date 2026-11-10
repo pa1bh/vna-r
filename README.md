@@ -6,8 +6,9 @@ Sweeps, SOLT calibration with kit fit, Smith chart and seven trace views, marker
 difference trace, segments, time-domain reflectometry (TDR) with gating, and Touchstone import and
 export. Hobby project by Bas Hendriks, PA1BH.
 
-Status: version 0.2.0, verified on a LiteVNA 64, a LiteVNA 67 and a NanoVNA-F 4.3, on macOS and on
-Linux (NixOS). Changes per version are in [CHANGELOG.md](CHANGELOG.md).
+Status: verified on a LiteVNA 64, a LiteVNA 67 and a NanoVNA-F 4.3, on macOS and on Linux (NixOS,
+Fedora); the Windows build has not been tried with a device yet. The current version is in
+`Cargo.toml`; changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ![vna-r measuring an off-centre-fed HF dipole with a LiteVNA 67](docs/images/gui-ocf-antenne.webp)
 
@@ -20,7 +21,7 @@ an archive per platform with `vna-cli`, `vna-gui`, the manual (English and Dutch
 |---|---|
 | `…-aarch64-macos.tar.gz` | Mac with Apple Silicon (M1 and later) |
 | `…-x86_64-macos.tar.gz` | Mac with an Intel processor |
-| `…-x86_64-linux.tar.gz` | Linux on x86_64; needs `libudev` and GTK 3 from your distribution (not NixOS, see below) |
+| `…-x86_64-linux.tar.gz` | Linux on x86_64; needs `libudev` and, for the file dialogs, an `xdg-desktop-portal` (every desktop environment ships one; not NixOS, see below) |
 | `…-x86_64-windows.zip` | Windows 10 or 11 on x86_64 |
 
 Nothing is code-signed yet. **macOS** therefore refuses to start a binary that was downloaded with a
@@ -28,13 +29,13 @@ browser and unpacked with the Finder ("cannot be opened because the developer ca
 Either unpack in the Terminal, which does not mark the files:
 
 ```bash
-tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+tar xzf vna-r-v*-aarch64-macos.tar.gz
 ```
 
 or remove the mark after unpacking:
 
 ```bash
-xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+xattr -dr com.apple.quarantine vna-r-v*-aarch64-macos
 ```
 
 **Windows** shows a SmartScreen warning for the same reason; *More info ▸ Run anyway* starts it. The
@@ -51,10 +52,10 @@ nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 The package also ships the udev rule (`services.udev.packages = [ vna-r ];`). The release tarballs
 do not run on NixOS; use the flake there.
 
-**Build from source.** You need a Rust toolchain (stable). On Debian/Ubuntu also:
+**Build from source.** You need a Rust toolchain (stable, 1.82 or later). On Debian/Ubuntu also:
 
 ```bash
-sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+sudo apt-get install -y pkg-config libudev-dev
 ```
 
 Then:
@@ -69,6 +70,11 @@ The binaries land in `target/release/`. `cargo run --release -p vna-gui` starts 
 stutter (NVK on older NVIDIA cards under nouveau) or software rasterisers, where it picks OpenGL. If
 menus feel sluggish, check the renderer line under **Help ▸ About** and try `WGPU_BACKEND=gl`; the
 manual's troubleshooting chapter has more.
+
+**File dialogs on Linux.** Open and Save go through the desktop portal (`xdg-desktop-portal`
+with the backend of your desktop: GTK, KDE, GNOME, wlr). Without a running portal, as on a bare
+window manager, the dialogs do not appear and nothing is opened or saved; install and start a
+portal backend in that case.
 
 **Serial port access on Linux.** Copy [linux/70-litevna.rules](linux/70-litevna.rules) to
 `/etc/udev/rules.d/` and reload udev (instructions in the file), or add yourself to the `dialout`

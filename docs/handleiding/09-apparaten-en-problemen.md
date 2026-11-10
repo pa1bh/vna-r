@@ -34,7 +34,8 @@ herhaalbaarheid na los- en vastdraaien ±0,01 dB en ±0,1°.
 
 - **macOS**: geen stuurprogramma, poort `/dev/cu.usbmodem…`.
 - **Linux**: poort `/dev/ttyACM*`, udev-regel of groep `dialout` voor de rechten,
-  bouwpakketten `pkg-config libudev-dev libgtk-3-dev`, op NixOS de flake (hoofdstuk 2).
+  bouwpakketten `pkg-config libudev-dev`, een desktop-portal voor de bestandsdialogen, op
+  NixOS de flake (hoofdstuk 2).
   CLI en GUI zijn op een NixOS-laptop geverifieerd met de LiteVNA 67 op `/dev/ttyACM0`:
   zelfde registers, 329 punten/s, geen verloren punten, calibratie en markers als op de
   Mac.

@@ -31,12 +31,16 @@ appear as `/dev/cu.usbmodem…`.
 
 ### Linux
 
-Building needs three system packages: `pkg-config`, `libudev-dev` (for the
-serial port) and `libgtk-3-dev` (for the file dialogs). On Debian and Ubuntu:
+Building needs two system packages: `pkg-config` and `libudev-dev` (for the serial
+port). On Debian and Ubuntu:
 
 ```bash
-sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+sudo apt-get install -y pkg-config libudev-dev
 ```
+
+The file dialogs of the GUI use the desktop portal (`xdg-desktop-portal` with the
+backend of your desktop environment). On a bare window manager without a portal they
+do not appear; install a backend such as `xdg-desktop-portal-gtk` then.
 
 The port is called `/dev/ttyACM0` or higher. To be allowed to open it without root, install
 the udev rule from the repository:
@@ -59,7 +63,7 @@ nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
 (Append `#vna-cli` for the command line.) To build and develop yourself,
-`nix develop` gives a shell with Rust, pkg-config, udev, GTK and the graphics libraries that
+`nix develop` gives a shell with Rust, pkg-config, udev and the graphics libraries that
 the GUI loads at run time; in it `cargo run --release -p vna-gui` simply works.
 The package includes the udev rule, so in the system configuration
 
@@ -76,7 +80,7 @@ On every tag `v*`, GitHub Actions builds one archive per platform and attaches t
 release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, the manual (English and
 Dutch) and on Linux the udev rule: `aarch64-macos` (Apple Silicon), `x86_64-macos` (Intel
 Mac), `x86_64-linux` and `x86_64-windows` (zip). They are ordinary dynamically linked
-binaries: on Linux the distribution's `libudev` and GTK 3 must be present, and on NixOS
+binaries: on Linux the distribution's `libudev` and a desktop portal must be present, and on NixOS
 they do not work (use the flake there). Between tags there is only the CI build, which
 publishes nothing; build from source yourself in that case.
 
@@ -85,13 +89,13 @@ browser and unpacked with the Finder ("cannot be opened because the developer ca
 verified"). Unpack in the Terminal, which does not mark the files:
 
 ```bash
-tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+tar xzf vna-r-v*-aarch64-macos.tar.gz
 ```
 
 or remove the mark afterwards:
 
 ```bash
-xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+xattr -dr com.apple.quarantine vna-r-v*-aarch64-macos
 ```
 
 **Windows** shows a SmartScreen warning for the same reason; *More info ▸ Run anyway*

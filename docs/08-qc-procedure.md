@@ -239,3 +239,24 @@ Verwacht: `crw-rw----+ 1 root dialout` (een `+` voor de ACL) met een regel
 `user:<jouw naam>:rw-` uit getfacl, en `vna-cli info` werkt zonder sudo. Op NixOS via de
 flake: `nix build .#vna-r && ls result/lib/udev/rules.d/` toont `70-litevna.rules`.
 
+## Punt 16 — Documentatie en flake zonder GTK (L2, L3)
+
+**Zonder apparaat.**
+```bash
+grep -rn -i 'gtk\|v0\.2\.3\|version 0\.2\.0' README.md docs/manual docs/handleiding .github flake.nix
+```
+Verwacht: alleen treffers waarin "gtk" als portal-backend genoemd wordt
+(`xdg-desktop-portal-gtk`), geen `libgtk-3-dev`, geen oude versienummers.
+
+**Na push (CI).** De job "nix build (flake)" moet groen zijn: de flake bouwt nu zonder
+`gtk3` en `wrapGAppsHook3`, met `makeWrapper` voor het `LD_LIBRARY_PATH` van de GUI. Op de
+NixOS-laptop daarna:
+```bash
+nix run github:pa1bh/vna-r
+```
+Verwacht: GUI start en File ▸ Open as trace… toont een dialoog (de portal van de desktop).
+
+**Op Fedora/Debian met een release-tarball.** `vna-gui` start zonder GTK-ontwikkelpakketten;
+File ▸ Open… toont de dialoog van de desktop. Op een kale X11-windowmanager zonder
+`xdg-desktop-portal` verschijnt geen dialoog; dat staat nu in README en handleiding.
+

@@ -21,10 +21,10 @@ jobs:
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
-        # serialport needs libudev; rfd (file dialogs) needs GTK 3.
+        # serialport needs libudev. The file dialogs (rfd) use the xdg portal at run time, no GTK.
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+          sudo apt-get install -y pkg-config libudev-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:

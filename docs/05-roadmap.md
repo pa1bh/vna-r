@@ -1,7 +1,11 @@
 # Roadmap
 
-Stand: 2026-11-04. Wat er al is: binair LiteVNA-protocol, sweeps, SOLT-calibratie met
-interpolatie en kit-fit (CLI), TDR, een egui-GUI met markers en bewaarde instellingen.
+Stand: 2026-11-10. De twaalf stappen hieronder zijn gedaan (stap 4 onderzocht, stap 10 op
+een NanoVNA-F in plaats van de H1); het vervolg staat onderaan in "Werklijst november
+2026". De oorspronkelijke tekst van 4 november:
+
+Wat er al is: binair LiteVNA-protocol, sweeps, SOLT-calibratie met interpolatie en
+kit-fit (CLI en GUI), TDR, een egui-GUI met markers en bewaarde instellingen.
 Alles hieronder bouwt daarop voort. De volgorde is bewust: eerst het instrument
 afmaken, dan het gebruik verrijken, dan de breedte in. Elke stap sluit af met een
 meting op echte hardware en een commit; de onderzoeksnotities in `docs/0x-*.md`
@@ -224,8 +228,8 @@ handleiding een antenne kan meten, calibreren en een kabelfout kan lokaliseren.
 
 Kleine dingen die tussendoor kunnen zonder een stap te zijn: apparaat-bandbreedte
 (register 0x40 kan niet teruggelezen worden, dus alleen schrijven met een eigen
-administratie), batterijindicator in de GUI, een `--json` export in de CLI, en een
-icoon voor de app-bundel.
+administratie), een `--json` export in de CLI (werklijst 34) en een icoon voor de
+app-bundel. De batterijindicator zit sinds 0.2.0 in de topbalk.
 
 Gedaan voor de eerste testronde met anderen (0.2.0): één versienummer in de workspace
 met git-revisie, menubalk met About, Developer tools (log en diagnostiek) standaard uit,
@@ -258,7 +262,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 13 | Export-commentaar en referentienaam bij bestandstrace; standaard-sweeps door de middeling; floats uit instellingen clampen | B12, B13, B14 | S | gedaan 2026-11-10 (`SweepResult::average` in de library) |
 | 14 | `points == 0` en u64-aftrekking afvangen; `check_lines` band ≤ 0 weigeren | B15, B16 | S | gedaan 2026-11-10 |
 | 15 | udev-regel: `70-litevna.rules` met uaccess, zonder 0666 | V1 | S | gedaan 2026-11-10 |
-| 16 | README/handleidingen: versie, archiefnamen, GTK-verwijzingen weg, xdg-portal noemen; docs/04 DC-term; roadmap-intro | L2, L3 | S | |
+| 16 | README/handleidingen: versie, archiefnamen, GTK-verwijzingen weg, xdg-portal noemen; docs/04 DC-term; roadmap-intro | L2, L3 | S | gedaan 2026-11-10 (flake zonder gtk3: CI moet dit bevestigen) |
 | 17 | CHANGELOG naar het Engels (besluit 2); `[0.1.0]`-link herstellen | L3 | S | |
 | 18 | `num-complex` uit vna-cli; verouderde UI-teksten (Hold, step 8, bestandsnamen) | L5, U10 | S | |
 | 19 | Firmware en PDF's uit git, links in docs/02 (besluit 1) | L1 | S | |

@@ -79,6 +79,10 @@ calibratiebestanden.
   nog een `resume` sturen en weer wachten); nu één keer.
 
 ### Documentatie
+- GTK was geen afhankelijkheid: de bestandsdialogen lopen via de xdg-desktop-portal.
+  README, handleidingen, CI en flake noemden `libgtk-3-dev`/`gtk3` toch; die zijn weg en
+  de echte eis (een draaiende portal) staat er nu. README noemde nog versie 0.2.0 en
+  archiefnamen van 0.2.3; docs/04 beschreef de DC-term van vóór 0.2.5.
 - De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
   duik naar 0 Ω blijft de 50 Ω-lijn leesbaar, bij de open zat die onderin een as tot
   500 Ω.

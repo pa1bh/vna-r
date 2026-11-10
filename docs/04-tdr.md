@@ -29,7 +29,11 @@ heeft geen DC nodig en laat zien *waar* reflecties zitten en hoe sterk (|Γ| in 
 NanoVNA-firmware en -software standaard tonen.
 
 **Lowpass-stapresponse.** Hiervoor wordt het spectrum eerst herbemonsterd op een harmonisch raster
-(k·Δf), naar DC geëxtrapoleerd en conjugeerd-symmetrisch gespiegeld, zodat de IFFT reëel is. De
+(k·Δf), polair geïnterpoleerd (grootte en fase apart, anders valt de eindpiek van een lange kabel te
+laag uit) en conjugeerd-symmetrisch gespiegeld, zodat de IFFT reëel is. Het DC-punt wordt niet
+geëxtrapoleerd uit de laagste meetpunten (dat faalt zodra S11 daarbinnen een volle cirkel draait,
+zoals bij kabels van meer dan een paar meter) maar volgt uit causaliteit: vóór het referentievlak
+reflecteert niets, dus de DC-term is de waarde waarbij de stapresponsie voor t < 0 nul is. De
 lopende som van die impuls is Γ(t) **met teken**, en daaruit volgt de impedantie langs de kabel:
 `Z(t) = Z0 · (1 + Γ) / (1 − Γ)`. Zo zie je 50 Ω kabel, een 75 Ω stuk, een open (Z → ∞) of een
 short (Z → 0) als niveaus.

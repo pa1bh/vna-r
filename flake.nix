@@ -12,8 +12,9 @@
       packages = forAll (pkgs:
         let
           inherit (pkgs) lib stdenv;
-          # What the GUI dlopens at run time on Linux: winit (X11 / Wayland),
-          # wgpu (Vulkan, with GL as fallback) and the file dialogs (GTK 3).
+          # What the GUI dlopens at run time on Linux: winit (X11 / Wayland) and
+          # wgpu (Vulkan, with GL as fallback). The file dialogs talk to the
+          # xdg desktop portal over D-Bus and need no library.
           runtimeLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
             libxkbcommon
             wayland
@@ -36,19 +37,17 @@
             cargoLock.lockFile = ./Cargo.lock;
 
             nativeBuildInputs = [ pkgs.pkg-config ]
-              ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.wrapGAppsHook3 ];
-            buildInputs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [ udev gtk3 ]);
+              ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.makeWrapper ];
+            buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ pkgs.udev ];
 
             # The tests need no hardware.
             doCheck = true;
 
-            # Ship the udev rule so `services.udev.packages = [ vna-r ]` works on NixOS.
+            # Ship the udev rule so `services.udev.packages = [ vna-r ]` works on NixOS,
+            # and give the GUI the graphics libraries on its search path.
             postInstall = lib.optionalString stdenv.hostPlatform.isLinux ''
               install -Dm644 linux/70-litevna.rules $out/lib/udev/rules.d/70-litevna.rules
-            '';
-            # Let the GTK wrapper also add the graphics libraries to the GUI's search path.
-            preFixup = lib.optionalString stdenv.hostPlatform.isLinux ''
-              gappsWrapperArgs+=(--prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibs})
+              wrapProgram $out/bin/vna-gui --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibs}
             '';
 
             meta = with lib; {
@@ -84,7 +83,7 @@
         {
           default = pkgs.mkShell {
             packages = with pkgs; [ rustc cargo rustfmt clippy rust-analyzer pkg-config ]
-              ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.udev pkgs.gtk3 ];
+              ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.udev ];
             # `cargo run -p vna-gui` finds the graphics libraries through this.
             LD_LIBRARY_PATH = lib.optionalString stdenv.hostPlatform.isLinux (lib.makeLibraryPath runtimeLibs);
           };

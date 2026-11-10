@@ -31,12 +31,16 @@ verschijnen als `/dev/cu.usbmodem…`.
 
 ### Linux
 
-Voor het bouwen zijn drie systeempakketten nodig: `pkg-config`, `libudev-dev` (voor de
-seriële poort) en `libgtk-3-dev` (voor de bestandsdialogen). Op Debian en Ubuntu:
+Voor het bouwen zijn twee systeempakketten nodig: `pkg-config` en `libudev-dev` (voor de
+seriële poort). Op Debian en Ubuntu:
 
 ```bash
-sudo apt-get install -y pkg-config libudev-dev libgtk-3-dev
+sudo apt-get install -y pkg-config libudev-dev
 ```
+
+De bestandsdialogen van de GUI lopen via de desktop-portal (`xdg-desktop-portal` met de
+backend van je bureaubladomgeving). Op een kale windowmanager zonder portal verschijnen
+ze niet; installeer dan een backend zoals `xdg-desktop-portal-gtk`.
 
 De poort heet `/dev/ttyACM0` of hoger. Om hem zonder root te mogen openen, installeer je
 de udev-regel uit de repository:
@@ -59,7 +63,7 @@ nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
 (`#vna-cli` erachter voor de commandoregel.) Om zelf te bouwen en te ontwikkelen geeft
-`nix develop` een shell met Rust, pkg-config, udev, GTK en de grafische bibliotheken die
+`nix develop` een shell met Rust, pkg-config, udev en de grafische bibliotheken die
 de GUI tijdens het draaien laadt; daarin werkt `cargo run --release -p vna-gui` gewoon.
 Het pakket bevat de udev-regel, dus in de systeemconfiguratie volstaat
 
@@ -76,7 +80,7 @@ Bij elke tag `v*` bouwt GitHub Actions een archief per platform en hangt die aan
 release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, de handleiding (Engels en
 Nederlands) en op Linux de udev-regel: `aarch64-macos` (Apple Silicon), `x86_64-macos`
 (Intel-Mac), `x86_64-linux` en `x86_64-windows` (zip). Het zijn gewone dynamisch gelinkte
-binaries: op Linux moeten `libudev` en GTK 3 van de distributie aanwezig zijn, en op NixOS
+binaries: op Linux moeten `libudev` en een desktop-portal aanwezig zijn, en op NixOS
 werken ze niet (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
 publiceert; bouw dan zelf uit de bron.
 
@@ -86,13 +90,13 @@ worden geverifieerd"). Pak uit in de Terminal, dan krijgen de bestanden die mark
 niet:
 
 ```bash
-tar xzf vna-r-v0.2.3-aarch64-macos.tar.gz
+tar xzf vna-r-v*-aarch64-macos.tar.gz
 ```
 
 of haal de markering achteraf weg:
 
 ```bash
-xattr -dr com.apple.quarantine vna-r-v0.2.3-aarch64-macos
+xattr -dr com.apple.quarantine vna-r-v*-aarch64-macos
 ```
 
 **Windows** toont om dezelfde reden een SmartScreen-waarschuwing; *Meer informatie ▸ Toch

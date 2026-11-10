@@ -34,7 +34,8 @@ repeatability after unscrewing and reconnecting ±0.01 dB and ±0.1°.
 
 - **macOS**: no driver, port `/dev/cu.usbmodem…`.
 - **Linux**: port `/dev/ttyACM*`, a udev rule or the `dialout` group for the permissions,
-  build packages `pkg-config libudev-dev libgtk-3-dev`, on NixOS the flake (chapter 2).
+  build packages `pkg-config libudev-dev`, a desktop portal for the file dialogs, on NixOS
+  the flake (chapter 2).
   CLI and GUI have been verified on a NixOS laptop with the LiteVNA 67 on `/dev/ttyACM0`:
   same registers, 329 points/s, no lost points, calibration and markers as on the
   Mac.
