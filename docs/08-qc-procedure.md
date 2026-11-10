@@ -178,3 +178,12 @@ segmentversie zegt `host calibration per segment`. Met `--trace` verschijnt de r
 vraagt een apparaat dat een foute header stuurt; controleer anders de code: `bpp != 16`
 en `MAX_SIDE` in `device.rs::screenshot`.
 
+## Punt 11 — Apparaatgrens in "Set sweep for TDR" en nieuwe segmenten (U5)
+
+**Met NanoVNA-F.** Verbind, sweep 1 – 30 MHz, kies TDR met Max distance 2 m: de
+waarschuwing "Span too small" noemt een stop van hoogstens 1.500 GHz en **Set sweep for
+TDR** zet Stop op `1.5GHz` (geen oranje buiten-bereik-melding). **+ segment** onder
+Segments krijgt stop `1.5GHz`.
+
+**Met LiteVNA.** Hetzelfde geeft 6,3 GHz, zoals voorheen. Zonder apparaat ook 6,3 GHz.
+

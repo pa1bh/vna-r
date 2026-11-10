@@ -14,6 +14,8 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: **Set sweep for TDR** en een nieuw segment gingen altijd tot 6,3 GHz, ook op een
+  NanoVNA-F (1,5 GHz); ze nemen nu de bovengrens van het verbonden apparaat.
 - Een onzinnige schermafdruk-header (van een apparaat dat geen LiteVNA is of een gestoorde
   verbinding) kon tot 17 GB laten reserveren voordat er iets gelezen was; de afmetingen
   zijn nu begrensd op 4096×4096 en alleen 16 bits per pixel wordt geaccepteerd, wat de

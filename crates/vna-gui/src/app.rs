@@ -583,6 +583,11 @@ impl App {
         matches!(self.connection, Connection::Connected { .. })
     }
 
+    /// Top of the connected device's range; the LiteVNA's 6.3 GHz when nothing is connected.
+    fn device_max_hz(&self) -> u64 {
+        self.device_limits().map_or(6_300_000_000, |l| l.max_hz)
+    }
+
     fn device_limits(&self) -> Option<Limits> {
         match &self.connection {
             Connection::Connected { info, .. } => Some(info.limits),
@@ -1465,7 +1470,7 @@ impl App {
                 // Resolution is 1/span: a narrow HF sweep smears a cable into one blob.
                 if res_m > self.tdr_max_m / 10.0 {
                     let needed_span = litevna::timedomain::C0 * self.tdr_vf / (2.0 * self.tdr_max_m / 20.0);
-                    let stop = needed_span.min(6.3e9);
+                    let stop = needed_span.min(self.device_max_hz() as f64);
                     ui.colored_label(
                         Color32::from_rgb(230, 150, 80),
                         format!(
@@ -1697,7 +1702,8 @@ impl App {
             }
             if ui.small_button("+ segment").clicked() {
                 let start = self.extra_segments.last().map(|s| s.stop.clone()).unwrap_or_else(|| self.stop.clone());
-                self.extra_segments.push(SegmentSettings { start, stop: "6.3G".into(), points: 1001, cal_file: None });
+                let stop = format_hz(self.device_max_hz()).replace(' ', "");
+                self.extra_segments.push(SegmentSettings { start, stop, points: 1001, cal_file: None });
             }
         });
     }
