@@ -285,3 +285,15 @@ cargo tree -p vna-cli --depth 1 | grep -c num-complex
 ```
 Verwacht: `0`.
 
+## Punt 19 — Fabrikantbestanden uit git (L1)
+
+**Zonder apparaat.**
+```bash
+git ls-files assets
+ls assets/*.pdf assets/*.bin
+git status --short assets
+```
+Verwacht: alleen `assets/litevna-projects.txt` is getrackt; de drie PDF's en drie
+firmware-images staan nog op schijf; `git status` toont ze niet (genegeerd). Ze zitten
+nog wel in de git-geschiedenis: dat was het besluit (geen history rewrite).
+

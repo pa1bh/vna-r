@@ -13,14 +13,22 @@ Wat er ligt, en wat het ons oplevert voor het protocolwerk.
 | `NanoVNASaver.*.zip`, `nanovna-saver` | NanoVNA-Saver binaries (jan 2022) voor macOS (x86_64), Linux, Windows | Werkt op je M-serie via Rosetta. Goed om naast onze POC te leggen voor een sanity check van S11/S21-waarden. Let op: ~400 MB in totaal. |
 | `litevna-projects.txt` | Je eigen linklijst | — |
 
-## Advies voor git
+## In git
 
-De zip/7z-archieven en de macOS-binary zijn samen ruim 400 MB. Niet committen; voeg aan `.gitignore` toe:
+Alleen `litevna-projects.txt` (de eigen linklijst) staat in git. De rest blijft lokaal in
+`assets/` en wordt genegeerd (`.gitignore`):
 
-```
-assets/*.zip
-assets/*.7z
-assets/nanovna-saver
-```
+- De zip/7z-archieven en de macOS-binary zijn samen ruim 400 MB.
+- De PDF's en de firmware-images zijn klein, maar van de fabrikant: een MIT-repository
+  hoort ze niet te herdistribueren. Tot 10 november 2026 stonden ze wel in git (ze zitten
+  dus nog in de geschiedenis); sindsdien niet meer.
 
-De PDF's, de firmware-images (90 kB per stuk) en de linklijst zijn klein en de moeite waard om te bewaren.
+Waar ze vandaan komen, om ze opnieuw op te halen:
+
+| Bestand | Bron |
+|---|---|
+| `LiteVNA_User Guide.pdf` | https://nanovna.com/wp-content/uploads/2021/11/LiteVNA_User-Guide.pdf (byte-identiek, zie boven) |
+| `LiteVNA_User Guide-cn.pdf`, `LiteVNA Menu Structure Map-1.2.pdf`, `liteVNA6x-260713.bin` | de downloadpagina van de fabrikant en de bestandensectie van de LiteVNA-groep, zie de links in `assets/litevna-projects.txt` (https://nanorfe.com/nanovna-software.html, https://groups.io/g/liteVNA) |
+
+De md5 van de User Guide staat in de tabel hierboven; van de firmware-images is het
+kenmerk de versiestring `FW Version: v1.4.10`, `Build Time: Jul 13 2026` in de image.

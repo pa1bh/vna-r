@@ -19,6 +19,9 @@ things that are not backwards compatible, such as the format of the calibration 
   `73-seat-late.rules`. Remove `/etc/udev/rules.d/99-litevna.rules` if you installed it.
 - This changelog is in English from here on, like the README and the release notes on
   GitHub that are made from it.
+- The manufacturer's firmware images and PDFs in `assets/` are no longer tracked in git;
+  an MIT repository should not redistribute them. `docs/02-assets-inventaris.md` says
+  where they come from.
 - GUI: the default file names when saving are the frequency range (`1MHz-30MHz.cal.json`,
   `sweep-1MHz-30MHz.s2p`) instead of `litevna.cal.json` and `sweep.s2p`; two hints in the
   Traces panel pointed at a button and a roadmap step that no longer exist.

@@ -4,8 +4,13 @@
 /*.png
 .DS_Store
 
-# Large third-party binaries in assets/ (>400 MB together); PDFs, firmware .bin and notes stay tracked
+# Third-party material in assets/ stays local: the binaries are large (>400 MB together)
+# and the manufacturer's PDFs and firmware images are not ours to redistribute under MIT.
+# docs/02-assets-inventaris.md says what they are and where they come from; only the
+# link list is tracked.
 assets/*.zip
 assets/*.7z
 assets/nanovna-saver
+assets/*.pdf
+assets/*.bin
 /cal/
