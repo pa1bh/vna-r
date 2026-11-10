@@ -25,6 +25,11 @@ things that are not backwards compatible, such as the format of the calibration 
 - GUI: the default file names when saving are the frequency range (`1MHz-30MHz.cal.json`,
   `sweep-1MHz-30MHz.s2p`) instead of `litevna.cal.json` and `sweep.s2p`; two hints in the
   Traces panel pointed at a button and a roadmap step that no longer exist.
+- Calibration files carry a format number (`"format": 1`) and the stored GUI settings a
+  version. Files and settings from 0.2.x load unchanged; a calibration file written by a
+  newer vna-r with a higher format is refused with a message instead of being misread.
+  The settings keep their marker and plot lists as lists, so a future change in the number
+  of markers or plots no longer resets every setting.
 
 ### Development
 - The workspace declares its minimum Rust version (1.95, the floor of egui 0.37) and is

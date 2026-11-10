@@ -56,10 +56,48 @@ const MARKER_COLORS: [Color32; MARKERS] = [
     Color32::from_rgb(255, 170, 60),
 ];
 
+/// Version written into the stored settings; see [`Settings::version`].
+const SETTINGS_VERSION: u32 = 1;
+
+/// Read a list that older versions stored as a fixed-size array. eframe keeps
+/// the settings as RON, where an array is a tuple `(a,b,c)` and a `Vec` is a
+/// list `[a,b,c]`; taking either keeps settings from before 0.3 readable.
+fn list_or_tuple<'de, D, T>(d: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    struct Items<T>(std::marker::PhantomData<T>);
+    impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Items<T> {
+        type Value = Vec<T>;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a list or a tuple")
+        }
+        fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Vec<T>, A::Error> {
+            let mut out = Vec::new();
+            while let Some(item) = seq.next_element()? {
+                out.push(item);
+            }
+            Ok(out)
+        }
+    }
+    d.deserialize_any(Items(std::marker::PhantomData))
+}
+
 /// Everything worth remembering between sessions (stored by eframe).
-#[derive(Serialize, Deserialize, Clone)]
+///
+/// Compatibility rules: every field has a default (`#[serde(default)]`), so a
+/// file from an older version loads with the new fields at their defaults,
+/// and unknown fields from a newer version are ignored. Lists are `Vec`s that
+/// `apply_settings` cuts or pads to what this build uses, so changing the
+/// number of markers or plots does not discard the whole file. A change that
+/// these rules cannot absorb raises `SETTINGS_VERSION` and gets a branch in
+/// `Settings::migrated`.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(default)]
 struct Settings {
+    /// 0 (absent) for settings stored before 0.3.
+    version: u32,
     port: Option<String>,
     start: String,
     stop: String,
@@ -73,11 +111,13 @@ struct Settings {
     tdr_vf: f64,
     tdr_window: String,
     tdr_max_m: f64,
-    marker_freqs: [Option<u64>; MARKERS],
+    #[serde(deserialize_with = "list_or_tuple")]
+    marker_freqs: Vec<Option<u64>>,
     fit_f_min: String,
     fit_as_delay: bool,
     /// Trace kind per plot (ids from TraceKind::id), top-right, bottom-left, bottom-right.
-    plot_kinds: [String; 3],
+    #[serde(deserialize_with = "list_or_tuple")]
+    plot_kinds: Vec<String>,
     gd_aperture: usize,
     gate_on: bool,
     gate_start_m: f64,
@@ -94,7 +134,7 @@ struct Settings {
 /// One extra sweep segment. The primary segment is the Start/Stop/Points of
 /// the Sweep panel and uses the calibration panel; an extra segment may carry
 /// its own calibration file (e.g. a dense HF calibration next to a 6.3 GHz one).
-#[derive(Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Debug)]
 #[serde(default)]
 struct SegmentSettings {
     start: String,
@@ -106,6 +146,10 @@ struct SegmentSettings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
+            // The defaults stand in for whatever a stored file lacks, so a
+            // file without a version reads as 0; `App::settings` writes the
+            // current one.
+            version: 0,
             port: None,
             start: "1M".into(),
             stop: "30M".into(),
@@ -119,10 +163,10 @@ impl Default for Settings {
             tdr_vf: 0.70,
             tdr_window: "hann".into(),
             tdr_max_m: 2.0,
-            marker_freqs: [None; MARKERS],
+            marker_freqs: vec![None; MARKERS],
             fit_f_min: "300M".into(),
             fit_as_delay: false,
-            plot_kinds: ["logmag".into(), "swr".into(), "phase".into()],
+            plot_kinds: vec!["logmag".into(), "swr".into(), "phase".into()],
             gd_aperture: 2,
             gate_on: false,
             gate_start_m: -0.1,
@@ -327,6 +371,17 @@ enum View {
     Tdr,
 }
 
+impl Settings {
+    /// Bring settings stored by an older version up to `SETTINGS_VERSION`.
+    /// Versions 0 and 1 differ only in how the two lists are written, which
+    /// `list_or_tuple` already reads; a later incompatible change adds its
+    /// conversion here.
+    fn migrated(mut self) -> Settings {
+        self.version = SETTINGS_VERSION;
+        self
+    }
+}
+
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
@@ -412,6 +467,7 @@ impl App {
     }
 
     fn apply_settings(&mut self, s: Settings) {
+        let s = s.migrated();
         if let Some(p) = &s.port {
             if self.ports.iter().any(|c| &c.path == p) {
                 self.selected_port = Some(p.clone());
@@ -431,12 +487,16 @@ impl App {
         self.tdr_vf = finite_or(s.tdr_vf, 0.3, 1.0, 0.70);
         self.tdr_window = Window::parse(&s.tdr_window).unwrap_or(Window::Hann);
         self.tdr_max_m = finite_or(s.tdr_max_m, 0.1, 1000.0, 2.0);
-        self.pending_marker_freqs = Some(s.marker_freqs);
+        let mut marker_freqs = [None; MARKERS];
+        for (slot, f) in marker_freqs.iter_mut().zip(&s.marker_freqs) {
+            *slot = *f;
+        }
+        self.pending_marker_freqs = Some(marker_freqs);
         self.cal.fit_f_min = s.fit_f_min;
         self.cal.fit_as_delay = s.fit_as_delay;
-        for (k, id) in s.plot_kinds.iter().enumerate() {
+        for (slot, id) in self.plot_kinds.iter_mut().zip(&s.plot_kinds) {
             if let Some(kind) = TraceKind::parse(id) {
-                self.plot_kinds[k] = kind;
+                *slot = kind;
             }
         }
         self.gd_aperture = s.gd_aperture.clamp(1, 50);
@@ -467,6 +527,7 @@ impl App {
             marker_freqs = p;
         }
         Settings {
+            version: SETTINGS_VERSION,
             port: self.selected_port.clone(),
             start: self.start.clone(),
             stop: self.stop.clone(),
@@ -480,14 +541,10 @@ impl App {
             tdr_vf: self.tdr_vf,
             tdr_window: self.tdr_window.name().into(),
             tdr_max_m: self.tdr_max_m,
-            marker_freqs,
+            marker_freqs: marker_freqs.to_vec(),
             fit_f_min: self.cal.fit_f_min.clone(),
             fit_as_delay: self.cal.fit_as_delay,
-            plot_kinds: [
-                self.plot_kinds[0].id().into(),
-                self.plot_kinds[1].id().into(),
-                self.plot_kinds[2].id().into(),
-            ],
+            plot_kinds: self.plot_kinds.iter().map(|k| k.id().to_string()).collect(),
             gd_aperture: self.gd_aperture,
             gate_on: self.gate_on,
             gate_start_m: self.gate_start_m,
@@ -2772,4 +2829,50 @@ fn compact_hz(hz: u64) -> String {
 
 fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
     x.iter().zip(y).map(|(x, y)| [*x, y]).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The settings exactly as vna-r 0.2.5 stored them (arrays as RON tuples, no version).
+    const SETTINGS_0_2_5: &str = r#"(port:Some("/dev/cu.usbmodemv1_01"),start:"50k",stop:"6,3G",points:101,average:1,cal_file:Some("/tmp/n-6g3.cal.json"),cal_apply:true,show_s11:true,show_s21:false,view_tdr:false,tdr_vf:0.85,tdr_window:"hann",tdr_max_m:7.4,marker_freqs:(Some(6111001500),None,None,None),fit_f_min:"300M",fit_as_delay:false,plot_kinds:("logmag","swr","phase"),gd_aperture:2,gate_on:false,gate_start_m:0.22,gate_stop_m:0.7,gate_notch:false,sweep_avg:1,extra_segments:[],dev_tools:false)"#;
+
+    #[test]
+    fn settings_from_0_2_5_load_completely() {
+        let s: Settings = ron::from_str(SETTINGS_0_2_5).expect("old settings must stay readable");
+        assert_eq!(s.version, 0);
+        assert_eq!(s.stop, "6,3G");
+        assert_eq!(s.points, 101);
+        assert_eq!(s.tdr_vf, 0.85);
+        assert_eq!(s.marker_freqs, vec![Some(6_111_001_500), None, None, None]);
+        assert_eq!(s.plot_kinds, vec!["logmag", "swr", "phase"]);
+        assert_eq!(s.migrated().version, SETTINGS_VERSION);
+    }
+
+    #[test]
+    fn settings_round_trip_and_tolerate_other_list_lengths() {
+        let s = Settings {
+            marker_freqs: vec![Some(14_200_000), None, Some(28_000_000), None],
+            ..Default::default()
+        };
+        let text = ron::to_string(&s).unwrap();
+        assert_eq!(ron::from_str::<Settings>(&text).unwrap(), s);
+        // A build with more markers or plots wrote longer lists, an older one shorter; neither is an error.
+        let longer = text.replace("plot_kinds:[", "plot_kinds:[\"phase\",");
+        assert_eq!(ron::from_str::<Settings>(&longer).unwrap().plot_kinds.len(), 4);
+        // Unknown fields from a newer version are ignored, missing ones take their default.
+        let sparse: Settings = ron::from_str(r#"(version:7,start:"2M",some_future_field:3)"#).unwrap();
+        assert_eq!(sparse.start, "2M");
+        assert_eq!(sparse.stop, Settings::default().stop);
+    }
+
+    #[test]
+    fn compact_hz_for_file_names() {
+        assert_eq!(compact_hz(50_000), "50kHz");
+        assert_eq!(compact_hz(14_200_000), "14.2MHz");
+        assert_eq!(compact_hz(6_300_000_000), "6.3GHz");
+        assert_eq!(compact_hz(30_000_000), "30MHz");
+        assert_eq!(compact_hz(500), "500Hz");
+    }
 }

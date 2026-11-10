@@ -220,10 +220,19 @@ pub struct StandardMeasurement {
     pub s21: Vec<C64>,
 }
 
+/// Format number written into calibration files; see [`CalibrationSet::format`].
+pub const CAL_FORMAT: u32 = 1;
+
 /// Everything measured for one calibration, on one frequency grid.
 /// Serialises to JSON so a CLI can collect the standards one run at a time.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CalibrationSet {
+    /// Format of the file this set was read from or will be written as.
+    /// Absent (0) in files written before 0.3; 1 is the same layout with this
+    /// field. Raise [`CAL_FORMAT`] when a change makes old readers misread a
+    /// file; `from_json` refuses a number higher than it knows.
+    #[serde(default)]
+    pub format: u32,
     pub freqs_hz: Vec<u64>,
     pub kit: CalKit,
     pub note: Option<String>,
@@ -241,6 +250,7 @@ pub struct CalibrationSet {
 impl CalibrationSet {
     pub fn new(freqs_hz: Vec<u64>, kit: CalKit) -> Self {
         CalibrationSet {
+            format: CAL_FORMAT,
             freqs_hz,
             kit,
             note: None,
@@ -315,8 +325,16 @@ impl CalibrationSet {
     }
 
     pub fn from_json(text: &str) -> Result<Self> {
-        let set: Self = serde_json::from_str(text)?;
+        let mut set: Self = serde_json::from_str(text)?;
+        if set.format > CAL_FORMAT {
+            return Err(Error::Calibration(format!(
+                "calibration file has format {}, this version of vna-r reads up to format {CAL_FORMAT}; use a newer vna-r",
+                set.format
+            )));
+        }
         set.validate()?;
+        // In memory a set is always the current format, so saving upgrades an old file.
+        set.format = CAL_FORMAT;
         Ok(set)
     }
 
@@ -457,6 +475,7 @@ impl CalibrationSet {
             s21: interpolate_complex(&self.freqs_hz, &m.s21, freqs_hz),
         };
         Ok(CalibrationSet {
+            format: CAL_FORMAT,
             freqs_hz: freqs_hz.to_vec(),
             kit: self.kit.clone(),
             note: self.note.clone(),
@@ -1295,6 +1314,23 @@ mod tests {
             set.set(std, &sweep_from(freqs, s11, s21)).unwrap();
         }
         set
+    }
+
+    #[test]
+    fn calibration_file_format_number() {
+        let freqs: Vec<u64> = vec![1_000_000, 2_000_000, 3_000_000];
+        let set = CalibrationSet::new(freqs, CalKit::ideal());
+        let json = set.to_json().unwrap();
+        assert!(json.contains("\"format\": 1"), "{json}");
+        assert_eq!(CalibrationSet::from_json(&json).unwrap(), set);
+        // A file from before the field existed reads as the current format.
+        let old = json.replace("\"format\": 1,", "");
+        assert!(!old.contains("format"));
+        assert_eq!(CalibrationSet::from_json(&old).unwrap().format, CAL_FORMAT);
+        // A file from a newer vna-r is refused with a readable message.
+        let newer = json.replace("\"format\": 1", "\"format\": 99");
+        let err = CalibrationSet::from_json(&newer).unwrap_err().to_string();
+        assert!(err.contains("format 99") && err.contains("newer"), "{err}");
     }
 
     #[test]

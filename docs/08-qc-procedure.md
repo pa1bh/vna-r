@@ -337,3 +337,24 @@ heeft uitgefaseerd faalt de job direct met een duidelijke melding en moet de reg
 `tar tzf vna-r-v*-aarch64-macos.tar.gz | grep -c '/\._'` geeft `0`. De releasetekst op
 GitHub bevat alleen de changelog-sectie.
 
+## Punt 25 — Formaatversies (D4)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna calibration_file_format && cargo test -p vna-gui settings_
+```
+Verwacht: groen; de GUI-test leest een letterlijke instellingenregel van 0.2.5.
+
+**Echte bestanden.**
+1. Maak een kopie van je instellingen (`cp ~/Library/Application\ Support/vna-r/app.ron
+   /tmp/app.ron.bak`), start de nieuwe GUI: poort, sweep, calibratiebestand, TDR-waarden,
+   markerfrequentie en plotkeuzes zijn zoals je ze achterliet. Sluit af en bekijk
+   `app.ron`: het bevat nu `version:1`, `marker_freqs:[…]` en `plot_kinds:[…]`.
+2. Laad `cal/n-6g3.cal.json` (zonder `format`-veld): werkt. Save… naar `/tmp/qc.cal.json`
+   en `head -3 /tmp/qc.cal.json` toont `"format": 1`.
+3. Zet in `/tmp/qc.cal.json` de waarde op `99` en laad het: foutmelding "calibration file
+   has format 99 … use a newer vna-r".
+4. Terug naar 0.2.5 (oude binary) met de nieuwe `app.ron`: die versie kan de lijsten
+   `[…]` niet als array lezen en begint met standaardinstellingen. Dat is de enige
+   onomkeerbare kant van deze wijziging; zet zo nodig `/tmp/app.ron.bak` terug.
+
