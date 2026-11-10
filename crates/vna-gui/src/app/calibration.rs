@@ -71,6 +71,15 @@ pub(super) struct SegCal {
 }
 
 impl App {
+    /// Build what is shown again from the last raw sweep (or opened file):
+    /// after the calibration, its apply switch or the port extension changed.
+    pub(super) fn reshow(&mut self) {
+        if let Some(raw) = self.raw.clone() {
+            let corrected = self.corrected(&raw);
+            self.set_shown(corrected);
+        }
+    }
+
     /// Correct one segment with its own calibration file (loaded on first use).
     pub(super) fn seg_correct(&mut self, path: &Path, part: &SweepResult) -> SweepResult {
         let entry = self.seg_cals.entry(path.to_path_buf()).or_default();
@@ -203,10 +212,7 @@ impl App {
             }
         }
         self.cal.solved = None;
-        if let Some(raw) = self.raw.clone() {
-            let corrected = self.corrected(&raw);
-            self.set_shown(corrected);
-        }
+        self.reshow();
     }
 
     pub(super) fn calibration_panel(&mut self, ui: &mut egui::Ui) {
@@ -270,12 +276,41 @@ impl App {
 
         self.standard_buttons(ui, &Standard::ALL, connected);
         ui.horizontal(|ui| {
+            ui.label("Port extension");
+            let changed = ui
+                .add(
+                    egui::DragValue::new(&mut self.port_ext_ps)
+                        .range(-PORT_EXT_MAX_PS..=PORT_EXT_MAX_PS)
+                        .speed(1.0)
+                        .fixed_decimals(1)
+                        .suffix(" ps"),
+                )
+                .on_hover_text(
+                    "moves the reference plane outward by this one-way delay (S11 turns by twice, S21 by once): \
+                     for an adapter or fixture behind the calibration plane. Read the delay off the TDR, \
+                     or tune until a short at the new plane is a dot at the left of the Smith chart. 0 = off.",
+                )
+                .changed();
+            if self.port_ext_ps != 0.0 {
+                // One-way length at the TDR velocity factor, as a feel for the size.
+                ui.small(format!(
+                    "≈ {:.1} mm at VF {:.2}",
+                    self.port_ext_ps * 1e-12 * C0 * self.tdr_vf * 1e3,
+                    self.tdr_vf
+                ));
+                if ui.small_button("0").on_hover_text("switch the port extension off").clicked() {
+                    self.port_ext_ps = 0.0;
+                    self.reshow();
+                }
+            }
+            if changed {
+                self.reshow();
+            }
+        });
+        ui.horizontal(|ui| {
             let changed = ui.checkbox(&mut self.cal.apply, "apply").changed();
             if changed {
-                if let Some(raw) = self.raw.clone() {
-                    let corrected = self.corrected(&raw);
-                    self.set_shown(corrected);
-                }
+                self.reshow();
             }
             if ui.button("Load…").clicked() {
                 self.load_cal();
@@ -393,10 +428,7 @@ impl App {
                 self.cal.fit = None;
                 self.cal.solved = None;
                 self.cal.message = Some("kit reset to ideal".into());
-                if let Some(raw) = self.raw.clone() {
-                    let corrected = self.corrected(&raw);
-                    self.set_shown(corrected);
-                }
+                self.reshow();
             }
         });
         if let Some((fit, model)) = self.cal.fit {
@@ -453,10 +485,7 @@ impl App {
             set.kit.open_c0() * 1e15,
             set.kit.open.offset_delay_s * 1e12
         ));
-        if let Some(raw) = self.raw.clone() {
-            let corrected = self.corrected(&raw);
-            self.set_shown(corrected);
-        }
+        self.reshow();
     }
 
     pub(super) fn load_cal(&mut self) {
@@ -479,10 +508,7 @@ impl App {
                 self.cal.warning = None;
                 self.cal.message = Some("loaded".into());
                 self.log(format!("loaded calibration {}", path.display()));
-                if let Some(raw) = self.raw.clone() {
-                    let corrected = self.corrected(&raw);
-                    self.set_shown(corrected);
-                }
+                self.reshow();
             }
             Err(e) => self.error = Some(format!("loading calibration: {e}")),
         }

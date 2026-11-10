@@ -88,6 +88,11 @@ enum Cmd {
         /// Velocity factor for --gate distances.
         #[arg(long, default_value_t = 0.70)]
         vf: f64,
+        /// Port extension: move the reference plane outward by this one-way delay
+        /// in picoseconds (S11 turns by twice the delay, S21 by once), applied
+        /// after the calibration and before a gate.
+        #[arg(long, value_name = "PS", allow_negative_numbers = true)]
+        port_extension: Option<f64>,
         /// Sweep several segments into one trace: `START:STOP:POINTS[@cal.json]`,
         /// repeatable, e.g. `--segment 100k:50M:1001@hf.json --segment 50M:6.3G:1001@n6g3.json`.
         /// Used instead of --start/--stop/--points/--cal; segments must not overlap.
@@ -153,6 +158,9 @@ enum Cmd {
         /// Write distance/time/impulse/step/impedance as CSV ("-" for stdout).
         #[arg(long)]
         csv: Option<PathBuf>,
+        /// Port extension in picoseconds (one-way), applied before the transform.
+        #[arg(long, value_name = "PS", allow_negative_numbers = true)]
+        port_extension: Option<f64>,
         /// Read S11 from a Touchstone file (.s1p/.s2p) instead of sweeping; the
         /// file has its own grid and needs no calibration.
         #[arg(long, value_name = "FILE", conflicts_with_all = ["cal", "start", "stop", "points"])]
@@ -293,6 +301,18 @@ struct Conn {
     json: bool,
 }
 
+/// `--port-extension <ps>`: move the reference plane of a sweep.
+fn apply_port_extension(sweep: &mut SweepResult, ps: Option<f64>) -> Result<()> {
+    if let Some(ps) = ps {
+        if !ps.is_finite() {
+            bail!("--port-extension wants a delay in picoseconds, got {ps}");
+        }
+        sweep.extend_port(ps * 1e-12);
+        eprintln!("port extension {ps} ps (one-way)");
+    }
+    Ok(())
+}
+
 /// A complex number as JSON: `[re, im]`.
 fn complex_json(re: f64, im: f64) -> serde_json::Value {
     serde_json::json!([re, im])
@@ -326,6 +346,7 @@ fn main() -> Result<()> {
             gate,
             gate_notch,
             vf,
+            port_extension,
             segment,
         } => sweep(
             &conn,
@@ -340,6 +361,7 @@ fn main() -> Result<()> {
             gate,
             gate_notch,
             vf,
+            port_extension,
             segment,
         ),
         Cmd::Cal {
@@ -362,8 +384,21 @@ fn main() -> Result<()> {
             peaks,
             max_distance,
             csv,
+            port_extension,
             from,
-        } => tdr_cmd(&conn, grid, measure, cal, vf, &window, peaks, max_distance, csv, from),
+        } => tdr_cmd(
+            &conn,
+            grid,
+            measure,
+            cal,
+            vf,
+            &window,
+            peaks,
+            max_distance,
+            csv,
+            port_extension,
+            from,
+        ),
         Cmd::Screenshot { out, swap_bytes } => screenshot(&mut open(&conn)?, &out, swap_bytes),
         Cmd::Release => {
             open(&conn)?.release()?;
@@ -761,6 +796,7 @@ fn sweep(
     gate_arg: Option<String>,
     gate_notch: bool,
     vf: f64,
+    port_extension: Option<f64>,
     segments: Vec<String>,
 ) -> Result<()> {
     if conn.json && csv.as_deref().is_some_and(|p| p.as_os_str() == "-") {
@@ -778,6 +814,7 @@ fn sweep(
         acquire_segments(conn, &segments, &m, keep_usb_mode)?
     };
 
+    apply_port_extension(&mut result, port_extension)?;
     if let Some(spec) = &gate_arg {
         let (start_m, stop_m) = parse_distance_range(spec).context("--gate")?;
         let kind = if gate_notch { GateKind::Notch } else { GateKind::BandPass };
@@ -869,10 +906,11 @@ fn tdr_cmd(
     n_peaks: usize,
     max_distance: Option<f64>,
     csv: Option<PathBuf>,
+    port_extension: Option<f64>,
     from: Option<PathBuf>,
 ) -> Result<()> {
     let window = Window::parse(window).with_context(|| format!("unknown window {window:?}"))?;
-    let result = match from {
+    let mut result = match from {
         Some(path) => {
             let r = litevna::touchstone::read_touchstone_file(&path).with_context(|| format!("reading {}", path.display()))?;
             eprintln!(
@@ -891,6 +929,7 @@ fn tdr_cmd(
             acquire(conn, &grid, &m, cal_file.as_deref(), false)?.result
         }
     };
+    apply_port_extension(&mut result, port_extension)?;
     let cfg = TdrConfig {
         window,
         velocity_factor: vf,

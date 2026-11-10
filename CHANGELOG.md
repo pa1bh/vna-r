@@ -13,6 +13,10 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- Port extension: move the reference plane outward by a one-way delay in picoseconds
+  (**Port extension** in the calibration panel, `--port-extension <ps>` with `sweep` and
+  `tdr`), for an adapter or fixture behind the calibration plane. It applies to
+  everything shown and is noted in exported files; the calibration is not touched.
 - GUI: keyboard shortcuts (space Run/Stop, `S` single sweep, `1`–`4` active marker, `H`
   hold, `G` gate, `T` frequency/time domain; arrow keys now also move the TDR marker),
   the battery voltage is read again every minute, and **View ▸ Connect at start**

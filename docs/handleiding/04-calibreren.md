@@ -118,6 +118,23 @@ de kabel zelf te zijn (−30 dB), geen calibratiefout. `vna-cli cal check` laat 
 band zien: de golving op de kabel vóór en na een gate om de verre reflectie, en de term
 op het referentievlak. Details in `docs/03-calibratie.md` §8 en §9.
 
+## Poortverlenging
+
+Een calibratie legt het referentievlak waar de standaarden zaten. Zit er achter dat vlak
+iets dat niet hoort bij wat je wilt meten (een verloopstuk, een meetklem, een kort
+staartje), dan schuift **Port extension** in het calibratiepaneel het vlak naar buiten
+met een enkele-weg-vertraging in picoseconden: S11 wordt met tweemaal die vertraging
+teruggedraaid, S21 met eenmaal. Het gaat uit van een verliesvrije lijn van 50 Ω, dus het
+is voor korte stukjes, niet voor meters kabel (calibreer daarvoor aan het eind).
+
+De vertraging vind je zo: zet een short op het nieuwe vlak en draai tot de trace op de
+Smith-chart krimpt tot een punt links, of lees in de TDR-weergave de heen-en-terug-tijd
+van de short af en neem de helft. Het paneel toont de bijbehorende lengte bij de huidige
+velocity factor. De verlenging geldt voor alles wat getoond wordt, ook bestanden, en
+staat in geëxporteerde bestanden vermeld; de calibratie zelf en haar standaarden blijven
+onaangeroerd. `0` zet hem uit. Op de commandoregel: `--port-extension <ps>` bij `sweep`
+en `tdr`.
+
 ## Kit-definities met de hand
 
 Weet je de waarden van je kit (uit het datablad), zet ze dan in het bestand:

@@ -69,6 +69,8 @@ pub(super) struct Settings {
     pub(super) gate_start_m: f64,
     pub(super) gate_stop_m: f64,
     pub(super) gate_notch: bool,
+    /// Port extension, one-way delay in picoseconds.
+    pub(super) port_ext_ps: f64,
     /// Number of sweeps averaged in software (1 = off).
     pub(super) sweep_avg: usize,
     /// Segments beyond the primary one (start/stop/points/calibration file).
@@ -120,6 +122,7 @@ impl Default for Settings {
             gate_start_m: -0.1,
             gate_stop_m: 0.5,
             gate_notch: false,
+            port_ext_ps: 0.0,
             sweep_avg: 1,
             extra_segments: Vec::new(),
             dev_tools: false,
@@ -181,6 +184,7 @@ impl App {
             self.gate_stop_m = self.gate_start_m + 0.01;
         }
         self.gate_notch = s.gate_notch;
+        self.port_ext_ps = finite_or(s.port_ext_ps, -PORT_EXT_MAX_PS, PORT_EXT_MAX_PS, 0.0);
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.extra_segments = s.extra_segments;
         self.dev_tools = s.dev_tools;
@@ -225,6 +229,7 @@ impl App {
             gate_start_m: self.gate_start_m,
             gate_stop_m: self.gate_stop_m,
             gate_notch: self.gate_notch,
+            port_ext_ps: self.port_ext_ps,
             sweep_avg: self.sweep_avg,
             extra_segments: self.extra_segments.clone(),
             dev_tools: self.dev_tools,

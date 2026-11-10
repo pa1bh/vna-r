@@ -194,6 +194,20 @@ impl SweepResult {
         out
     }
 
+    /// Port extension: move the reference plane of port 1 outward by a
+    /// one-way delay (seconds; negative moves it inward), as if the
+    /// calibration had been done that much further along a lossless line.
+    /// S11 is turned by twice the delay (the wave goes there and back), S21
+    /// by once. For a fixture or an adapter behind the calibration plane
+    /// whose delay you know or read off the TDR.
+    pub fn extend_port(&mut self, delay_s: f64) {
+        for (i, &f) in self.freqs_hz.iter().enumerate() {
+            let turn = 2.0 * std::f64::consts::PI * f as f64 * delay_s;
+            self.s11[i] *= Complex64::from_polar(1.0, 2.0 * turn);
+            self.s21[i] *= Complex64::from_polar(1.0, turn);
+        }
+    }
+
     /// The complex mean of several sweeps on the same grid, per point, for
     /// both S11 and S21. Averaging the complex values lowers noise without the
     /// bias that averaging magnitudes in dB has. Counts and times add up; the
@@ -1152,6 +1166,34 @@ mod tests {
         let back = SweepConfig::from_frequencies(&c.frequencies()).unwrap();
         assert_eq!((back.start_hz, back.step_hz, back.points), (c.start_hz, c.step_hz, c.points));
         assert!(SweepConfig::from_frequencies(&[1, 2, 4]).is_err());
+    }
+
+    #[test]
+    fn port_extension_moves_the_reference_plane() {
+        // A short behind 100 ps of line, and a through of the same line.
+        let tau = 100e-12;
+        let freqs: Vec<u64> = (1..=50).map(|i| i * 100_000_000).collect();
+        let w = |f: u64| 2.0 * std::f64::consts::PI * f as f64 * tau;
+        let mut sweep = SweepResult {
+            s11: freqs.iter().map(|&f| -Complex64::from_polar(1.0, -2.0 * w(f))).collect(),
+            s21: freqs.iter().map(|&f| Complex64::from_polar(0.9, -w(f))).collect(),
+            freqs_hz: freqs,
+            points: Vec::new(),
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        };
+        let before = sweep.clone();
+        sweep.extend_port(tau);
+        for (a, b) in sweep.s11.iter().zip(&sweep.s21) {
+            assert!((a - Complex64::new(-1.0, 0.0)).norm() < 1e-9, "S11 {a}");
+            assert!((b - Complex64::new(0.9, 0.0)).norm() < 1e-9, "S21 {b}");
+        }
+        // The opposite extension undoes it; zero does nothing.
+        sweep.extend_port(-tau);
+        sweep.extend_port(0.0);
+        assert!(sweep.s11.iter().zip(&before.s11).all(|(a, b)| (a - b).norm() < 1e-9));
     }
 
     #[test]

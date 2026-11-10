@@ -623,3 +623,24 @@ verandert mee (vergelijk met `vna-cli info`). Zet View ▸ Connect at start aan,
 start opnieuw met het apparaat aangesloten: verbindt vanzelf. Start zonder apparaat:
 geen foutmelding, de poortlijst wacht. Zet de optie weer uit als je hem niet wilt.
 
+## Punt 35 — Poortverlenging (N5)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna port_extension
+vna-cli tdr --from cal/sweep.s2p | sed -n 3,4p
+vna-cli tdr --from cal/sweep.s2p --port-extension 100000 | sed -n 4,5p
+```
+Verwacht: test groen; de eerste reflectie schuift van 336,8 ns naar 137,9 ns (2 × 100 ns
+eerder). GUI: open `cal/sweep.s2p`, TDR, zet Port extension op 100000 ps: de piek schuift
+14,5 m naar links; de regel eronder toont "≈ 20985 mm at VF 0.70"; knop **0** zet hem
+uit en de piek staat terug.
+
+**Met apparaat (LiteVNA, gecalibreerd).** Schroef een verloopstuk of kort kabeltje op de
+poort met een short aan het eind. Smith-chart: een boog. Draai Port extension omhoog tot
+de boog een punt links is (bijv. enkele tientallen tot honderden ps): fase S11 is dan
+±180° vlak. Controleer met TDR: de short staat op 0 m. Sla een .s2p op: het commentaar
+bevat "port extension … ps". Sluit af en start opnieuw: de waarde is onthouden. Meet
+daarna een standaard (open): de calibratie zelf is niet beïnvloed (het paneel toont
+dezelfde punten, en met extension 0 is alles als voorheen).
+

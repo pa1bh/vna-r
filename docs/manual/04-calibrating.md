@@ -119,6 +119,22 @@ check` shows that per band: the ripple on the cable before and after a gate arou
 reflection, and the term at the reference plane. Details in `docs/03-calibratie.md`
 (Dutch) §8 and §9.
 
+## Port extension
+
+A calibration puts the reference plane where the standards were. If something sits behind
+that plane that is not part of what you want to measure (an adapter, a fixture, a short
+pigtail), **Port extension** in the calibration panel moves the plane outward by a
+one-way delay in picoseconds: S11 is turned back by twice that delay, S21 by once. It
+assumes a lossless 50 Ω line, so it is for short pieces, not for metres of cable
+(calibrate at the far end for that).
+
+To find the delay: put a short at the new plane and tune until the trace on the Smith
+chart shrinks to a dot at the left, or read the round-trip time of the short in the TDR
+view and take half. The panel shows the equivalent length at the current velocity factor.
+The extension applies to everything shown, files included, and is noted in exported
+files; the calibration itself and its standards are not touched. `0` switches it off. On
+the command line: `--port-extension <ps>` with `sweep` and `tdr`.
+
 ## Kit definitions by hand
 
 If you know the values of your kit (from the data sheet), put them in the file:

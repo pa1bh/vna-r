@@ -75,6 +75,8 @@ const REF_COLORS: [Color32; 4] = [
 ];
 
 const MAX_REFS: usize = 4;
+/// Largest port extension the field accepts, ps (100 ns, about 20 m of cable).
+const PORT_EXT_MAX_PS: f64 = 100_000.0;
 
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 
@@ -162,6 +164,8 @@ pub struct App {
     gate_start_m: f64,
     gate_stop_m: f64,
     gate_notch: bool,
+    /// Port extension: one-way delay (ps) the reference plane is moved outward by.
+    port_ext_ps: f64,
     /// Which gate edge the pointer hovers / drags in the TDR plots (0 = start, 1 = stop).
     gate_hover: Option<usize>,
     gate_drag: Option<usize>,
@@ -256,6 +260,7 @@ impl App {
             gate_start_m: -0.1,
             gate_stop_m: 0.5,
             gate_notch: false,
+            port_ext_ps: 0.0,
             gate_hover: None,
             gate_drag: None,
             gate_error: None,
@@ -507,7 +512,14 @@ impl App {
         }
     }
 
-    fn set_shown(&mut self, sweep: SweepResult) {
+    /// Everything that is shown goes through here: a corrected device sweep,
+    /// a raw one, a file. The port extension is applied at this point, so the
+    /// frequency view, the TDR, the gate, references and exports all see it,
+    /// while `raw` and the calibration standards never do.
+    fn set_shown(&mut self, mut sweep: SweepResult) {
+        if self.port_ext_ps != 0.0 {
+            sweep.extend_port(self.port_ext_ps * 1e-12);
+        }
         self.shown = Some(sweep);
         self.shown_rev += 1;
     }

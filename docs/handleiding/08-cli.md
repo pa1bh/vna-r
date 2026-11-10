@@ -53,6 +53,7 @@ Eén sweep, afgedrukt als tabel en desgewenst geëxporteerd.
 | `--cal <bestand>` | calibratie toepassen; een ander raster binnen het bereik wordt geïnterpoleerd |
 | `--segment START:STOP:POINTS[@cal]` | meerdere segmenten in één trace, herhaalbaar; vervangt start/stop/points/cal |
 | `--s2p <bestand>`, `--s1p <bestand>`, `--csv <bestand>` | export (`--s1p` is alleen S11); `--csv -` naar stdout |
+| `--port-extension <ps>` | referentievlak naar buiten schuiven met deze enkele-weg-vertraging (hoofdstuk 4) |
 | `--rows <n>` | aantal tabelregels, 0 is alles |
 | `--average <1..80>` | bandbreedte van het apparaat (blijft staan); alleen LiteVNA |
 | `--channel s11\|s21` | één kanaal meten; alleen LiteVNA |

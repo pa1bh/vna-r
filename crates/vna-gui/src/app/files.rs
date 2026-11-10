@@ -82,6 +82,11 @@ impl App {
         } else {
             String::new()
         };
+        let gated = if self.port_ext_ps != 0.0 {
+            format!("{gated}, port extension {:.1} ps", self.port_ext_ps)
+        } else {
+            gated
+        };
         let comment = format!(
             "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),
