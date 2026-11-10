@@ -533,3 +533,19 @@ met alle drie "ready for S11", met through erbij "ready for S11 + S21".
 vloeiend (menu's openen direct). Activity Monitor: het CPU-gebruik van vna-gui in rust
 (geen sweep, muis stil) is vrijwel nul.
 
+## Punt 24 — app.rs gesplitst (D2)
+
+**Veranderd.** Alleen de plaats van de code: `crates/vna-gui/src/app/` met `mod.rs`
+(toestand, topbalk, menubalk, zijpaneel, events) en de submodules `settings`, `sweep`,
+`calibration`, `plots`, `tdr`, `files`, `diagnostics`. Geen gedrag gewijzigd.
+
+**Zonder apparaat.**
+```bash
+ls crates/vna-gui/src/app/ && wc -l crates/vna-gui/src/app/*.rs
+cargo test -p vna-gui
+```
+Verwacht: acht bestanden, het grootste (`mod.rs`) rond 900 regels; drie tests groen.
+
+Dit punt is de reden om na afloop **de hele GUI één keer door te lopen**; zie de
+slotronde onderaan dit document.
+

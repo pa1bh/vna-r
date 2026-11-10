@@ -40,6 +40,8 @@ things that are not backwards compatible, such as the format of the calibration 
   of markers or plots no longer resets every setting.
 
 ### Development
+- The GUI's 2900-line `app.rs` is split by subject into `app/` (settings, sweep,
+  calibration, plots, tdr, files, diagnostics); code moved unchanged.
 - GUI: one copy of the shown sweep per frame instead of three, without the raw records,
   and the calibration status line no longer solves the calibration every frame.
 - Rules that the CLI and the GUI each had a copy of now live in the library with tests:

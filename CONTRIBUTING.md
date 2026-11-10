@@ -27,7 +27,7 @@ complete shell. No test needs a device.
 |---|---|
 | `crates/litevna` | The library. No UI, no `anyhow`; errors are `litevna::Error`. |
 | `crates/vna-cli` | Command line tool; thin, argument parsing and printing. |
-| `crates/vna-gui` | egui/eframe GUI. `app.rs` is the state and all panels, `worker.rs` the device thread, `smith.rs` the Smith chart. |
+| `crates/vna-gui` | egui/eframe GUI. `app/` is the state and the panels (see below), `worker.rs` the device thread, `smith.rs` the Smith chart. |
 | `crates/build_git_rev.rs` | Build script shared by the two binaries (git revision for About and `--version`). |
 | `docs/manual`, `docs/handleiding` | The user manual, English and Dutch, chapter for chapter the same. |
 | `docs/01` … `docs/08` | Research notes, roadmap, analysis and QC procedure, in Dutch. |
@@ -45,7 +45,24 @@ Inside the library, from the wire upwards:
   `14.2M`) are pure maths on `SweepResult` and know nothing about devices.
 
 The GUI keeps all serial I/O on the worker thread. The UI sends `worker::Cmd` and gets
-`worker::Event`; nothing in `app.rs` may block on the device.
+`worker::Event`; nothing under `app/` may block on the device.
+
+`app/mod.rs` holds the `App` struct, the constants, the frame (top bar, menu bar, side
+panel) and the handling of worker events. The rest of `impl App` is spread over
+submodules by subject, each seeing the parent through `use super::*`:
+
+| Module | What |
+|---|---|
+| `settings` | `Settings` as stored by eframe, reading older versions, apply and collect |
+| `sweep` | sweep fields, segments, start and stop, software averaging |
+| `calibration` | calibration panel, standards, kit fit, calibration files, correcting a sweep |
+| `plots` | frequency view: Smith chart, the three plots, markers, references |
+| `tdr` | time-domain view and the gate |
+| `files` | Touchstone open and save, device screenshot |
+| `diagnostics` | About, developer log, diagnostics text |
+
+A method that another module calls is `pub(super)`; a new panel gets its own module
+rather than growing `mod.rs`.
 
 ## Conventions
 
