@@ -320,11 +320,11 @@ impl Screenshot {
     /// each 16-bit pixel (NanoVNA-Saver treats the LiteVNA 64 as big-endian).
     pub fn to_rgb888_with(&self, big_endian: bool) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.data.len() / 2 * 3);
-        for px in self.data.chunks_exact(2) {
+        for px in self.data.as_chunks::<2>().0 {
             let v = if big_endian {
-                u16::from_be_bytes([px[0], px[1]])
+                u16::from_be_bytes(*px)
             } else {
-                u16::from_le_bytes([px[0], px[1]])
+                u16::from_le_bytes(*px)
             };
             let r = ((v >> 11) & 0x1F) as u32;
             let g = ((v >> 5) & 0x3F) as u32;
@@ -599,7 +599,11 @@ impl LiteVna {
         let mut buf = vec![0u8; n * FIFO_POINT_SIZE];
         let timeout = (PER_POINT_BUDGET * n as u32).max(MIN_FIFO_TIMEOUT);
         self.recv_exact(&mut buf, timeout)?;
-        buf.chunks_exact(FIFO_POINT_SIZE).map(FifoPoint::parse).collect()
+        buf.as_chunks::<FIFO_POINT_SIZE>()
+            .0
+            .iter()
+            .map(|record| FifoPoint::parse(record))
+            .collect()
     }
 
     /// Configure, clear the FIFO and collect one complete sweep.
