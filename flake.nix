@@ -44,7 +44,7 @@
 
             # Ship the udev rule so `services.udev.packages = [ vna-r ]` works on NixOS.
             postInstall = lib.optionalString stdenv.hostPlatform.isLinux ''
-              install -Dm644 linux/99-litevna.rules $out/lib/udev/rules.d/99-litevna.rules
+              install -Dm644 linux/70-litevna.rules $out/lib/udev/rules.d/70-litevna.rules
             '';
             # Let the GTK wrapper also add the graphics libraries to the GUI's search path.
             preFixup = lib.optionalString stdenv.hostPlatform.isLinux ''

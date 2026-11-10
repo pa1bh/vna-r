@@ -1,0 +1,14 @@
+# LiteVNA 64 / 67 and NanoVNA V2 (Cypress CDC-ACM, VID 04B4 PID 0008) and
+# NanoVNA-F / NanoVNA-H (STMicroelectronics VCP, VID 0483 PID 5740).
+# Lets ordinary users open the serial port without root.
+#
+#   sudo cp linux/70-litevna.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Then re-plug the device. The "uaccess" tag gives the user at the seat
+# (the one logged in on the console) access through an ACL; it only works
+# from a file that sorts before 73-seat-late.rules, hence the 70- prefix.
+# The group is a fallback for systems without logind: "dialout" on
+# Debian/Ubuntu/Fedora, "uucp" on Arch (edit the GROUP= below there).
+SUBSYSTEM=="tty", ATTRS{idVendor}=="04b4", ATTRS{idProduct}=="0008", MODE="0660", GROUP="dialout", TAG+="uaccess"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0660", GROUP="dialout", TAG+="uaccess"

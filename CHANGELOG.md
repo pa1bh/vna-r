@@ -13,6 +13,12 @@ calibratiebestanden.
 
 ## [Unreleased]
 
+### Gewijzigd
+- De udev-regel voor Linux heet nu `linux/70-litevna.rules` en geeft de poort aan de
+  ingelogde gebruiker (`uaccess`) en de groep `dialout` (`0660`) in plaats van aan
+  iedereen (`0666`). In het oude 99-bestand deed de `uaccess`-tag niets omdat hij na
+  `73-seat-late.rules` kwam. Verwijder `/etc/udev/rules.d/99-litevna.rules` als je die had.
+
 ### Opgelost
 - Library: een sweep-configuratie met nul punten, een niet-oplopend raster in de TDR en
   een band van nul of negatief in `check_lines` gaven een rekenfout (overflow) of een

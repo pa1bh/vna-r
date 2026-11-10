@@ -257,7 +257,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 12 | Eén encodering voor "geen ruwe records" in `SweepResult.points`; Touchstone-sweep als standaard mogelijk | B10 | S | gedaan 2026-11-10 |
 | 13 | Export-commentaar en referentienaam bij bestandstrace; standaard-sweeps door de middeling; floats uit instellingen clampen | B12, B13, B14 | S | gedaan 2026-11-10 (`SweepResult::average` in de library) |
 | 14 | `points == 0` en u64-aftrekking afvangen; `check_lines` band ≤ 0 weigeren | B15, B16 | S | gedaan 2026-11-10 |
-| 15 | udev-regel: `70-litevna.rules` met uaccess, zonder 0666 | V1 | S | |
+| 15 | udev-regel: `70-litevna.rules` met uaccess, zonder 0666 | V1 | S | gedaan 2026-11-10 |
 | 16 | README/handleidingen: versie, archiefnamen, GTK-verwijzingen weg, xdg-portal noemen; docs/04 DC-term; roadmap-intro | L2, L3 | S | |
 | 17 | CHANGELOG naar het Engels (besluit 2); `[0.1.0]`-link herstellen | L3 | S | |
 | 18 | `num-complex` uit vna-cli; verouderde UI-teksten (Hold, step 8, bestandsnamen) | L5, U10 | S | |

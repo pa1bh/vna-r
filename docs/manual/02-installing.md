@@ -42,7 +42,7 @@ The port is called `/dev/ttyACM0` or higher. To be allowed to open it without ro
 the udev rule from the repository:
 
 ```bash
-sudo cp linux/99-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo cp linux/70-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 Then unplug the USB cable briefly and plug it back in. An alternative is to add yourself to the group

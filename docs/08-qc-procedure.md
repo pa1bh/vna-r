@@ -223,3 +223,19 @@ Verwacht: drie tests groen. Praktijkcontrole: open een .s2p waarvan je twee rege
 omgewisseld (niet-oplopend) als trace: de reader weigert hem al ("frequencies are not
 increasing"); de TDR-controle is de tweede verdedigingslinie voor samengevoegde segmenten.
 
+## Punt 15 — udev-regel 70-litevna.rules (V1)
+
+**Op een Linux-machine (hp-nixos of een Debian/Fedora-doos), met apparaat.**
+```bash
+sudo rm -f /etc/udev/rules.d/99-litevna.rules
+sudo cp linux/70-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+Herplug het apparaat en controleer:
+```bash
+ls -l /dev/ttyACM0 && getfacl /dev/ttyACM0 2>/dev/null | grep user:
+vna-cli info
+```
+Verwacht: `crw-rw----+ 1 root dialout` (een `+` voor de ACL) met een regel
+`user:<jouw naam>:rw-` uit getfacl, en `vna-cli info` werkt zonder sudo. Op NixOS via de
+flake: `nix build .#vna-r && ls result/lib/udev/rules.d/` toont `70-litevna.rules`.
+

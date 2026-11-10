@@ -42,7 +42,7 @@ De poort heet `/dev/ttyACM0` of hoger. Om hem zonder root te mogen openen, insta
 de udev-regel uit de repository:
 
 ```bash
-sudo cp linux/99-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo cp linux/70-litevna.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 Haal daarna de USB-stekker even los en weer vast. Een alternatief is jezelf in de groep

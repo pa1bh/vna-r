@@ -81,7 +81,7 @@ jobs:
           else
             cp "$bin/vna-cli" "$bin/vna-gui" "$name"/
             if [ "${{ runner.os }}" = "Linux" ]; then
-              cp linux/99-litevna.rules "$name"/
+              cp linux/70-litevna.rules "$name"/
             fi
             tar czf "$name.tar.gz" "$name"
             shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"

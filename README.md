@@ -70,7 +70,7 @@ stutter (NVK on older NVIDIA cards under nouveau) or software rasterisers, where
 menus feel sluggish, check the renderer line under **Help ▸ About** and try `WGPU_BACKEND=gl`; the
 manual's troubleshooting chapter has more.
 
-**Serial port access on Linux.** Copy [linux/99-litevna.rules](linux/99-litevna.rules) to
+**Serial port access on Linux.** Copy [linux/70-litevna.rules](linux/70-litevna.rules) to
 `/etc/udev/rules.d/` and reload udev (instructions in the file), or add yourself to the `dialout`
 group. The port is `/dev/ttyACM*`; on macOS it is `/dev/cu.usbmodem…` and no driver is needed.
 
