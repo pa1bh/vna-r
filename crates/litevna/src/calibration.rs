@@ -308,6 +308,19 @@ impl CalibrationSet {
         if sweep.missing_points() > 0 {
             return Err(Error::Calibration(format!("{} points missing in sweep", sweep.missing_points())));
         }
+        // A NaN or infinity (a record with a zero reference wave, a damaged
+        // file) would spread into every error term and, once saved, make the
+        // calibration file unreadable: JSON has no such numbers.
+        if let Some(i) = (0..sweep.s11.len()).find(|&i| {
+            let (a, b) = (sweep.s11[i], sweep.s21[i]);
+            !(a.re.is_finite() && a.im.is_finite() && b.re.is_finite() && b.im.is_finite())
+        }) {
+            return Err(Error::Calibration(format!(
+                "{}: the measurement at {} Hz is not a finite number",
+                standard.name(),
+                sweep.freqs_hz[i]
+            )));
+        }
         *self.slot(standard) = Some(StandardMeasurement {
             s11: sweep.s11.clone(),
             s21: sweep.s21.clone(),
@@ -641,6 +654,11 @@ impl CalibrationSet {
         let mut last_rms = 0.0;
         for _ in 0..10 {
             let (k, n, rms_before, rms_after) = work.fit_step(f_min_hz)?;
+            if !k.is_finite() {
+                return Err(Error::Calibration(
+                    "the kit fit did not produce a number (a line measurement with zero reflection?)".into(),
+                ));
+            }
             if first.is_none() {
                 first = Some((rms_before, n));
             }
@@ -1313,6 +1331,24 @@ mod tests {
             set.set(std, &sweep_from(freqs, s11, s21)).unwrap();
         }
         set
+    }
+
+    #[test]
+    fn a_non_finite_measurement_is_refused_as_a_standard() {
+        let freqs: Vec<u64> = vec![1_000_000, 2_000_000, 3_000_000];
+        let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
+        let mut s11 = vec![C64::new(1.0, 0.0); 3];
+        s11[1] = C64::new(f64::NAN, 0.0);
+        let err = set
+            .set(Standard::Open, &sweep_from(&freqs, s11, vec![C64::new(0.0, 0.0); 3]))
+            .unwrap_err();
+        assert!(err.to_string().contains("2000000 Hz is not a finite number"), "{err}");
+        assert!(!set.has(Standard::Open));
+        let mut s21 = vec![C64::new(0.0, 0.0); 3];
+        s21[2] = C64::new(0.0, f64::INFINITY);
+        assert!(set
+            .set(Standard::Through, &sweep_from(&freqs, vec![C64::new(0.0, 0.0); 3], s21))
+            .is_err());
     }
 
     #[test]

@@ -302,6 +302,12 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 43 | Tekst-`scan` voor NanoVNA-H/H4 zonder `scan_bin` | N13 | M | alleen met hardware |
 | 44 | 12-term 2-poorts via omdraaien van de DUT | N18 | L | alleen met hardware |
 
+## Toegevoegd tijdens het werk
+
+| # | Werk | Code | Grootte | Status |
+|---|------|------|---------|--------|
+| 48 | Niet-eindige waarden weigeren als standaard en in de kit-fit; Touchstone met `nan`/`inf` of dubbele frequentie weigeren | B21, B22 | S | gedaan 2026-11-10 |
+
 ## Meten
 
 | # | Werk | Code | Status |

@@ -465,3 +465,16 @@ Verwacht: twee tests groen (LiteVNA: 255, 510, 600 van 600; shell: 301, 602, 700
 en een standaardmeting: balk loopt tot 25608 punten; Stop breekt binnen een seconde af.
 Screenshot tijdens Run: de sweep loopt daarna door.
 
+## Punt 48 — Niet-eindige waarden en dubbele frequenties (B21, B22)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna non_finite a_non_finite tabs_crlf
+printf '# MHz S RI R 50\n1 0.5 0.0\n1 0.4 0.0\n2 0.3 0.0\n' > /tmp/qc-dup.s1p
+cargo run -q --release -p vna-cli -- tdr --from /tmp/qc-dup.s1p
+```
+Verwacht: tests groen; de CLI meldt "frequency 1000000 Hz appears more than once". Een
+bestand van een ander programma dat een frequentie dubbel bevat (aansluitende segmenten)
+wordt nu geweigerd; vna-r zelf schrijft zulke bestanden niet. Als je zo'n bestand
+tegenkomt dat je wel wilt lezen, is dat het moment om hierover te beslissen.
+

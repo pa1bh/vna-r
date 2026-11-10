@@ -64,6 +64,11 @@ things that are not backwards compatible, such as the format of the calibration 
 - GUI: a USB cable pulled during a sweep is recognised as a disconnect also when the
   failure shows up as a timeout: the worker checks whether the port still exists. Before,
   the GUI could stay "connected" to a device that was gone.
+- A measurement that is not a finite number (NaN or infinity, from a damaged file or a
+  record without a reference wave) is refused as a calibration standard, and a kit fit
+  that produces no number is refused instead of written into the kit; such a value made
+  the saved calibration file unreadable. A Touchstone file with `nan`/`inf` values or
+  with the same frequency twice is refused with a message.
 - A Touchstone file that cannot be read now reports the line ("line 12: not a number:
   …") as its own kind of error instead of "invalid argument".
 - Library: a sweep configuration with zero points, a non-increasing grid in the TDR and

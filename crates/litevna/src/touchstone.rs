@@ -97,6 +97,10 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
             let v: f64 = t
                 .parse()
                 .map_err(|_| Error::parse(Some(lineno + 1), format!("not a number: {t:?}")))?;
+            // Rust reads "nan" and "inf" as numbers; a measurement file has neither.
+            if !v.is_finite() {
+                return Err(Error::parse(Some(lineno + 1), format!("not a finite number: {t:?}")));
+            }
             tokens.push(v);
         }
     }
@@ -143,6 +147,10 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
     }
     if freqs_hz.windows(2).any(|w| w[1] < w[0]) {
         return Err(Error::parse(None, "frequencies are not increasing".into()));
+    }
+    if let Some(w) = freqs_hz.windows(2).find(|w| w[1] == w[0]) {
+        // Two rows for one frequency: which of the two is the measurement?
+        return Err(Error::parse(None, format!("frequency {} Hz appears more than once", w[0])));
     }
     if (z0 - 50.0).abs() > 1e-9 {
         for g in &mut s11 {
@@ -277,6 +285,25 @@ pub use crate::traces::{db, swr};
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_finite_values_and_repeated_frequencies_are_refused() {
+        let err = read_touchstone("# MHz S RI R 50\n1 0.5 0.0\n2 nan 0.0\n".as_bytes(), Some(1)).unwrap_err();
+        assert_eq!(err.to_string(), "line 3: not a finite number: \"nan\"");
+        let err = read_touchstone("# MHz S DB R 50\n1 inf 0.0\n".as_bytes(), Some(1)).unwrap_err();
+        assert!(err.to_string().contains("not a finite number"), "{err}");
+        let err = read_touchstone("# MHz S RI R 50\n1 0.5 0.0\n1 0.4 0.0\n2 0.3 0.0\n".as_bytes(), Some(1)).unwrap_err();
+        assert_eq!(err.to_string(), "frequency 1000000 Hz appears more than once");
+    }
+
+    #[test]
+    fn tabs_crlf_and_trailing_comments_are_fine() {
+        let text = "! made by something else\r\n#\tMHZ\tS\tMA\tR\t50\r\n1\t0.5\t90 ! first point\r\n2\t0.25\t-90\r\n";
+        let sweep = read_touchstone(text.as_bytes(), Some(1)).unwrap();
+        assert_eq!(sweep.freqs_hz, vec![1_000_000, 2_000_000]);
+        assert!((sweep.s11[0] - Complex64::new(0.0, 0.5)).norm() < 1e-12);
+        assert!((sweep.s11[1] - Complex64::new(0.0, -0.25)).norm() < 1e-12);
+    }
 
     #[test]
     fn parse_errors_name_the_line() {
