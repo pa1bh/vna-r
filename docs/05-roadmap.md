@@ -230,3 +230,78 @@ icoon voor de app-bundel.
 Gedaan voor de eerste testronde met anderen (0.2.0): één versienummer in de workspace
 met git-revisie, menubalk met About, Developer tools (log en diagnostiek) standaard uit,
 CHANGELOG met releaseprocedure en een tag-controle in de release-workflow.
+
+---
+
+# Werklijst november 2026
+
+Stand: 2026-11-10, na de doorlichting in [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md).
+De codes (B1, U2, D3 …) verwijzen naar dat rapport; de besluiten staan in §10 daarvan.
+Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
+
+## 0.2.6 — bugfix, geen nieuwe features
+
+| # | Werk | Code | Grootte | Status |
+|---|------|------|---------|--------|
+| 1 | Calibratie-interpolatie polair (grootte en fase), 90°-grens eruit, test met grof raster | B1 | S | |
+| 2 | `max_time_s = 1/(2·df)`, test en GUI-label "alias-free range" mee | B2 | S | |
+| 3 | `NanoVnaShell::open`: `restore_on_drop` pas na geslaagde `sync` | B3 | S | |
+| 4 | Statusmelding ("measured …", "loaded", "save to keep it") scheiden van de solve-fout | B4, U2 | S | |
+| 5 | Standaarden meten op het toegepaste raster, of waarschuwen bij afwijking van het getypte | U1 | S | |
+| 6 | `fail()` stopt de lus alleen bij sweep- en connect-fouten; screenshot en set average niet | B5 | S | |
+| 7 | Markers op frequentie: per sweep `nearest_index`, buiten bereik weg | B6, N1 | S | |
+| 8 | Pijltjestoetsen alleen zonder tekstfocus (`wants_keyboard_input`) | B7 | S | |
+| 9 | CLI: s2p-commentaar bij `--segment` en per apparaat, `tdr --csv -` naar stdout, debugregel achter `--trace` | B8, B9, U12 | S | |
+| 10 | Screenshot-header cappen (bijv. 4096×4096, alleen bpp 16) | B11, V2 | S | |
+| 11 | "Set sweep for TDR" en nieuwe segmenten uit `device_limits()` | U5, N19 | S | |
+| 12 | Eén encodering voor "geen ruwe records" in `SweepResult.points`; Touchstone-sweep als standaard mogelijk | B10 | S | |
+| 13 | Export-commentaar en referentienaam bij bestandstrace; standaard-sweeps door de middeling; floats uit instellingen clampen | B12, B13, B14 | S | |
+| 14 | `points == 0` en u64-aftrekking afvangen; `check_lines` band ≤ 0 weigeren | B15, B16 | S | |
+| 15 | udev-regel: `70-litevna.rules` met uaccess, zonder 0666 | V1 | S | |
+| 16 | README/handleidingen: versie, archiefnamen, GTK-verwijzingen weg, xdg-portal noemen; docs/04 DC-term; roadmap-intro | L2, L3 | S | |
+| 17 | CHANGELOG naar het Engels (besluit 2); `[0.1.0]`-link herstellen | L3 | S | |
+| 18 | `num-complex` uit vna-cli; verouderde UI-teksten (Hold, step 8, bestandsnamen) | L5, U10 | S | |
+| 19 | Firmware en PDF's uit git, links in docs/02 (besluit 1) | L1 | S | |
+| 20 | `build.rs`: ook `refs/heads/*` en `packed-refs` als rerun-trigger | B25 | S | |
+
+## 0.3 — structuur, vóór nieuwe features
+
+| # | Werk | Code | Grootte | Status |
+|---|------|------|---------|--------|
+| 21 | `SerialLink` met injecteerbare nep-poort; tests voor `LiteVna::sweep`, `scan_bin`, `command`, screenshots | D1, D6 | M/L | |
+| 22 | Annuleren en voortgang: `sweep_with(cfg, callback)` per chunk; worker en Stop erdoorheen (besluit 5) | F2, N2, U4 | M | |
+| 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | |
+| 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | |
+| 25 | Versieveld in bewaarde instellingen en calibratie-JSON; `Vec` in plaats van vaste arrays | D4 | S | |
+| 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | |
+| 27 | Fouttype: `Parse { line }`, `NotConnected`, `Unsupported(Kind)`; "apparaat weg" ook bij `Timeout` | D7 | S | |
+| 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | |
+| 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | |
+| 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | |
+| 31 | `Arc<SweepResult>` voor shown en referenties; statusstring cachen | D9 | S | |
+| 32 | Z0, SWR-clamp en dB-vloer op één plek | D8 | S | |
+| 33 | CONTRIBUTING of korte architectuurnotitie | D12 | S | |
+
+## Later — features
+
+| # | Werk | Code | Grootte | Status |
+|---|------|------|---------|--------|
+| 34 | `--json` voor info, list, sweep, tdr, cal show | N4 | S | |
+| 35 | Poortverlenging / elektrische vertraging op de host | N5 | S | |
+| 36 | Referenties bewaren met de sessie (besluit 8) | N12 | M | |
+| 37 | Host-middeling via `valuesPerFrequency` | N6, F3 | S/M | |
+| 38 | Sneltoetsen, auto-connect, batterij verversen, TDR-marker nudgen | N7–N9, N11 | S | |
+| 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | |
+| 40 | CSV met afgeleide kolommen; `.s1p`-export; Touchstone v2 | N15, N16 | S | |
+| 41 | `cal` als subcommando's met completions | N17 | M | |
+| 42 | Kit-bestanden lezen, load serie-L | N14 | S/M | |
+| 43 | Tekst-`scan` voor NanoVNA-H/H4 zonder `scan_bin` | N13 | M | alleen met hardware |
+| 44 | 12-term 2-poorts via omdraaien van de DUT | N18 | L | alleen met hardware |
+
+## Meten
+
+| # | Werk | Code | Status |
+|---|------|------|--------|
+| 45 | FIFO-timeouts bij average 80 en lage shell-bandbreedte | B18 | |
+| 46 | Stale records na een configuratiewijziging (zelfde aantal punten, ander raster) | B20 | |
+| 47 | Windows met een apparaat (`list`, `info`, `sweep`, `screenshot --trace`) | — | geen tester |
