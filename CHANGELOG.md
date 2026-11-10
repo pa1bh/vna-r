@@ -14,6 +14,10 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- Een sweep uit een Touchstone-bestand kon niet als calibratiestandaard dienen ("n points
+  missing in sweep"): bestanden en NanoVNA-shell-sweeps codeerden "geen ruwe records"
+  verschillend. Nu één afspraak: geen records is een lege lijst, en dat telt niet als
+  ontbrekende punten.
 - GUI: **Set sweep for TDR** en een nieuw segment gingen altijd tot 6,3 GHz, ook op een
   NanoVNA-F (1,5 GHz); ze nemen nu de bovengrens van het verbonden apparaat.
 - Een onzinnige schermafdruk-header (van een apparaat dat geen LiteVNA is of een gestoorde

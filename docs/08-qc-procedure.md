@@ -187,3 +187,13 @@ Segments krijgt stop `1.5GHz`.
 
 **Met LiteVNA.** Hetzelfde geeft 6,3 GHz, zoals voorheen. Zonder apparaat ook 6,3 GHz.
 
+## Punt 12 — Geen ruwe records is een lege lijst (B10)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna a_sweep_without_raw_records
+```
+Verwacht: groen. De API heeft geen pad om een bestand als standaard in te lezen (CLI
+`cal` meet altijd), dus dit is een library-eigenschap; hij komt van pas zodra de GUI of
+CLI standaarden uit .s1p-bestanden accepteert.
+

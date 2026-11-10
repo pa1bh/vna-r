@@ -150,7 +150,7 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
     }
     Ok(TouchstoneFile {
         sweep: SweepResult {
-            points: vec![None; n],
+            points: Vec::new(),
             freqs_hz,
             s11,
             s21,
@@ -296,7 +296,7 @@ mod tests {
         let s11: Vec<Complex64> = freqs_hz.iter().map(|&f| Complex64::from_polar(0.3, -(f as f64) * 1e-8)).collect();
         let s21: Vec<Complex64> = freqs_hz.iter().map(|&f| Complex64::from_polar(0.9, -(f as f64) * 3e-8)).collect();
         SweepResult {
-            points: vec![None; 5],
+            points: Vec::new(),
             freqs_hz,
             s11,
             s21,
@@ -375,7 +375,7 @@ mod tests {
             freqs_hz: vec![1_000_000, 2_000_000],
             s11: vec![Complex64::new(0.5, 0.0), Complex64::new(0.0, -0.5)],
             s21: vec![Complex64::new(0.1, 0.0), Complex64::new(0.0, 0.1)],
-            points: vec![None, None],
+            points: Vec::new(),
             checksum_ok: 0,
             checksum_bad: 0,
             duplicates: 0,

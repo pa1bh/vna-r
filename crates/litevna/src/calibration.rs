@@ -1294,6 +1294,21 @@ mod tests {
     }
 
     #[test]
+    fn a_sweep_without_raw_records_is_a_valid_standard() {
+        // Touchstone files and NanoVNA shell sweeps carry no FIFO records
+        // (`points` empty); that is not "every point missing".
+        let freqs: Vec<u64> = (0..5).map(|i| 1_000_000 + i * 1_000_000).collect();
+        let sweep = SweepResult {
+            points: Vec::new(),
+            ..sweep_from(&freqs, vec![C64::new(1.0, 0.0); 5], vec![C64::new(0.0, 0.0); 5])
+        };
+        assert_eq!(sweep.missing_points(), 0);
+        let mut set = CalibrationSet::new(freqs, CalKit::ideal());
+        set.set(Standard::Open, &sweep).unwrap();
+        assert!(set.has(Standard::Open));
+    }
+
+    #[test]
     fn interpolation_tracks_smooth_terms() {
         let kit = CalKit::ideal();
         let coarse: Vec<u64> = (0..=100).map(|i| 10_000_000 + i * 9_900_000).collect(); // 10 MHz..1 GHz

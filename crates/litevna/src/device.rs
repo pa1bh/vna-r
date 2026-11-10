@@ -100,7 +100,11 @@ pub struct SweepResult {
     pub freqs_hz: Vec<u64>,
     pub s11: Vec<Complex64>,
     pub s21: Vec<Complex64>,
-    /// The raw records, `None` where a point never arrived.
+    /// The raw LiteVNA FIFO records, one per frequency point (`None` where a
+    /// point never arrived). **Empty** for a sweep without raw records: a
+    /// NanoVNA shell sweep, a Touchstone file, an average. `missing_points`
+    /// is then 0; only a vector as long as `freqs_hz` says something about
+    /// completeness.
     pub points: Vec<Option<FifoPoint>>,
     pub checksum_ok: usize,
     pub checksum_bad: usize,
@@ -110,7 +114,11 @@ pub struct SweepResult {
 }
 
 impl SweepResult {
+    /// Points that never arrived; 0 for a sweep that carries no raw records.
     pub fn missing_points(&self) -> usize {
+        if self.points.len() != self.freqs_hz.len() {
+            return 0;
+        }
         self.points.iter().filter(|p| p.is_none()).count()
     }
 
