@@ -12,6 +12,14 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.0-rc.1] - 2026-11-10
+
+Release candidate: the result of a review of the whole project (bugs in the calibration
+and TDR, the calibration flow in the GUI, a stricter CLI, new functions, and a round of
+restructuring). Checked by the tests and on files; **not yet tried with a device** on any
+platform. Settings and calibration files of 0.2.x are read; 0.2.x does not read the
+settings this version writes, so keep a copy of `app.ron` if you want to go back.
+
 ### Added
 - CLI: `vna-cli cal --help` lists the standards and actions with what each does, and a
   mistyped one is refused with the list; `vna-cli completions <shell>` prints a completion
@@ -295,7 +303,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0-rc.1...HEAD
+[0.3.0-rc.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.1
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
 [0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
 [0.2.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.3

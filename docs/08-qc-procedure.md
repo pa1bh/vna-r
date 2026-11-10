@@ -1,7 +1,8 @@
 # QC-procedure werklijst november 2026
 
-Stand: 10 november 2026: ruim veertig commits op `main` die niet gepusht zijn (`git log --oneline origin/main..HEAD`), versienummer nog
-0.2.5. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+Stand: 10 november 2026: alles staat op GitHub en is uitgebracht als release candidate
+**0.3.0-rc.1** (pre-release, met archieven voor Linux, beide Macs en Windows), op jouw
+verzoek vóór de QC, om het testen op andere platforms makkelijker te maken. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
 
@@ -10,7 +11,7 @@ Wat ik zelf al gecontroleerd heb: `cargo fmt`, `cargo clippy -D warnings` en all
 geen apparaat nodig hebben; en dat de GUI met jouw bestaande instellingen van 0.2.5
 start en tien seconden draait zonder fout. **Niet gecontroleerd**: alles met een
 apparaat, alles wat je moet zien (de GUI heb ik niet kunnen bekijken), Linux, Windows en
-de CI (er is niets gepusht).
+het gedrag van de release-archieven op andere machines.
 
 ## Voorbereiding
 
@@ -19,6 +20,10 @@ cargo build --workspace --release
 export PATH="$PWD/target/release:$PATH"
 cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
+
+Op een andere machine neem je in plaats van de eerste twee regels het archief van de
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.1> (pre-release), uitpakken
+zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
 voorbeelden hieronder de nieuwe versie zijn; de derde bewaart je instellingen van 0.2.5
@@ -825,12 +830,12 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
    Besluit van 10 november: de Help-links blijven naar de tag van de eigen versie wijzen;
    een correctie in de handleiding gaat mee met de volgende release. Er is niets
    veranderd aan de code.
-2. **Versienummer en release.** Alles staat onder *Unreleased*. Er is nieuw gedrag
-   (instellingenformaat, CLI weigert meer, nieuwe functies), dus 0.3.0 ligt meer voor de
-   hand dan 0.2.6. Pas na jouw QC: versie in `Cargo.toml`, de kop in `CHANGELOG.md`,
-   commit, tag, push.
-3. **Pushen.** Al het werk van deze sessie staat alleen lokaal. Pas na een push draait de CI, die de
-   Nix-build zonder GTK (punt 16) en de nieuwe stappen (punt 29) moet bevestigen.
+2. **Versienummer en release: beantwoord.** Uitgebracht als 0.3.0-rc.1, een
+   pre-release. Vindt de QC fouten, dan volgt rc.2. Is alles goed: hernoem de sectie
+   `## [0.3.0-rc.1]` in `CHANGELOG.md` naar `## [0.3.0] - <datum>`, zet `0.3.0` in
+   `Cargo.toml`, pas de twee links onderaan de changelog aan, commit, tag `v0.3.0`, push.
+3. **Pushen: gedaan.** De CI heeft gedraaid; zie punt 16 en 29 voor wat je daarin
+   naloopt.
 4. **Punt 42, kit-bestanden.** Welk formaat wil je kunnen lezen (NanoVNA-Saver, een
    Keysight-achtige tabel, iets anders)? Zonder voorbeeldbestand bouw ik dat niet.
 5. **Dubbele frequenties in Touchstone (punt 48)** worden nu geweigerd. Kom je een

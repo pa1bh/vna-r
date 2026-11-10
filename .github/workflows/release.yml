@@ -124,3 +124,6 @@ jobs:
           # The changelog section is the release text; no auto-generated notes under it.
           body_path: notes.md
           generate_release_notes: false
+          # A tag with a suffix (v0.3.0-rc.1) is a release candidate: marked as a
+          # pre-release, so "latest" keeps pointing at the last full release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
