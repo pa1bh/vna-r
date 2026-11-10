@@ -531,7 +531,7 @@ mod tests {
         let (mut worst, mut count) = (0.0f64, 0);
         for (i, &f) in freqs.iter().enumerate() {
             let f = f as f64;
-            if f < 300e6 || f > 700e6 {
+            if !(300e6..=700e6).contains(&f) {
                 continue;
             }
             let want = -0.9 * Complex64::from_polar(1.0, -2.0 * PI * f * tau);
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn rejects_bad_input() {
         let freqs = grid();
-        assert!(tdr(&freqs[..4], &vec![Complex64::new(0.0, 0.0); 4], &TdrConfig::default()).is_err());
+        assert!(tdr(&freqs[..4], &[Complex64::new(0.0, 0.0); 4], &TdrConfig::default()).is_err());
         let mut uneven = freqs.clone();
         uneven[5] += 1;
         assert!(tdr(&uneven, &vec![Complex64::new(0.0, 0.0); uneven.len()], &TdrConfig::default()).is_err());

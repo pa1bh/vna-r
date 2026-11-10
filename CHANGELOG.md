@@ -26,6 +26,14 @@ things that are not backwards compatible, such as the format of the calibration 
   `sweep-1MHz-30MHz.s2p`) instead of `litevna.cal.json` and `sweep.s2p`; two hints in the
   Traces panel pointed at a button and a roadmap step that no longer exist.
 
+### Development
+- The workspace declares its minimum Rust version (1.95, the floor of egui 0.37) and is
+  clean under clippy; CI now runs clippy with warnings as errors, tests the library with
+  overflow checks, and checks that the Dutch and English manuals have the same structure.
+  The release workflow builds the Linux tarball on Ubuntu 22.04 (glibc 2.35, so Debian 12
+  works), keeps macOS `._*` files out of the archives and no longer appends auto-generated
+  notes to the changelog text.
+
 ### Fixed
 - Library: a sweep configuration with zero points, a non-increasing grid in the TDR and
   a zero or negative band in `check_lines` caused an arithmetic overflow or an endless

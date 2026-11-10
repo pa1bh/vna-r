@@ -4,12 +4,16 @@ version.workspace = true
 description = "Command line tool for LiteVNA and NanoVNA-F vector network analysers"
 build = "build.rs"
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [[bin]]
 name = "vna-cli"
 path = "src/main.rs"
+
+[lints]
+workspace = true
 
 [dependencies]
 litevna = { path = "../litevna" }

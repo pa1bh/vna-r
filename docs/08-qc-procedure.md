@@ -309,3 +309,31 @@ Verwacht: de tweede `--version` toont een andere revisie dan de eerste (de hash 
 lege commit). Vóór 0.2.6 bleef de oude staan tot een branchwissel. De laatste regel haalt
 de testcommit weer weg; voer hem alleen uit op een schone werkboom.
 
+---
+
+# 0.3 — structuur
+
+## Punt 29 — CI, clippy, minimale Rust-versie, handleidingcheck (D11, D13)
+
+**Zonder apparaat.**
+```bash
+cargo clippy --workspace --all-targets -- -D warnings
+./scripts/check-manuals.sh
+grep -n 'rust-version' Cargo.toml crates/*/Cargo.toml
+```
+Verwacht: clippy zonder meldingen; "manuals in step: 10 files each"; `rust-version =
+"1.95"` in de workspace en `rust-version.workspace = true` in de drie crates.
+
+Negatieve test van het script: voeg tijdelijk een regel `## Test` toe aan
+`docs/manual/03-gui.md` en draai het script: verwacht "DIFFERENT STRUCTURE" en exitcode 1.
+Haal de regel weer weg.
+
+**Na push.** Alle CI-jobs groen, inclusief de nieuwe stappen "Clippy", "Manuals in step"
+en "Test the library with overflow checks".
+
+**Bij de volgende release.** De Linux-job draait op `ubuntu-22.04`; als GitHub die runner
+heeft uitgefaseerd faalt de job direct met een duidelijke melding en moet de regel in
+`release.yml` naar de oudste beschikbare LTS. Controleer in het macOS-archief:
+`tar tzf vna-r-v*-aarch64-macos.tar.gz | grep -c '/\._'` geeft `0`. De releasetekst op
+GitHub bevat alleen de changelog-sectie.
+

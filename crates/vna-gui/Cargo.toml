@@ -4,12 +4,16 @@ version.workspace = true
 description = "Desktop GUI for LiteVNA and NanoVNA-F vector network analysers (egui)"
 build = "build.rs"
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
 [[bin]]
 name = "vna-gui"
 path = "src/main.rs"
+
+[lints]
+workspace = true
 
 [dependencies]
 litevna = { path = "../litevna" }

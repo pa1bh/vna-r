@@ -104,9 +104,9 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
         Some(2) => 9,
         Some(n) => return Err(Error::InvalidArgument(format!("{n}-port files are not supported"))),
         None => {
-            if tokens.len() % 9 == 0 && tokens.len() % 3 == 0 && looks_like_two_port(&tokens) {
+            if tokens.len().is_multiple_of(9) && tokens.len().is_multiple_of(3) && looks_like_two_port(&tokens) {
                 9
-            } else if tokens.len() % 3 == 0 {
+            } else if tokens.len().is_multiple_of(3) {
                 3
             } else {
                 return Err(Error::InvalidArgument(format!(
@@ -116,7 +116,7 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
             }
         }
     };
-    if tokens.len() % per != 0 {
+    if !tokens.len().is_multiple_of(per) {
         return Err(Error::InvalidArgument(format!(
             "{} values do not form records of {per}",
             tokens.len()

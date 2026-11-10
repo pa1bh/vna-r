@@ -52,7 +52,7 @@ nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 The package also ships the udev rule (`services.udev.packages = [ vna-r ];`). The release tarballs
 do not run on NixOS; use the flake there.
 
-**Build from source.** You need a Rust toolchain (stable, 1.82 or later). On Debian/Ubuntu also:
+**Build from source.** You need a Rust toolchain (stable, 1.95 or later). On Debian/Ubuntu also:
 
 ```bash
 sudo apt-get install -y pkg-config libudev-dev
@@ -194,8 +194,9 @@ and paste the result. For CLI problems, the output with `--trace` helps.
 | `crates/vna-cli` | Command line tool on top of the library. |
 | `crates/vna-gui` | Desktop GUI (egui/eframe). |
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) builds and tests on Ubuntu, macOS and Windows
-and builds the Nix flake on every push.
+[.github/workflows/ci.yml](.github/workflows/ci.yml) checks formatting and clippy, builds and
+tests on Ubuntu, macOS and Windows, checks that the two manuals have the same structure
+([scripts/check-manuals.sh](scripts/check-manuals.sh)) and builds the Nix flake on every push.
 
 ## Versions and releases
 

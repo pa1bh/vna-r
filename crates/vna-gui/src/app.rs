@@ -135,6 +135,8 @@ impl Default for Settings {
     }
 }
 
+// One value for the whole program, replaced on connect and disconnect only.
+#[allow(clippy::large_enum_variant)]
 enum Connection {
     Disconnected,
     Connecting(String),
@@ -924,7 +926,7 @@ impl App {
     /// buffer resets when the grid changes. Averaging complex values shrinks
     /// noise without biasing the magnitude, unlike averaging dB.
     fn push_average(&mut self, raw: SweepResult) -> SweepResult {
-        if self.avg_buf.front().map_or(false, |b| b.freqs_hz != raw.freqs_hz) {
+        if self.avg_buf.front().is_some_and(|b| b.freqs_hz != raw.freqs_hz) {
             self.avg_buf.clear();
         }
         self.avg_buf.push_back(raw);
@@ -961,7 +963,7 @@ impl App {
             let done = match cal_path {
                 Some(p) => {
                     let d = self.seg_correct(&p, &part);
-                    flags.push(self.seg_cals.get(&p).map_or(false, |c| c.solved.is_some()));
+                    flags.push(self.seg_cals.get(&p).is_some_and(|c| c.solved.is_some()));
                     d
                 }
                 None => match self.cal.calibration_for(&part.freqs_hz) {
@@ -1831,8 +1833,8 @@ impl App {
             .cal
             .set
             .as_ref()
-            .map_or(false, |s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
-        let solvable = self.cal.set.as_ref().map_or(false, |s| s.solve().is_ok());
+            .is_some_and(|s| s.has(Standard::LineOpen) && s.has(Standard::LineShort));
+        let solvable = self.cal.set.as_ref().is_some_and(|s| s.solve().is_ok());
         ui.small("With open, short and load done: put a cable (≥ 50 cm) on port 1 and measure it with an open and a short at the far end. The ripple difference gives the open/short asymmetry of the kit.");
         self.standard_buttons(ui, &Standard::LINE, connected);
         ui.horizontal(|ui| {
@@ -1853,7 +1855,7 @@ impl App {
             if ui.add_enabled(self.cal.fit.is_some(), egui::Button::new("Apply to kit")).clicked() {
                 self.apply_kit_fit();
             }
-            let not_ideal = self.cal.set.as_ref().map_or(false, |s| s.kit != CalKit::ideal());
+            let not_ideal = self.cal.set.as_ref().is_some_and(|s| s.kit != CalKit::ideal());
             if ui.add_enabled(not_ideal, egui::Button::new("Reset kit")).clicked() {
                 if let Some(set) = &mut self.cal.set {
                     set.kit = CalKit::ideal();
@@ -2468,9 +2470,9 @@ impl App {
     fn marker_readout(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Markers");
-            for k in 0..MARKERS {
+            for (k, color) in MARKER_COLORS.iter().enumerate() {
                 let placed = self.markers[k].is_some();
-                let text = RichText::new(format!("M{}", k + 1)).color(MARKER_COLORS[k]);
+                let text = RichText::new(format!("M{}", k + 1)).color(*color);
                 let text = if placed { text.strong() } else { text.weak() };
                 if ui.selectable_label(self.active_marker == k, text).clicked() {
                     self.active_marker = k;

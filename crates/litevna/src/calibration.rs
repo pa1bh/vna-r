@@ -910,8 +910,8 @@ impl CalibrationSet {
         }
 
         let (mut d, mut c) = (0.0, 0usize);
-        for i in 0..n {
-            if f[i] >= f_first && f[i] <= f_last {
+        for (i, &fi) in f.iter().enumerate() {
+            if fi >= f_first && fi <= f_last {
                 d += (xo.s11[i] - xs.s11[i]).norm_sqr();
                 c += 1;
             }
@@ -920,8 +920,8 @@ impl CalibrationSet {
 
         // Asymmetry re-fit on the gated lines (same estimator as fit_step).
         let (mut sxy, mut sxx) = (0.0, 0.0);
-        for i in 0..n {
-            if f[i] < f_first.max(300e6) || f[i] > f_last {
+        for (i, &fi) in f.iter().enumerate() {
+            if fi < f_first.max(300e6) || fi > f_last {
                 continue;
             }
             let (o, s_) = (go.s11[i], gs.s11[i]);
@@ -930,7 +930,7 @@ impl CalibrationSet {
                 continue;
             }
             let y = (1.0 - o.norm() / s_.norm()) / (2.0 * r);
-            let x = 2.0 * PI * f[i] * o.arg().sin();
+            let x = 2.0 * PI * fi * o.arg().sin();
             sxy += x * y;
             sxx += x * x;
         }

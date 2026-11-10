@@ -28,18 +28,29 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Format
         run: cargo fmt --all --check
 
+      - name: Manuals in step (Dutch and English)
+        if: runner.os == 'Linux'
+        run: ./scripts/check-manuals.sh
+
       - name: Build
         run: cargo build --workspace --release
 
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
+
       - name: Test
         run: cargo test --workspace --release
+
+      - name: Test the library with overflow checks (debug)
+        if: runner.os == 'Linux'
+        run: cargo test -p litevna
 
       - name: CLI smoke test (no device)
         shell: bash

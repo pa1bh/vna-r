@@ -22,7 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Not ubuntu-latest: the runner's glibc is the oldest the tarball
+          # runs on, and 22.04 (glibc 2.35) still covers Debian 12 and Ubuntu 22.04.
+          - os: ubuntu-22.04
             target: x86_64-linux
             cargo_target: ""
           - os: macos-latest
@@ -69,6 +71,9 @@ jobs:
 
       - name: Package
         shell: bash
+        env:
+          # macOS tar would otherwise add ._* AppleDouble entries to the archive.
+          COPYFILE_DISABLE: "1"
         run: |
           name=vna-r-${GITHUB_REF_NAME}-${{ matrix.target }}
           bin=target/${{ matrix.cargo_target }}/release
@@ -116,5 +121,6 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          # The changelog section is the release text; no auto-generated notes under it.
           body_path: notes.md
-          generate_release_notes: true
+          generate_release_notes: false
