@@ -434,3 +434,34 @@ GUI: Connect, Run, een minuut laten lopen, Stop, Disconnect, opnieuw Connect.
 **Herstel na een fout (LiteVNA).** Run, trek de kabel los tijdens een sweep, steek hem
 terug, Connect, Run: de sweep loopt weer normaal (geen "sweep did not complete").
 
+## Punt 22 — Stop per blok en voortgangsbalk (F2, N2, U4)
+
+**Veranderd.** `sweep_with` in de library (voortgang per blok, annuleren); de worker kijkt
+na elk blok naar de commando's en breekt af bij Stop, Disconnect, Connect of een nieuwe
+weergavesweep; een standaardmeting wacht op de lopende sweep. Voortgangsbalk in de topbalk
+na 0,7 s.
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna progress_is_reported
+```
+Verwacht: twee tests groen (LiteVNA: 255, 510, 600 van 600; shell: 301, 602, 700 van 700).
+
+**Met NanoVNA-F** (hier is het verschil het grootst).
+1. Sweep 1 – 900 MHz met 3201 punten, **Run**: na ongeveer een seconde verschijnt in de
+   topbalk een balk die in stappen van 301 oploopt ("301/3201", "602/3201", …).
+2. Druk **Stop** halverwege: binnen ongeveer 3 s staat de knop weer op Run en verdwijnt de
+   balk. Vóór 0.3 duurde dat tot het einde van de sweep (ongeveer 28 s).
+3. Run opnieuw, wijzig Points naar 201 en **Apply sweep**: de lange sweep wordt afgebroken
+   en de korte verschijnt binnen enkele seconden.
+4. Run met 3201 punten, **Disconnect** halverwege: binnen 3 s verbroken, het apparaat
+   toont weer zijn eigen scherm.
+5. Run met 1001 punten, klik **open** in het calibratiepaneel: de lopende sweep maakt
+   zijn ronde af, dan volgt de standaardmeting ("open…"), daarna loopt de weergave door.
+6. Klik **load** en direct **Stop**: melding "measuring load was stopped", de knop is weer
+   vrij.
+
+**Met LiteVNA.** 201 punten continu: geen balk (te snel). 3201 punten met Sweep avg 8
+en een standaardmeting: balk loopt tot 25608 punten; Stop breekt binnen een seconde af.
+Screenshot tijdens Run: de sweep loopt daarna door.
+

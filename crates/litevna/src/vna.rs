@@ -8,7 +8,7 @@
 //! averaging, bandwidth) stay on the concrete types behind [`Vna::as_lite_mut`]
 //! and [`Vna::as_shell_mut`].
 
-use crate::device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};
+use crate::device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepProgress, SweepResult};
 use crate::discovery::{self, Kind};
 use crate::error::{Error, Result};
 use crate::shell::{NanoVnaShell, ShellInfo, MAX_SCAN_POINTS};
@@ -181,6 +181,16 @@ impl Vna {
         match self {
             Vna::Lite(d) => d.sweep(cfg, fifo_all),
             Vna::Shell(d) => d.sweep(cfg),
+        }
+    }
+
+    /// [`Vna::sweep`] that reports progress after every block of data and can
+    /// be stopped there, see [`SweepProgress`]: within 255 points on a
+    /// LiteVNA, within 301 points (about 3 s) on a NanoVNA shell.
+    pub fn sweep_with(&mut self, cfg: &SweepConfig, fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult> {
+        match self {
+            Vna::Lite(d) => d.sweep_with(cfg, fifo_all, progress),
+            Vna::Shell(d) => d.sweep_with(cfg, progress),
         }
     }
 

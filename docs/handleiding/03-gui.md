@@ -31,6 +31,10 @@ dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
    apparaat dat je later aansluit verschijnt vanzelf; **rescan** zoekt direct.
 2. **Connect**. De bovenbalk toont model, firmware en batterijspanning.
 3. **Run** start continu sweepen, **Single** doet er één. Run nogmaals stopt.
+   Een sweep die meer dan een ogenblik duurt (een NanoVNA-F, veel punten) toont een balk
+   met de punten die al gemeten zijn. **Stop**, **Disconnect** en **Apply sweep** wachten
+   niet tot de sweep klaar is: ze werken bij het volgende blok gegevens, binnen 255
+   punten op een LiteVNA en binnen 301 punten (ongeveer drie seconden) op een NanoVNA-F.
 
 Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met **Apply
 sweep**; tijdens Run herstart de sweep dan met de nieuwe instellingen. Frequenties typ je

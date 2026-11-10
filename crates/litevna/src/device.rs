@@ -96,6 +96,14 @@ impl SweepConfig {
     }
 }
 
+/// What a sweep calls while it runs: after every block of data, with the
+/// number of points measured so far and the total. Returning
+/// `ControlFlow::Break(())` stops the sweep, which then fails with
+/// [`Error::Cancelled`]. A block is one READFIFO chunk of at most 255 records
+/// on a LiteVNA and one `scan_bin` of at most 301 points on a NanoVNA shell,
+/// so that is how soon a sweep can be stopped.
+pub type SweepProgress<'a> = &'a mut dyn FnMut(usize, usize) -> std::ops::ControlFlow<()>;
+
 /// A completed sweep, indexed by frequency point.
 #[derive(Debug, Clone)]
 pub struct SweepResult {
@@ -538,17 +546,23 @@ impl LiteVna {
     /// the first read, otherwise points are fetched in chunks of 255 like
     /// NanoVNA-Saver does.
     pub fn sweep(&mut self, cfg: &SweepConfig, fifo_all: bool) -> Result<SweepResult> {
-        let result = self.sweep_inner(cfg, fifo_all);
+        self.sweep_with(cfg, fifo_all, &mut |_, _| std::ops::ControlFlow::Continue(()))
+    }
+
+    /// [`LiteVna::sweep`] that reports progress and can be stopped, see [`SweepProgress`].
+    pub fn sweep_with(&mut self, cfg: &SweepConfig, fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult> {
+        let result = self.sweep_inner(cfg, fifo_all, progress);
         if result.is_err() {
-            // After a failure the reply stream may be out of step (a READFIFO
-            // answered late, half a record read). Forget the configuration so
-            // the next sweep starts with the protocol reset in `configure_sweep`.
+            // After a failure or a cancel the reply stream may be out of step
+            // (a READFIFO answered late, half a record read). Forget the
+            // configuration so the next sweep starts with the protocol reset
+            // in `configure_sweep`.
             self.configured = None;
         }
         result
     }
 
-    fn sweep_inner(&mut self, cfg: &SweepConfig, fifo_all: bool) -> Result<SweepResult> {
+    fn sweep_inner(&mut self, cfg: &SweepConfig, fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult> {
         if self.configured.as_ref() != Some(cfg) {
             self.configure_sweep(cfg)?;
         }
@@ -592,6 +606,9 @@ impl LiteVna {
                     filled += 1;
                 }
                 points[idx] = Some(r);
+            }
+            if progress(filled, n).is_break() && filled < n {
+                return Err(Error::Cancelled);
             }
         }
         let elapsed = started.elapsed();
@@ -690,6 +707,9 @@ mod tests {
         /// device leaves up to 32, docs/01 §7): delivered first after a clear.
         in_flight_after_clear: Vec<u16>,
         queued: VecDeque<[u8; 32]>,
+        /// Where the running sweep is when the host clears the FIFO (the
+        /// sweep runs on between the configuration and the clear).
+        position_at_clear: Option<u16>,
         next_index: u16,
         pass: i32,
         generated: usize,
@@ -717,6 +737,7 @@ mod tests {
                 mem,
                 in_flight_after_clear: Vec::new(),
                 queued: VecDeque::new(),
+                position_at_clear: None,
                 next_index: 0,
                 pass: 0,
                 generated: 0,
@@ -805,11 +826,18 @@ mod tests {
                     }
                     cmd::WRITE if c[1] == reg::VALUES_FIFO => {
                         self.queued = self.in_flight_after_clear.iter().map(|&i| Self::record(i, -1)).collect();
+                        if let Some(at) = self.position_at_clear {
+                            self.next_index = at;
+                        }
                     }
                     cmd::WRITE if c[1] == reg::SCREENSHOT => rx.extend(self.screenshot.iter()),
                     _ => {
                         let a = c[1] as usize;
                         self.mem[a..a + len - 2].copy_from_slice(&c[2..]);
+                        // A new sweep definition starts the sweep from its first point.
+                        if [reg::SWEEP_START_HZ, reg::SWEEP_STEP_HZ, reg::SWEEP_POINTS].contains(&c[1]) {
+                            self.next_index = 0;
+                        }
                     }
                 }
             }
@@ -894,7 +922,7 @@ mod tests {
     fn a_sweep_that_starts_mid_way_still_fills_every_point() {
         // The device sweeps continuously; after the clear it carries on where it was.
         let mut dev = FakeLite::new();
-        dev.next_index = 37;
+        dev.position_at_clear = Some(37);
         let (mut vna, _) = lite(dev);
         let r = vna.sweep(&cfg(100), false).unwrap();
         assert_eq!((r.missing_points(), r.duplicates), (0, 0));
@@ -971,6 +999,37 @@ mod tests {
         let tx = port.written();
         assert!(tx.starts_with(&proto::RESET_SEQUENCE));
         assert!(contains(&tx, &proto::encode_write8(reg::SWEEP_START_HZ, c.start_hz)));
+    }
+
+    #[test]
+    fn progress_is_reported_per_chunk_and_can_cancel() {
+        use std::ops::ControlFlow;
+        let (mut vna, port) = lite(FakeLite::new());
+        let c = cfg(600);
+        let mut seen = Vec::new();
+        let r = vna
+            .sweep_with(&c, false, &mut |done, total| {
+                seen.push((done, total));
+                ControlFlow::Continue(())
+            })
+            .unwrap();
+        assert_eq!(r.missing_points(), 0);
+        assert_eq!(seen, [(255, 600), (510, 600), (600, 600)]);
+
+        // Stop after the first chunk: no further READFIFO goes out.
+        port.clear_written();
+        let err = vna.sweep_with(&c, false, &mut |_, _| ControlFlow::Break(())).unwrap_err();
+        assert!(matches!(err, Error::Cancelled), "{err:?}");
+        assert!(!err.is_link_failure());
+        let fifo_reads = port
+            .written()
+            .windows(2)
+            .filter(|w| w == &[cmd::READFIFO, reg::VALUES_FIFO])
+            .count();
+        assert_eq!(fifo_reads, 1);
+        // Breaking on the last block is not a cancel: the sweep is complete.
+        let r = vna.sweep_with(&cfg(100), false, &mut |_, _| ControlFlow::Break(())).unwrap();
+        assert_eq!(r.missing_points(), 0);
     }
 
     #[test]

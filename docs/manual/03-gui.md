@@ -31,6 +31,10 @@ as text. Paste that into an issue report (chapter 9). The choice is remembered.
    you plug in later appears by itself; **rescan** searches straight away.
 2. **Connect**. The top bar shows the model, firmware and battery voltage.
 3. **Run** starts continuous sweeping, **Single** does one sweep. Run again stops.
+   A sweep that takes more than a moment (a NanoVNA-F, many points) shows a bar with
+   the points measured so far. **Stop**, **Disconnect** and **Apply sweep** do not wait
+   for the sweep to finish: they take effect at the next block of data, within 255
+   points on a LiteVNA and within 301 points (about three seconds) on a NanoVNA-F.
 
 Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Apply
 sweep**; during Run the sweep then restarts with the new settings. You type frequencies

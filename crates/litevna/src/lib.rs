@@ -38,7 +38,7 @@ pub mod traces;
 pub mod vna;
 
 pub use calibration::{CalKit, Calibration, CalibrationSet, Standard};
-pub use device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepResult};
+pub use device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepProgress, SweepResult};
 pub use error::{Error, Result};
 pub use protocol::FifoPoint;
 pub use shell::NanoVnaShell;

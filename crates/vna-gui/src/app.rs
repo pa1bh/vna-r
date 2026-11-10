@@ -290,6 +290,9 @@ pub struct App {
     sweep_error: Option<String>,
     average: u8,
     running: bool,
+    /// Points done and total of the sweep under way, and when it began; shown
+    /// as a bar once a sweep takes long enough to wonder about.
+    progress: Option<(usize, usize, Instant)>,
 
     raw: Option<SweepResult>,
     shown: Option<SweepResult>,
@@ -398,6 +401,7 @@ impl App {
             sweep_error: None,
             average: 1,
             running: false,
+            progress: None,
             raw: None,
             shown: None,
             last_plan: Vec::new(),
@@ -807,6 +811,7 @@ impl App {
 
     fn stop_sweep(&mut self) {
         self.running = false;
+        self.progress = None;
         self.send(Cmd::Stop);
     }
 
@@ -822,10 +827,26 @@ impl App {
                     // Never average sweeps of this device with those of the previous one.
                     self.avg_buf.clear();
                 }
+                Event::Progress { done, total } => {
+                    // A lower count than before means a new sweep began.
+                    let since = match self.progress {
+                        Some((prev, _, since)) if done >= prev => since,
+                        _ => Instant::now(),
+                    };
+                    self.progress = Some((done, total, since));
+                }
+                Event::Cancelled { purpose } => {
+                    self.progress = None;
+                    if let Purpose::Standard(std) = purpose {
+                        self.cal.pending = None;
+                        self.cal.message = Some(format!("measuring {} was stopped", std.name()));
+                    }
+                }
                 Event::Disconnected => {
                     self.log("disconnected");
                     self.connection = Connection::Disconnected;
                     self.running = false;
+                    self.progress = None;
                     self.avg_buf.clear();
                 }
                 Event::SweepDone {
@@ -833,42 +854,45 @@ impl App {
                     result,
                     purpose,
                     repeat,
-                } => match purpose {
-                    Purpose::Display => {
-                        self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() {
-                            self.sent_plan_cals.clone()
-                        } else {
-                            vec![None; cfgs.len()]
-                        };
-                        self.last_plan = cfgs;
-                        self.file_trace = None;
-                        self.sweep_count += 1;
-                        if let Some(old) = self.raw.as_ref().map(|r| r.freqs_hz.clone()) {
-                            self.remap_markers(&old, &result.freqs_hz);
-                        }
-                        let result = self.push_average(result);
-                        let corrected = self.corrected(&result);
-                        self.set_shown(corrected);
-                        if let Some(freqs) = self.pending_marker_freqs.take() {
-                            for (k, f) in freqs.iter().enumerate() {
-                                self.markers[k] = f.map(|f| nearest_index(&result.freqs_hz, f));
+                } => {
+                    self.progress = None;
+                    match purpose {
+                        Purpose::Display => {
+                            self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() {
+                                self.sent_plan_cals.clone()
+                            } else {
+                                vec![None; cfgs.len()]
+                            };
+                            self.last_plan = cfgs;
+                            self.file_trace = None;
+                            self.sweep_count += 1;
+                            if let Some(old) = self.raw.as_ref().map(|r| r.freqs_hz.clone()) {
+                                self.remap_markers(&old, &result.freqs_hz);
                             }
+                            let result = self.push_average(result);
+                            let corrected = self.corrected(&result);
+                            self.set_shown(corrected);
+                            if let Some(freqs) = self.pending_marker_freqs.take() {
+                                for (k, f) in freqs.iter().enumerate() {
+                                    self.markers[k] = f.map(|f| nearest_index(&result.freqs_hz, f));
+                                }
+                            }
+                            if self.show_log {
+                                self.log(format!(
+                                    "sweep #{}: {} points in {} ms",
+                                    self.sweep_count,
+                                    result.freqs_hz.len(),
+                                    result.elapsed.as_millis()
+                                ));
+                            }
+                            self.raw = Some(result);
                         }
-                        if self.show_log {
-                            self.log(format!(
-                                "sweep #{}: {} points in {} ms",
-                                self.sweep_count,
-                                result.freqs_hz.len(),
-                                result.elapsed.as_millis()
-                            ));
+                        Purpose::Standard(std) => {
+                            self.cal.pending = None;
+                            self.store_standard(std, &result, repeat);
                         }
-                        self.raw = Some(result);
                     }
-                    Purpose::Standard(std) => {
-                        self.cal.pending = None;
-                        self.store_standard(std, &result, repeat);
-                    }
-                },
+                }
                 Event::Screenshot(shot) => {
                     let rgb = shot.to_rgb888();
                     let image = egui::ColorImage::from_rgb([shot.width as usize, shot.height as usize], &rgb);
@@ -883,6 +907,7 @@ impl App {
                     if stops_sweep {
                         self.running = false;
                         self.cal.pending = None;
+                        self.progress = None;
                     }
                     if let Connection::Connecting(_) = self.connection {
                         self.connection = Connection::Disconnected;
@@ -1159,6 +1184,18 @@ impl App {
                     self.send(Cmd::Screenshot);
                 }
             });
+            // A sweep that takes a while (a NanoVNA-F, many points, averaged
+            // standards) shows how far it is; a quick one would only flicker.
+            if let Some((done, total, since)) = self.progress {
+                if since.elapsed() > Duration::from_millis(700) && total > 0 {
+                    ui.add(
+                        egui::ProgressBar::new(done as f32 / total as f32)
+                            .desired_width(110.0)
+                            .text(format!("{done}/{total}")),
+                    )
+                    .on_hover_text("points measured in the running sweep; Stop takes effect at the next block of data");
+                }
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(err) = self.error.clone() {
                     if ui.small_button("×").clicked() {

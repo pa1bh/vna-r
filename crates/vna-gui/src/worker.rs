@@ -2,7 +2,15 @@
 //!
 //! The UI sends [`Cmd`]s and receives [`Event`]s over channels. After every
 //! event the worker asks egui to repaint, so the UI never has to poll.
+//!
+//! A sweep can take long (a NanoVNA-F does about 115 points/s). While one
+//! runs, the worker looks at the command queue after every block of data the
+//! device delivers: a command that makes the sweep pointless (Stop,
+//! Disconnect, a new sweep) cancels it there, anything else waits until the
+//! sweep is done.
 
+use std::collections::VecDeque;
+use std::ops::ControlFlow;
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::thread;
 
@@ -52,6 +60,15 @@ pub enum Event {
         purpose: Purpose,
         repeat: usize,
     },
+    /// A sweep is under way: `done` of `total` points, over all segments and repeats.
+    Progress {
+        done: usize,
+        total: usize,
+    },
+    /// A sweep was cut short by a later command (Stop, Disconnect, a new sweep); no result follows.
+    Cancelled {
+        purpose: Purpose,
+    },
     Screenshot(Screenshot),
     /// Something failed. `stops_sweep` says whether continuous sweeping ended
     /// with it (a sweep or connection failure) or goes on (a screenshot, a
@@ -82,8 +99,28 @@ struct Worker {
     /// Path of the open port, to check whether it still exists after an error.
     port: Option<String>,
     continuous: Option<(Vec<SweepConfig>, Purpose, usize)>,
+    cmds: Receiver<Cmd>,
+    /// Commands read from `cmds` while a sweep ran, to be handled in order after it.
+    backlog: VecDeque<Cmd>,
     events: Sender<Event>,
     ctx: egui::Context,
+}
+
+/// A command after which the result of a running sweep is no longer wanted.
+/// A request to measure a calibration standard is not one: it waits for the
+/// sweep under way, so the display has its data on the grid the standard is
+/// about to be measured on.
+fn interrupts(cmd: &Cmd) -> bool {
+    matches!(
+        cmd,
+        Cmd::Stop
+            | Cmd::Disconnect
+            | Cmd::Connect(_)
+            | Cmd::Sweep {
+                purpose: Purpose::Display,
+                ..
+            }
+    )
 }
 
 fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
@@ -91,19 +128,24 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
         dev: None,
         port: None,
         continuous: None,
+        cmds,
+        backlog: VecDeque::new(),
         events,
         ctx,
     };
     loop {
-        // Block for a command when idle; only peek when sweeping continuously.
-        let cmd = if w.continuous.is_some() {
-            match cmds.try_recv() {
+        // First what arrived during the last sweep; then block for a command
+        // when idle, and only peek when sweeping continuously.
+        let cmd = if let Some(c) = w.backlog.pop_front() {
+            Some(c)
+        } else if w.continuous.is_some() {
+            match w.cmds.try_recv() {
                 Ok(c) => Some(c),
                 Err(TryRecvError::Empty) => None,
                 Err(TryRecvError::Disconnected) => break,
             }
         } else {
-            match cmds.recv() {
+            match w.cmds.recv() {
                 Ok(c) => Some(c),
                 Err(_) => break,
             }
@@ -222,16 +264,55 @@ impl Worker {
 
     fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose, repeat: usize) {
         let repeat = repeat.max(1);
+        let total = cfgs.iter().map(|c| c.points as usize).sum::<usize>() * repeat;
+        // Points of the segments and passes that are complete.
+        let mut before = 0usize;
         let mut passes: Vec<SweepResult> = Vec::with_capacity(repeat);
         for _ in 0..repeat {
-            let Some(d) = &mut self.dev else {
-                self.fail("sweep", "not connected");
-                return;
-            };
             let mut parts = Vec::with_capacity(cfgs.len());
             for cfg in &cfgs {
-                match d.sweep(cfg, false) {
-                    Ok(r) => parts.push(r),
+                if self.dev.is_none() {
+                    self.fail("sweep", "not connected");
+                    return;
+                }
+                if self.backlog.iter().any(interrupts) {
+                    self.emit(Event::Cancelled { purpose });
+                    return;
+                }
+                let Worker {
+                    dev,
+                    cmds,
+                    backlog,
+                    events,
+                    ctx,
+                    ..
+                } = self;
+                let d = dev.as_mut().expect("checked above");
+                let mut progress = |done: usize, _segment_total: usize| {
+                    let _ = events.send(Event::Progress {
+                        done: before + done,
+                        total,
+                    });
+                    ctx.request_repaint();
+                    while let Ok(c) = cmds.try_recv() {
+                        let stop = interrupts(&c);
+                        backlog.push_back(c);
+                        if stop {
+                            return ControlFlow::Break(());
+                        }
+                    }
+                    ControlFlow::Continue(())
+                };
+                match d.sweep_with(cfg, false, &mut progress) {
+                    Ok(r) => {
+                        before += cfg.points as usize;
+                        parts.push(r);
+                    }
+                    Err(litevna::Error::Cancelled) => {
+                        // The command in the backlog says what happens next.
+                        self.emit(Event::Cancelled { purpose });
+                        return;
+                    }
                     Err(e) => {
                         let msg = e.to_string();
                         // The cable went: the port reports an error, or (a pulled

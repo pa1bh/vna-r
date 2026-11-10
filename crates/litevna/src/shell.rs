@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use num_complex::Complex64;
 use serialport::{ClearBuffer, SerialPort};
 
-use crate::device::{Screenshot, SweepConfig, SweepResult};
+use crate::device::{Screenshot, SweepConfig, SweepProgress, SweepResult};
 use crate::error::{Error, Result};
 
 /// The shell prompt that terminates every reply.
@@ -424,6 +424,12 @@ impl NanoVnaShell {
     /// own calibration. The device's on-screen sweep is remembered on the
     /// first call and restored when the handle is dropped.
     pub fn sweep(&mut self, cfg: &SweepConfig) -> Result<SweepResult> {
+        self.sweep_with(cfg, &mut |_, _| std::ops::ControlFlow::Continue(()))
+    }
+
+    /// [`NanoVnaShell::sweep`] that reports progress and can be stopped
+    /// between chunks, see [`SweepProgress`].
+    pub fn sweep_with(&mut self, cfg: &SweepConfig, progress: SweepProgress<'_>) -> Result<SweepResult> {
         if self.saved_sweep.is_none() {
             self.saved_sweep = Some(self.sweep_settings()?);
             // After raw scans the NanoVNA-F 1.0.4 showed an uncalibrated trace on screen
@@ -446,6 +452,9 @@ impl NanoVnaShell {
                 }
                 s11.push(p.s11.unwrap_or_default());
                 s21.push(p.s21.unwrap_or_default());
+            }
+            if progress(s11.len(), freqs.len()).is_break() && s11.len() < freqs.len() {
+                return Err(Error::Cancelled);
             }
         }
         Ok(SweepResult {
@@ -735,6 +744,27 @@ mod tests {
         // The chunks join without a gap or a repeated point.
         assert_eq!(r.s11[300].re as f32, 0.301);
         assert_eq!(r.s11[301].re as f32, 0.302);
+    }
+
+    #[test]
+    fn progress_is_reported_per_chunk_and_can_cancel() {
+        use std::ops::ControlFlow;
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let cfg = linear(1_000_000, 700_000_000, 700);
+        let mut seen = Vec::new();
+        sh.sweep_with(&cfg, &mut |done, total| {
+            seen.push((done, total));
+            ControlFlow::Continue(())
+        })
+        .unwrap();
+        assert_eq!(seen, [(301, 700), (602, 700), (700, 700)]);
+
+        commands.lock().unwrap().clear();
+        let err = sh.sweep_with(&cfg, &mut |_, _| ControlFlow::Break(())).unwrap_err();
+        assert!(matches!(err, Error::Cancelled), "{err:?}");
+        let scans = commands.lock().unwrap().iter().filter(|c| c.starts_with("scan_bin")).count();
+        assert_eq!(scans, 1, "stopped after the first chunk");
     }
 
     #[test]

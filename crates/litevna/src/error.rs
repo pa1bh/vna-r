@@ -21,6 +21,10 @@ pub enum Error {
     /// Touchstone file). `line` is 1-based, when the problem has one.
     #[error("{}{msg}", line_prefix(.line))]
     Parse { line: Option<usize>, msg: String },
+    /// The caller stopped a sweep through its progress callback (see
+    /// `sweep_with`). Not a failure of the device.
+    #[error("sweep cancelled")]
+    Cancelled,
     /// The connected device cannot do this: `what` needs the LiteVNA register
     /// protocol and `device` is something else.
     #[error("{what} needs a LiteVNA (register protocol); this is a {device}")]
