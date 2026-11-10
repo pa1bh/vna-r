@@ -266,10 +266,11 @@ impl Screenshot {
 /// measured 330 to 1100 points/s depending on channel selection and averaging
 /// (docs/01 §7 and §8), NanoVNA-Saver budgets 35 ms/point for the old V2.
 const PER_POINT_BUDGET: Duration = Duration::from_millis(20);
-const MIN_FIFO_TIMEOUT: Duration = Duration::from_secs(3);
-const REGISTER_TIMEOUT: Duration = Duration::from_secs(2);
+// The fixed waits are short under `cargo test`: the fake port answers at once.
+const MIN_FIFO_TIMEOUT: Duration = Duration::from_millis(if cfg!(test) { 100 } else { 3000 });
+const REGISTER_TIMEOUT: Duration = Duration::from_millis(if cfg!(test) { 100 } else { 2000 });
 /// Small pause after writes, mirroring every reference implementation.
-const WRITE_SETTLE: Duration = Duration::from_millis(50);
+const WRITE_SETTLE: Duration = Duration::from_millis(if cfg!(test) { 0 } else { 50 });
 
 /// A connected device.
 pub struct LiteVna {
@@ -288,6 +289,13 @@ impl LiteVna {
     pub fn open(path: &str) -> Result<Self> {
         // Baud rate is meaningless for USB CDC but must be set.
         let port = serialport::new(path, 115_200).timeout(Duration::from_millis(250)).open()?;
+        Self::from_port(port)
+    }
+
+    /// Drive a device over a port that is already open: another transport
+    /// than a local serial device, or the fake port of the tests. Brings the
+    /// protocol parser into a known state like [`LiteVna::open`].
+    pub fn from_port(port: Box<dyn SerialPort>) -> Result<Self> {
         let mut dev = LiteVna {
             port,
             trace: false,
@@ -530,6 +538,17 @@ impl LiteVna {
     /// the first read, otherwise points are fetched in chunks of 255 like
     /// NanoVNA-Saver does.
     pub fn sweep(&mut self, cfg: &SweepConfig, fifo_all: bool) -> Result<SweepResult> {
+        let result = self.sweep_inner(cfg, fifo_all);
+        if result.is_err() {
+            // After a failure the reply stream may be out of step (a READFIFO
+            // answered late, half a record read). Forget the configuration so
+            // the next sweep starts with the protocol reset in `configure_sweep`.
+            self.configured = None;
+        }
+        result
+    }
+
+    fn sweep_inner(&mut self, cfg: &SweepConfig, fifo_all: bool) -> Result<SweepResult> {
         if self.configured.as_ref() != Some(cfg) {
             self.configure_sweep(cfg)?;
         }
@@ -653,6 +672,390 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fakeport::{FakeDevice, FakePort};
+    use crate::protocol::{cmd, fifo_checksum};
+    use std::collections::VecDeque;
+
+    /// A LiteVNA as the driver sees it: registers, and a sweep that runs
+    /// continuously and delivers 32-byte records on READFIFO.
+    ///
+    /// Every record carries where it came from: `rev0 = (index, pass)` with
+    /// `fwd0 = (1000, 0)`, so S11 = (index + j·pass) / 1000. `pass` counts how
+    /// often the sweep has wrapped; records queued before a FIFO clear have
+    /// pass −1.
+    struct FakeLite {
+        pending: Vec<u8>,
+        mem: [u8; 256],
+        /// Records still in flight when the host clears the FIFO (the real
+        /// device leaves up to 32, docs/01 §7): delivered first after a clear.
+        in_flight_after_clear: Vec<u16>,
+        queued: VecDeque<[u8; 32]>,
+        next_index: u16,
+        pass: i32,
+        generated: usize,
+        /// Ordinals (0-based, counting generated records) to send with a bad checksum.
+        corrupt: Vec<usize>,
+        /// Ordinal → frequency index to send instead of the real one.
+        wrong_index: Option<(usize, u16)>,
+        /// The sweep never advances beyond this index.
+        stuck_at: Option<u16>,
+        /// Reply to a screenshot request.
+        screenshot: Vec<u8>,
+    }
+
+    impl FakeLite {
+        fn new() -> Self {
+            let mut mem = [0u8; 256];
+            mem[reg::DEVICE_VARIANT as usize] = 2;
+            mem[reg::PROTOCOL_VERSION as usize] = 1;
+            mem[reg::HARDWARE_REVISION as usize] = 0x40;
+            mem[reg::FW_MAJOR as usize] = 2;
+            mem[reg::FW_MINOR as usize] = 2;
+            mem[reg::BATTERY_MV as usize..reg::BATTERY_MV as usize + 2].copy_from_slice(&4123u16.to_le_bytes());
+            FakeLite {
+                pending: Vec::new(),
+                mem,
+                in_flight_after_clear: Vec::new(),
+                queued: VecDeque::new(),
+                next_index: 0,
+                pass: 0,
+                generated: 0,
+                corrupt: Vec::new(),
+                wrong_index: None,
+                stuck_at: None,
+                screenshot: Vec::new(),
+            }
+        }
+
+        fn points(&self) -> u16 {
+            let a = reg::SWEEP_POINTS as usize;
+            u16::from_le_bytes([self.mem[a], self.mem[a + 1]]).max(1)
+        }
+
+        fn record(index: u16, pass: i32) -> [u8; 32] {
+            let mut r = [0u8; 32];
+            r[0x00..0x04].copy_from_slice(&1000i32.to_le_bytes());
+            r[0x08..0x0C].copy_from_slice(&(index as i32).to_le_bytes());
+            r[0x0C..0x10].copy_from_slice(&pass.to_le_bytes());
+            r[0x10..0x14].copy_from_slice(&pass.to_le_bytes());
+            r[0x14..0x18].copy_from_slice(&(index as i32).to_le_bytes());
+            r[0x18..0x1A].copy_from_slice(&index.to_le_bytes());
+            r[0x1F] = fifo_checksum(&r);
+            r
+        }
+
+        fn next_record(&mut self) -> [u8; 32] {
+            if let Some(r) = self.queued.pop_front() {
+                return r;
+            }
+            let ordinal = self.generated;
+            self.generated += 1;
+            let index = self.stuck_at.unwrap_or(self.next_index);
+            let mut r = match self.wrong_index {
+                Some((at, wrong)) if at == ordinal => Self::record(wrong, self.pass),
+                _ => Self::record(index, self.pass),
+            };
+            if self.corrupt.contains(&ordinal) {
+                r[0x1F] ^= 0xFF;
+            }
+            self.next_index += 1;
+            if self.next_index >= self.points() {
+                self.next_index = 0;
+                self.pass += 1;
+            }
+            r
+        }
+    }
+
+    impl FakeDevice for FakeLite {
+        fn on_write(&mut self, bytes: &[u8], rx: &mut VecDeque<u8>) {
+            self.pending.extend_from_slice(bytes);
+            while let Some(&op) = self.pending.first() {
+                let len = match op {
+                    cmd::NOP | cmd::INDICATE => 1,
+                    cmd::READ | cmd::READ2 | cmd::READ4 => 2,
+                    cmd::READFIFO | cmd::WRITE => 3,
+                    cmd::WRITE2 => 4,
+                    cmd::WRITE4 => 6,
+                    cmd::WRITE8 => 10,
+                    other => panic!("fake LiteVNA: unknown opcode {other:#04x}"),
+                };
+                if self.pending.len() < len {
+                    break;
+                }
+                let c: Vec<u8> = self.pending.drain(..len).collect();
+                match op {
+                    cmd::NOP => {}
+                    cmd::INDICATE => rx.push_back(proto::INDICATE_ACK),
+                    cmd::READ | cmd::READ2 | cmd::READ4 => {
+                        let n = match op {
+                            cmd::READ => 1,
+                            cmd::READ2 => 2,
+                            _ => 4,
+                        };
+                        let a = c[1] as usize;
+                        rx.extend(&self.mem[a..a + n]);
+                    }
+                    cmd::READFIFO => {
+                        let n = if c[2] == 0 { self.points() as usize } else { c[2] as usize };
+                        for _ in 0..n {
+                            let r = self.next_record();
+                            rx.extend(r);
+                        }
+                    }
+                    cmd::WRITE if c[1] == reg::VALUES_FIFO => {
+                        self.queued = self.in_flight_after_clear.iter().map(|&i| Self::record(i, -1)).collect();
+                    }
+                    cmd::WRITE if c[1] == reg::SCREENSHOT => rx.extend(self.screenshot.iter()),
+                    _ => {
+                        let a = c[1] as usize;
+                        self.mem[a..a + len - 2].copy_from_slice(&c[2..]);
+                    }
+                }
+            }
+        }
+    }
+
+    fn lite(dev: FakeLite) -> (LiteVna, FakePort) {
+        let port = FakePort::new(dev);
+        let mut vna = LiteVna::from_port(port.boxed()).unwrap();
+        vna.release_on_drop = false;
+        (vna, port)
+    }
+
+    fn cfg(points: u16) -> SweepConfig {
+        SweepConfig::linear(1_000_000, 1_000_000 + (points as u64 - 1) * 1000, points).unwrap()
+    }
+
+    /// Does `haystack` contain the bytes `needle`?
+    fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+        haystack.windows(needle.len()).any(|w| w == needle)
+    }
+
+    #[test]
+    fn identity_and_battery_registers() {
+        let (mut vna, _) = lite(FakeLite::new());
+        vna.indicate().unwrap();
+        let info = vna.device_info().unwrap();
+        assert_eq!((info.variant, info.protocol_version, info.fw_major, info.fw_minor), (2, 1, 2, 2));
+        assert_eq!(vna.battery_millivolts().unwrap(), 4123);
+    }
+
+    #[test]
+    fn sweep_collects_every_point_once() {
+        let (mut vna, port) = lite(FakeLite::new());
+        // 600 points: more than two READFIFO chunks of 255.
+        let c = cfg(600);
+        let r = vna.sweep(&c, false).unwrap();
+        assert_eq!(r.freqs_hz, c.frequencies());
+        assert_eq!((r.checksum_ok, r.checksum_bad, r.duplicates, r.missing_points()), (600, 0, 0, 0));
+        for (i, g) in r.s11.iter().enumerate() {
+            assert_eq!((g.re, g.im), (i as f64 / 1000.0, 0.0), "point {i}");
+        }
+        // The sweep registers were written as one block: mode, start, step, points, values per frequency.
+        let tx = port.written();
+        assert!(contains(&tx, &proto::encode_write8(reg::SWEEP_START_HZ, c.start_hz)));
+        assert!(contains(&tx, &proto::encode_write8(reg::SWEEP_STEP_HZ, c.step_hz)));
+        assert!(contains(&tx, &proto::encode_write2(reg::SWEEP_POINTS, 600)));
+        // Chunks of at most 255, never more than still missing.
+        assert!(contains(&tx, &proto::encode_read_fifo(reg::VALUES_FIFO, 255)));
+        assert!(contains(&tx, &proto::encode_read_fifo(reg::VALUES_FIFO, 90)));
+    }
+
+    #[test]
+    fn fifo_all_asks_for_the_whole_sweep_at_once() {
+        let (mut vna, port) = lite(FakeLite::new());
+        let r = vna.sweep(&cfg(300), true).unwrap();
+        assert_eq!(r.missing_points(), 0);
+        assert!(contains(&port.written(), &proto::encode_read_fifo(reg::VALUES_FIFO, 0)));
+    }
+
+    #[test]
+    fn unchanged_config_is_not_written_again() {
+        let (mut vna, port) = lite(FakeLite::new());
+        let c = cfg(50);
+        vna.sweep(&c, false).unwrap();
+        port.clear_written();
+        vna.sweep(&c, false).unwrap();
+        let tx = port.written();
+        assert!(!contains(&tx, &proto::encode_write8(reg::SWEEP_START_HZ, c.start_hz)));
+        assert!(
+            contains(&tx, &proto::encode_write(reg::VALUES_FIFO, 0)),
+            "the FIFO is cleared before every sweep"
+        );
+        // Another grid is written.
+        port.clear_written();
+        let other = cfg(51);
+        vna.sweep(&other, false).unwrap();
+        assert!(contains(&port.written(), &proto::encode_write2(reg::SWEEP_POINTS, 51)));
+    }
+
+    #[test]
+    fn a_sweep_that_starts_mid_way_still_fills_every_point() {
+        // The device sweeps continuously; after the clear it carries on where it was.
+        let mut dev = FakeLite::new();
+        dev.next_index = 37;
+        let (mut vna, _) = lite(dev);
+        let r = vna.sweep(&cfg(100), false).unwrap();
+        assert_eq!((r.missing_points(), r.duplicates), (0, 0));
+        // Points 37..99 are from the pass that was running, 0..36 from the next.
+        assert_eq!(r.s11[37].im, 0.0);
+        assert_eq!(r.s11[36].im, 1.0 / 1000.0);
+    }
+
+    #[test]
+    fn records_in_flight_after_the_clear_fill_their_points_and_later_ones_count_as_duplicates() {
+        // docs/01 §7: clearing the FIFO leaves up to 32 queued records. They
+        // arrive first and fill their points like any other record; the sweep
+        // is complete as soon as every point has one.
+        let mut dev = FakeLite::new();
+        dev.in_flight_after_clear = (68..100).collect();
+        let (mut vna, _) = lite(dev);
+        let r = vna.sweep(&cfg(100), false).unwrap();
+        assert_eq!(r.missing_points(), 0);
+        // The tail came from the in-flight records (pass −1) ...
+        assert_eq!(r.s11[99].im, -1.0 / 1000.0);
+        // ... and the head from the sweep after the clear.
+        assert_eq!(r.s11[0].im, 0.0);
+        // 32 + 68 records were enough; nothing was read twice.
+        assert_eq!((r.checksum_ok, r.duplicates), (100, 0));
+    }
+
+    #[test]
+    fn a_record_with_a_bad_checksum_is_skipped_and_the_point_comes_again() {
+        let mut dev = FakeLite::new();
+        dev.corrupt = vec![5];
+        let (mut vna, _) = lite(dev);
+        let r = vna.sweep(&cfg(20), false).unwrap();
+        assert_eq!((r.checksum_bad, r.missing_points()), (1, 0));
+        // Point 5 was taken from the next pass of the sweep, not from the corrupt record.
+        assert_eq!(r.s11[5], Complex64::new(5.0 / 1000.0, 1.0 / 1000.0));
+        // The device sweeps on from point 0, so points 0..4 arrive a second
+        // time before point 5 does: counted as duplicates, and the newer
+        // record replaces the older one. Points after 5 are from the first pass.
+        assert_eq!(r.duplicates, 5);
+        assert_eq!(r.s11[4].im, 1.0 / 1000.0);
+        assert_eq!(r.s11[6].im, 0.0);
+        assert_eq!(r.checksum_ok, 19 + 6);
+    }
+
+    #[test]
+    fn an_index_beyond_the_sweep_is_a_protocol_error() {
+        let mut dev = FakeLite::new();
+        dev.wrong_index = Some((3, 500));
+        let (mut vna, _) = lite(dev);
+        let err = vna.sweep(&cfg(20), false).unwrap_err();
+        assert!(err.to_string().contains("freq_index 500 out of range"), "{err}");
+    }
+
+    #[test]
+    fn a_sweep_that_never_completes_gives_up() {
+        let mut dev = FakeLite::new();
+        dev.stuck_at = Some(0);
+        let (mut vna, _) = lite(dev);
+        let err = vna.sweep(&cfg(5), false).unwrap_err();
+        assert!(err.to_string().contains("sweep did not complete: 1/5"), "{err}");
+    }
+
+    #[test]
+    fn after_a_failed_sweep_the_next_one_reconfigures() {
+        let mut dev = FakeLite::new();
+        dev.wrong_index = Some((3, 500));
+        let (mut vna, port) = lite(dev);
+        let c = cfg(20);
+        assert!(vna.sweep(&c, false).is_err());
+        port.clear_written();
+        // Same config, but the protocol is reset and the registers are written again.
+        let r = vna.sweep(&c, false).unwrap();
+        assert_eq!(r.missing_points(), 0);
+        let tx = port.written();
+        assert!(tx.starts_with(&proto::RESET_SEQUENCE));
+        assert!(contains(&tx, &proto::encode_write8(reg::SWEEP_START_HZ, c.start_hz)));
+    }
+
+    #[test]
+    fn a_pulled_cable_is_a_link_failure() {
+        let (mut vna, port) = lite(FakeLite::new());
+        port.unplug();
+        let err = vna.sweep(&cfg(20), false).unwrap_err();
+        assert!(err.is_link_failure(), "{err:?}");
+    }
+
+    #[test]
+    fn a_silent_device_times_out() {
+        let mut dev = FakeLite::new();
+        // No records at all: the device answers nothing to READFIFO.
+        dev.mem[reg::SWEEP_POINTS as usize] = 0;
+        struct Mute;
+        impl FakeDevice for Mute {
+            fn on_write(&mut self, _: &[u8], _: &mut VecDeque<u8>) {}
+        }
+        let port = FakePort::new(Mute);
+        let mut vna = LiteVna::from_port(port.boxed()).unwrap();
+        vna.release_on_drop = false;
+        let err = vna.read_u8(reg::DEVICE_VARIANT).unwrap_err();
+        assert!(matches!(err, Error::Timeout { expected: 1, got: 0 }), "{err:?}");
+        assert!(!err.is_link_failure());
+    }
+
+    #[test]
+    fn screenshot_reads_header_and_pixels() {
+        let mut dev = FakeLite::new();
+        dev.screenshot.extend(4u16.to_le_bytes());
+        dev.screenshot.extend(2u16.to_le_bytes());
+        dev.screenshot.push(16);
+        // 8 pixels RGB565 big-endian: pure red 0xF800.
+        dev.screenshot.extend([0xF8, 0x00].repeat(8));
+        let (mut vna, _) = lite(dev);
+        let shot = vna.screenshot().unwrap();
+        assert_eq!((shot.width, shot.height, shot.bits_per_pixel, shot.data.len()), (4, 2, 16, 16));
+        let rgb = shot.to_rgb888();
+        assert_eq!(&rgb[..3], &[255, 0, 0]);
+        // The other byte order reads the same bytes as a dark green-blue.
+        assert_ne!(&shot.to_rgb888_with(false)[..3], &[255, 0, 0]);
+    }
+
+    #[test]
+    fn screenshot_refuses_an_implausible_header() {
+        for header in [
+            [0xFF, 0xFF, 0xFF, 0xFF, 32u8], // 65535 × 65535 × 4 bytes
+            [0x20, 0x03, 0xE0, 0x01, 24],   // 800 × 480 but 24 bpp
+            [0x00, 0x00, 0xE0, 0x01, 16],   // zero width
+        ] {
+            let mut dev = FakeLite::new();
+            dev.screenshot.extend(header);
+            let (mut vna, _) = lite(dev);
+            let err = vna.screenshot().unwrap_err();
+            assert!(err.to_string().contains("implausible screenshot header"), "{header:?}: {err}");
+        }
+    }
+
+    #[test]
+    fn sweep_config_rounds_to_the_device_grid() {
+        let c = SweepConfig::linear(1_000_000, 30_000_000, 201).unwrap();
+        assert_eq!((c.start_hz, c.step_hz, c.points), (1_000_000, 145_000, 201));
+        assert_eq!(c.stop_hz(), 30_000_000);
+        assert!(SweepConfig::linear(1_000_000, 30_000_000, 1).is_err());
+        assert!(SweepConfig::linear(30_000_000, 1_000_000, 201).is_err());
+        let back = SweepConfig::from_frequencies(&c.frequencies()).unwrap();
+        assert_eq!((back.start_hz, back.step_hz, back.points), (c.start_hz, c.step_hz, c.points));
+        assert!(SweepConfig::from_frequencies(&[1, 2, 4]).is_err());
+    }
+
+    #[test]
+    fn concat_and_segment_ranges() {
+        let (mut vna, _) = lite(FakeLite::new());
+        let (a, b) = (cfg(10), SweepConfig::linear(2_000_000, 2_004_000, 5).unwrap());
+        let parts = [vna.sweep(&a, false).unwrap(), vna.sweep(&b, false).unwrap()];
+        let all = SweepResult::concat(&parts);
+        assert_eq!(all.freqs_hz.len(), 15);
+        assert_eq!(all.checksum_ok, 15);
+        let ranges = SweepResult::segment_ranges(&[a, b]);
+        assert_eq!(ranges, vec![0..10, 10..15]);
+        let second = all.slice(ranges[1].clone());
+        assert_eq!(second.freqs_hz, b.frequencies());
+        assert_eq!(second.missing_points(), 0);
+    }
 
     #[test]
     fn zero_point_config_does_not_underflow() {

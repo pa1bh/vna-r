@@ -408,3 +408,29 @@ Lees `CONTRIBUTING.md` door en controleer of de conventies kloppen met hoe jij w
 werken (dit is jouw project; de tekst legt vast wat we tot nu toe deden). De drie
 commando's bovenaan moeten op een schone checkout werken.
 
+## Punt 21 — Drivertests zonder hardware (D1, B19)
+
+**Veranderd.** `LiteVna::from_port` en `NanoVnaShell::from_port`; `fakeport.rs` (alleen in
+tests) met een nagebootste LiteVNA en NanoVNA-F; na een mislukte sweep reset de LiteVNA-
+driver het protocol en schrijft de sweepregisters opnieuw.
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna device:: shell::
+```
+Verwacht: 32 tests groen in minder dan een seconde.
+
+**Met apparaat: gedrag ongewijzigd.** Dit punt raakt `open` van beide drivers en de
+sweep-lus van de LiteVNA, dus loop de basis na op beide apparaten:
+```bash
+vna-cli info
+vna-cli sweep --start 1M --stop 30M --points 201
+vna-cli sweep --start 50k --stop 6.3G --points 1001      # LiteVNA
+vna-cli screenshot --out /tmp/qc.png
+```
+Verwacht: als in 0.2.5; in de samenvatting van `sweep` 0 ontbrekende punten.
+GUI: Connect, Run, een minuut laten lopen, Stop, Disconnect, opnieuw Connect.
+
+**Herstel na een fout (LiteVNA).** Run, trek de kabel los tijdens een sweep, steek hem
+terug, Connect, Run: de sweep loopt weer normaal (geen "sweep did not complete").
+

@@ -27,6 +27,8 @@ pub mod calibration;
 pub mod device;
 pub mod discovery;
 pub mod error;
+#[cfg(test)]
+mod fakeport;
 pub mod freq;
 pub mod protocol;
 pub mod shell;

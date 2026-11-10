@@ -272,7 +272,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 
 | # | Werk | Code | Grootte | Status |
 |---|------|------|---------|--------|
-| 21 | `SerialLink` met injecteerbare nep-poort; tests voor `LiteVna::sweep`, `scan_bin`, `command`, screenshots | D1, D6 | M/L | |
+| 21 | `SerialLink` met injecteerbare nep-poort; tests voor `LiteVna::sweep`, `scan_bin`, `command`, screenshots | D1, D6 | M/L | gedaan 2026-11-10: `from_port` + `fakeport.rs`, 29 drivertests, resync na mislukte sweep (B19). Niet gedaan: één gedeelde `SerialLink` (D6); beide drivers houden hun eigen leeslus |
 | 22 | Annuleren en voortgang: `sweep_with(cfg, callback)` per chunk; worker en Stop erdoorheen (besluit 5) | F2, N2, U4 | M | |
 | 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | |
 | 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | |

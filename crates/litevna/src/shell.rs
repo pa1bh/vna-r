@@ -45,7 +45,9 @@ pub mod mask {
     pub const BINARY_REPLY: u16 = 0x80;
 }
 
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(3);
+// Short under `cargo test`: the fake port answers at once, and a test of a
+// device that stays silent should not take seconds.
+const COMMAND_TIMEOUT: Duration = Duration::from_millis(if cfg!(test) { 150 } else { 3000 });
 /// Per point: the device needs ~9 ms for S11 + S21 at the default bandwidth;
 /// narrower bandwidths are slower, so be generous.
 const PER_POINT_BUDGET: Duration = Duration::from_millis(60);
@@ -204,6 +206,12 @@ impl NanoVnaShell {
     /// Open the port and wait for a prompt. Fails when nothing answers with `ch> `.
     pub fn open(path: &str) -> Result<Self> {
         let port = serialport::new(path, 115_200).timeout(Duration::from_millis(100)).open()?;
+        Self::from_port(port)
+    }
+
+    /// Drive a device over a port that is already open (another transport,
+    /// or the fake port of the tests). Waits for a prompt like [`NanoVnaShell::open`].
+    pub fn from_port(port: Box<dyn SerialPort>) -> Result<Self> {
         // `restore_on_drop` stays off until the device has answered: dropping
         // a handle whose `sync` failed must not send `resume` to whatever is
         // on the port and wait another command timeout for its prompt.
@@ -512,6 +520,284 @@ impl Drop for NanoVnaShell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fakeport::{FakeDevice, FakePort};
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+
+    /// A NanoVNA-F as the driver sees it: a line shell that echoes each
+    /// command, answers and ends with the prompt `ch> `.
+    ///
+    /// `scan_bin` points carry their own frequency: S11 = (f/1e9, 0.5),
+    /// S21 = (0.25, −f/1e9).
+    struct FakeShell {
+        line: Vec<u8>,
+        /// Every command line received, for the test to inspect.
+        commands: Arc<Mutex<Vec<String>>>,
+        model: &'static str,
+        sweep: (u64, u64, u16),
+        cal_applied: bool,
+        /// Answers nothing at all (not a shell, or a dead device).
+        silent: bool,
+        /// Text the firmware answers to `scan_bin` instead of data.
+        scan_error: Option<&'static str>,
+        /// Echo something else than the command.
+        garbled_echo: bool,
+        /// Size of the `capture` reply in bytes.
+        capture_bytes: usize,
+    }
+
+    impl FakeShell {
+        fn new() -> (Self, Arc<Mutex<Vec<String>>>) {
+            let commands = Arc::new(Mutex::new(Vec::new()));
+            let dev = FakeShell {
+                line: Vec::new(),
+                commands: commands.clone(),
+                model: "NanoVNA-F 4.3",
+                sweep: (1_000_000, 30_000_000, 101),
+                cal_applied: true,
+                silent: false,
+                scan_error: None,
+                garbled_echo: false,
+                capture_bytes: 800 * 480 * 2,
+            };
+            (dev, commands)
+        }
+
+        fn reply(&mut self, cmd: &str, rx: &mut VecDeque<u8>) {
+            let words: Vec<&str> = cmd.split_whitespace().collect();
+            let mut echo = cmd.as_bytes().to_vec();
+            if self.garbled_echo {
+                echo.fill(b'x');
+            }
+            rx.extend(echo);
+            rx.extend(b"\r\n");
+            match words.as_slice() {
+                ["info"] => rx.extend(
+                    format!(
+                        "Model:        {}\r\nVersion:      Firmware 1.0.4 by BH5HNU\r\nBuild time:   Jun  3 2022\r\n",
+                        self.model
+                    )
+                    .bytes(),
+                ),
+                ["vbat"] => rx.extend(b"4209 mV\r\n"),
+                ["sweep"] => rx.extend(format!("{} {} {}\r\n", self.sweep.0, self.sweep.1, self.sweep.2).bytes()),
+                ["sweep", a, b, n] => self.sweep = (a.parse().unwrap(), b.parse().unwrap(), n.parse().unwrap()),
+                ["cal"] => rx.extend(if self.cal_applied {
+                    &b"load isoln Es Er Et cal'ed\r\n"[..]
+                } else {
+                    &b"load isoln Es Er Et\r\n"[..]
+                }),
+                ["cal", "on"] => self.cal_applied = true,
+                ["scan_bin", a, b, n, m] => {
+                    if let Some(text) = self.scan_error {
+                        rx.extend(text.bytes());
+                        rx.extend(b"\r\n");
+                    } else {
+                        let (a, b, n, m): (u64, u64, u16, u16) =
+                            (a.parse().unwrap(), b.parse().unwrap(), n.parse().unwrap(), m.parse().unwrap());
+                        rx.extend((m | mask::BINARY_REPLY).to_le_bytes());
+                        rx.extend(n.to_le_bytes());
+                        for i in 0..n as u64 {
+                            let f = if n > 1 { a + i * (b - a) / (n as u64 - 1) } else { a };
+                            let g = f as f32 / 1e9;
+                            rx.extend((f as u32).to_le_bytes());
+                            for v in [g, 0.5, 0.25, -g] {
+                                rx.extend(v.to_le_bytes());
+                            }
+                        }
+                    }
+                }
+                ["capture"] => rx.extend(std::iter::repeat_n(0x1Fu8, self.capture_bytes)),
+                // resume, pause, bandwidth, ...: no output.
+                _ => {}
+            }
+            rx.extend(PROMPT);
+        }
+    }
+
+    impl FakeDevice for FakeShell {
+        fn on_write(&mut self, bytes: &[u8], rx: &mut VecDeque<u8>) {
+            for &b in bytes {
+                if b != b'\r' {
+                    self.line.push(b);
+                    continue;
+                }
+                let cmd = String::from_utf8(std::mem::take(&mut self.line)).unwrap();
+                if self.silent {
+                    continue;
+                }
+                if cmd.is_empty() {
+                    // A bare return: just a new prompt.
+                    rx.extend(b"\r\n");
+                    rx.extend(PROMPT);
+                    continue;
+                }
+                self.commands.lock().unwrap().push(cmd.clone());
+                self.reply(&cmd, rx);
+            }
+        }
+    }
+
+    fn shell(dev: FakeShell) -> (NanoVnaShell, FakePort) {
+        let port = FakePort::new(dev);
+        (NanoVnaShell::from_port(port.boxed()).unwrap(), port)
+    }
+
+    fn linear(start: u64, stop: u64, points: u16) -> SweepConfig {
+        SweepConfig::linear(start, stop, points).unwrap()
+    }
+
+    #[test]
+    fn open_info_and_battery() {
+        let (dev, _) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let info = sh.info().unwrap();
+        assert_eq!(info.model, "NanoVNA-F 4.3");
+        assert_eq!(info.firmware, "Firmware 1.0.4 by BH5HNU");
+        assert_eq!(sh.battery_millivolts().unwrap(), 4209);
+        assert_eq!(sh.sweep_settings().unwrap(), (1_000_000, 30_000_000, 101));
+    }
+
+    #[test]
+    fn command_strips_echo_and_prompt() {
+        let (dev, _) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        assert_eq!(sh.command("vbat", COMMAND_TIMEOUT).unwrap(), "4209 mV");
+        assert_eq!(sh.command("resume", COMMAND_TIMEOUT).unwrap(), "");
+    }
+
+    #[test]
+    fn a_port_without_a_prompt_fails_and_is_left_alone() {
+        let (mut dev, _) = FakeShell::new();
+        dev.silent = true;
+        let port = FakePort::new(dev);
+        let err = NanoVnaShell::from_port(port.boxed()).err().expect("no prompt, no shell");
+        assert!(err.to_string().contains("no NanoVNA shell prompt"), "{err}");
+        // Only the probing return was sent: no `resume` to whatever is on
+        // this port when the half-built handle is dropped.
+        assert_eq!(port.written(), b"\r");
+    }
+
+    #[test]
+    fn sweep_returns_the_points_and_restores_the_device_on_drop() {
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let cfg = linear(2_000_000, 6_000_000, 5);
+        let r = sh.sweep(&cfg).unwrap();
+        assert_eq!(r.freqs_hz, vec![2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000]);
+        assert!(r.points.is_empty(), "a shell sweep has no raw FIFO records");
+        assert_eq!(r.missing_points(), 0);
+        for (i, f) in r.freqs_hz.iter().enumerate() {
+            let g = *f as f32 / 1e9;
+            assert_eq!(r.s11[i], Complex64::new(g as f64, 0.5));
+            assert_eq!(r.s21[i], Complex64::new(0.25, -g as f64));
+        }
+        // Raw data: mask = FREQ | S11 | S21 | UNCALIBRATED.
+        assert!(commands.lock().unwrap().contains(&"scan_bin 2000000 6000000 5 15".to_string()));
+        drop(sh);
+        let seen = commands.lock().unwrap().clone();
+        let tail: Vec<&str> = seen.iter().rev().take(3).rev().map(String::as_str).collect();
+        assert_eq!(tail, ["sweep 1000000 30000000 101", "cal on", "resume"], "all commands: {seen:?}");
+    }
+
+    #[test]
+    fn a_calibrated_sweep_leaves_out_the_raw_bit() {
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let mut cfg = linear(2_000_000, 6_000_000, 5);
+        cfg.calibrated = true;
+        sh.sweep(&cfg).unwrap();
+        assert!(commands.lock().unwrap().contains(&"scan_bin 2000000 6000000 5 7".to_string()));
+    }
+
+    #[test]
+    fn a_long_sweep_is_scanned_in_chunks_of_301() {
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let cfg = linear(1_000_000, 700_000_000, 700);
+        let r = sh.sweep(&cfg).unwrap();
+        assert_eq!(r.freqs_hz, cfg.frequencies());
+        let scans: Vec<String> = commands
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|c| c.starts_with("scan_bin"))
+            .cloned()
+            .collect();
+        assert_eq!(
+            scans,
+            [
+                "scan_bin 1000000 301000000 301 15",
+                "scan_bin 302000000 602000000 301 15",
+                "scan_bin 603000000 700000000 98 15",
+            ]
+        );
+        // The chunks join without a gap or a repeated point.
+        assert_eq!(r.s11[300].re as f32, 0.301);
+        assert_eq!(r.s11[301].re as f32, 0.302);
+    }
+
+    #[test]
+    fn a_text_answer_to_scan_bin_is_reported() {
+        let (mut dev, _) = FakeShell::new();
+        dev.scan_error = Some("sweep points exceeds range 301");
+        let (mut sh, _) = shell(dev);
+        let err = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap_err();
+        assert!(err.to_string().contains("sweep points exceeds range 301"), "{err}");
+    }
+
+    #[test]
+    fn a_wrong_echo_is_a_protocol_error() {
+        let (dev, _) = FakeShell::new();
+        let port = FakePort::new(dev);
+        let mut sh = NanoVnaShell::from_port(port.boxed()).unwrap();
+        // The saved sweep and calibration state are read with a good echo;
+        // garble only what follows by swapping in a second device state.
+        sh.saved_sweep = Some((1_000_000, 30_000_000, 101));
+        sh.saved_cal_apply = Some(false);
+        let (mut bad, _) = FakeShell::new();
+        bad.garbled_echo = true;
+        let port = FakePort::new(bad);
+        sh.port = port.boxed();
+        let err = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap_err();
+        assert!(err.to_string().contains("unexpected echo"), "{err}");
+        sh.restore_on_drop = false;
+    }
+
+    #[test]
+    fn screenshot_takes_the_size_from_the_model() {
+        let (dev, _) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let shot = sh.screenshot().unwrap();
+        assert_eq!((shot.width, shot.height, shot.bits_per_pixel), (800, 480, 16));
+        assert_eq!(shot.data.len(), 800 * 480 * 2);
+        assert!(!shot.big_endian);
+    }
+
+    #[test]
+    fn screenshot_of_an_unknown_model_goes_by_the_byte_count() {
+        let (mut dev, _) = FakeShell::new();
+        dev.model = "SomethingElse";
+        dev.capture_bytes = 480 * 320 * 2;
+        let (mut sh, _) = shell(dev);
+        let shot = sh.screenshot().unwrap();
+        assert_eq!((shot.width, shot.height), (480, 320));
+        // A size that matches no known screen is refused.
+        let (mut dev, _) = FakeShell::new();
+        dev.model = "SomethingElse";
+        dev.capture_bytes = 1000;
+        let (mut sh, _) = shell(dev);
+        assert!(sh.screenshot().unwrap_err().to_string().contains("unknown screen size"));
+    }
+
+    #[test]
+    fn a_pulled_cable_is_a_link_failure() {
+        let (dev, _) = FakeShell::new();
+        let (mut sh, port) = shell(dev);
+        port.unplug();
+        let err = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap_err();
+        assert!(err.is_link_failure(), "{err:?}");
+    }
 
     #[test]
     fn info_is_parsed() {

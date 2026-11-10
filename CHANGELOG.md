@@ -32,6 +32,11 @@ things that are not backwards compatible, such as the format of the calibration 
   of markers or plots no longer resets every setting.
 
 ### Development
+- The drivers can be tested without hardware: `LiteVna::from_port` and
+  `NanoVnaShell::from_port` take any serial port, and the tests drive them with a fake
+  LiteVNA and a fake NanoVNA-F (sweep loop, checksum and duplicate accounting, chunked
+  scans, echo and prompt framing, screenshots, a pulled cable, a silent device). The
+  library went from 39 to 75 tests.
 - The workspace declares its minimum Rust version (1.95, the floor of egui 0.37) and is
   clean under clippy; CI now runs clippy with warnings as errors, tests the library with
   overflow checks, and checks that the Dutch and English manuals have the same structure.
@@ -45,6 +50,9 @@ things that are not backwards compatible, such as the format of the calibration 
   that contradicted the measurements in docs/01 (FIFO checksum, points per second).
 
 ### Fixed
+- LiteVNA: after a sweep that failed (a timeout, a record with an impossible index) the
+  next sweep on the same grid did not reset the protocol and could stay out of step with
+  the device's replies; a failed sweep now forces a reset and a fresh configuration.
 - GUI: a USB cable pulled during a sweep is recognised as a disconnect also when the
   failure shows up as a timeout: the worker checks whether the port still exists. Before,
   the GUI could stay "connected" to a device that was gone.
