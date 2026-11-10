@@ -19,5 +19,6 @@ workspace = true
 litevna = { path = "../litevna" }
 anyhow = { workspace = true }
 clap = { workspace = true }
+clap_complete = { workspace = true }
 png = { workspace = true }
 serde_json = { workspace = true }

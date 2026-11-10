@@ -297,7 +297,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 38 | Sneltoetsen, auto-connect, batterij verversen, TDR-marker nudgen | N7–N9, N11 | S | gedaan 2026-11-10 (auto-connect als optie, standaard uit) |
 | 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | |
 | 40 | CSV met afgeleide kolommen; `.s1p`-export; Touchstone v2 | N15, N16 | S | gedaan 2026-11-10: `.s1p` en vier CSV-kolommen erbij. Niet gedaan: Touchstone v2 lezen (pas doen als er een bestand is dat het nodig heeft) |
-| 41 | `cal` als subcommando's met completions | N17 | M | |
+| 41 | `cal` als subcommando's met completions | N17 | M | gedaan 2026-11-10: de actie is een gevalideerde keuzelijst met uitleg per waarde (zelfde schrijfwijze als voorheen, geen echte subcommando's), `completions`, genegeerde opties zijn een fout, stil einde bij een gesloten pijp |
 | 42 | Kit-bestanden lezen, load serie-L | N14 | S/M | |
 | 43 | Tekst-`scan` voor NanoVNA-H/H4 zonder `scan_bin` | N13 | M | alleen met hardware |
 | 44 | 12-term 2-poorts via omdraaien van de DUT | N18 | L | alleen met hardware |

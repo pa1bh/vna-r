@@ -13,6 +13,12 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- CLI: `vna-cli cal --help` lists the standards and actions with what each does, and a
+  mistyped one is refused with the list; `vna-cli completions <shell>` prints a completion
+  script. Options that an action would ignore (`--note` with `cal show`, `--apply` without
+  `fit`, a grid with anything but a standard) are an error. Piping into `head` no longer
+  ends with a panic or "Broken pipe", and with `--csv -` stdout carries only the CSV (the
+  table used to be printed in front of it).
 - GUI: references are kept between sessions (as `ref-N.s2p` files in a `references`
   folder next to the settings) and come back at the next start with their names,
   visibility and the Δ choice.

@@ -147,8 +147,19 @@ leaves it, a NanoVNA-F gets its own sweep back and starts sweeping again.
 vna-cli release
 ```
 
+## completions
+
+Prints a completion script for your shell (bash, zsh, fish, elvish, powershell), so the
+commands, the options and the standards of `cal` complete with Tab:
+
+```bash
+vna-cli completions zsh > ~/.zfunc/_vna-cli
+```
+
 ## Exit codes and output
 
 Tables and data go to stdout, messages and warnings to stderr, so that
 `--csv -` can be used cleanly in a pipe. An error gives exit code 1 with a
-readable message.
+readable message; a wrong option gives exit code 2 with the usage. Options that a command
+would ignore are an error (for example `--note` with `cal show`). Piping into a program
+that stops reading, such as `head`, ends quietly.

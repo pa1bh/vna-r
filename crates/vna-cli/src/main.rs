@@ -106,8 +106,9 @@ enum Cmd {
     /// later ones reuse it. Needs open, short and load; through and isolation
     /// are optional. Use `cal show` to see what is in the file.
     Cal {
-        /// open | short | load | through | isolation | line-open | line-short | show | kit | fit | check | clear
-        what: String,
+        /// A standard to measure, or what to do with the file.
+        #[arg(value_enum)]
+        what: CalAction,
         /// Calibration file (JSON).
         #[arg(long, short)]
         file: PathBuf,
@@ -177,6 +178,63 @@ enum Cmd {
     },
     /// Hand the screen back to the on-device UI (LiteVNA: leave USB mode; NanoVNA: restore its sweep and resume).
     Release,
+    /// Print a completion script for your shell, e.g. `vna-cli completions zsh > ~/.zfunc/_vna-cli`.
+    Completions {
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
+}
+
+/// The first argument of `cal`: a standard to measure into the file, or an action on the file.
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum CalAction {
+    /// Measure the open standard.
+    #[value(alias = "o")]
+    Open,
+    /// Measure the short standard.
+    #[value(alias = "s")]
+    Short,
+    /// Measure the load standard.
+    #[value(alias = "l")]
+    Load,
+    /// Measure the through (port 1 to port 2).
+    #[value(aliases = ["thru", "t"])]
+    Through,
+    /// Measure the isolation (loads on both ports).
+    #[value(aliases = ["isol", "i"])]
+    Isolation,
+    /// Measure a cable with an open at its far end, for the kit fit.
+    #[value(aliases = ["line_open", "lineopen"])]
+    LineOpen,
+    /// Measure the same cable with a short at its far end.
+    #[value(aliases = ["line_short", "lineshort"])]
+    LineShort,
+    /// Show what is in the file.
+    Show,
+    /// Set the kit definition (--open-c, --short-l, --load-r, …).
+    Kit,
+    /// Fit the open/short asymmetry of the kit from line-open and line-short.
+    Fit,
+    /// Report what the calibration leaves over on the line measurements.
+    Check,
+    /// Delete the file.
+    Clear,
+}
+
+impl CalAction {
+    /// The standard this action measures, if it is one.
+    fn standard(self) -> Option<Standard> {
+        Some(match self {
+            CalAction::Open => Standard::Open,
+            CalAction::Short => Standard::Short,
+            CalAction::Load => Standard::Load,
+            CalAction::Through => Standard::Through,
+            CalAction::Isolation => Standard::Isolation,
+            CalAction::LineOpen => Standard::LineOpen,
+            CalAction::LineShort => Standard::LineShort,
+            CalAction::Show | CalAction::Kit | CalAction::Fit | CalAction::Check | CalAction::Clear => return None,
+        })
+    }
 }
 
 #[derive(Args, Clone)]
@@ -323,7 +381,43 @@ fn print_json(value: &serde_json::Value) -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn main() -> std::process::ExitCode {
+    // `vna-cli … | head` closes the pipe while we still print. That is not a
+    // failure: stop quietly instead of a panic message (println!) or an
+    // "Error: Broken pipe" (the writers that return an error).
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let closed_pipe = info
+            .payload()
+            .downcast_ref::<String>()
+            .is_some_and(|m| m.contains("failed printing to stdout") && m.contains("Broken pipe"));
+        if closed_pipe {
+            std::process::exit(0);
+        }
+        default_hook(info);
+    }));
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(e) if is_closed_pipe(&e) => std::process::ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("Error: {e:?}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+/// The error is a write to a pipe whose reader has gone.
+fn is_closed_pipe(e: &anyhow::Error) -> bool {
+    e.chain().any(|cause| {
+        let io = cause.downcast_ref::<io::Error>().or(match cause.downcast_ref::<litevna::Error>() {
+            Some(litevna::Error::Io(io)) => Some(io),
+            _ => None,
+        });
+        io.is_some_and(|io| io.kind() == io::ErrorKind::BrokenPipe)
+    })
+}
+
+fn run() -> Result<()> {
     let cli = Cli::parse();
     let conn = Conn {
         port: cli.port.clone(),
@@ -374,7 +468,7 @@ fn main() -> Result<()> {
             f_min,
             apply,
             as_delay,
-        } => cal(&conn, &what, &file, grid, measure, note, kit, f_min, apply, as_delay),
+        } => cal(&conn, what, &file, grid, measure, note, kit, f_min, apply, as_delay),
         Cmd::Tdr {
             grid,
             measure,
@@ -400,6 +494,11 @@ fn main() -> Result<()> {
             from,
         ),
         Cmd::Screenshot { out, swap_bytes } => screenshot(&mut open(&conn)?, &out, swap_bytes),
+        Cmd::Completions { shell } => {
+            use clap::CommandFactory;
+            clap_complete::generate(shell, &mut Cli::command(), "vna-cli", &mut io::stdout());
+            Ok(())
+        }
         Cmd::Release => {
             open(&conn)?.release()?;
             println!("device UI released");
@@ -852,7 +951,8 @@ fn sweep(
             "elapsed_ms": raw.elapsed.as_millis() as u64,
             "points": points,
         }))?;
-    } else {
+    } else if csv.as_deref().is_none_or(|p| p.as_os_str() != "-") {
+        // With `--csv -` stdout carries the CSV and nothing else.
         print_table(&result, rows);
     }
     if let Some(p) = raw.points.iter().flatten().next().filter(|_| conn.trace) {
@@ -938,7 +1038,17 @@ fn tdr_cmd(
     let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
 
     let limit_m = max_distance.unwrap_or(t.max_distance_m());
-    if !conn.json {
+    // With `--csv -` stdout carries the CSV and nothing else; the summary goes to stderr.
+    let csv_on_stdout = csv.as_deref().is_some_and(|p| p.as_os_str() == "-");
+    if csv_on_stdout {
+        eprintln!(
+            "TDR: resolution ≈ {:.3} m, alias-free range {:.1} m, VF {:.2}, {} window",
+            t.resolution_m(),
+            t.max_distance_m(),
+            vf,
+            window.name()
+        );
+    } else if !conn.json {
         println!(
             "TDR: resolution ≈ {:.3} m ({:.0} ps), alias-free range {:.1} m ({:.0} ns), VF {:.2}, {} window",
             t.resolution_m(),
@@ -990,10 +1100,10 @@ fn tdr_cmd(
             "peaks": peaks,
             "trace": trace,
         }))?;
-    } else {
+    } else if !csv_on_stdout {
         println!("{:>4} {:>10} {:>10} {:>9} {:>10}", "#", "distance", "time", "|Γ| dB", "Z behind");
     }
-    for (k, (i, mag)) in peaks.iter().enumerate().filter(|_| !conn.json) {
+    for (k, (i, mag)) in peaks.iter().enumerate().filter(|_| !conn.json && !csv_on_stdout) {
         // impedance a little beyond the edge, where the step has settled
         let j = (i + min_sep).min(t.impedance_ohm.len() - 1);
         println!(
@@ -1073,7 +1183,7 @@ fn save_cal(path: &Path, set: &CalibrationSet) -> Result<()> {
 #[allow(clippy::too_many_arguments)]
 fn cal(
     conn: &Conn,
-    what: &str,
+    what: CalAction,
     file: &Path,
     grid: GridArgs,
     m: MeasureArgs,
@@ -1083,14 +1193,24 @@ fn cal(
     apply: bool,
     as_delay: bool,
 ) -> Result<()> {
+    // Options that only one action reads are an error with any other, not silently dropped.
+    if what != CalAction::Fit && (f_min.is_some() || apply || as_delay) {
+        bail!("--f-min, --apply and --as-delay belong to `cal fit`");
+    }
+    if what.standard().is_none() && note.is_some() {
+        bail!("--note is stored when a standard is measured (cal open, short, load, …)");
+    }
+    if what.standard().is_none() && !grid.is_empty() {
+        bail!("--start/--stop/--points set the grid when a standard is measured; this action uses the file as it is");
+    }
     let existing = if file.exists() { Some(load_cal(file)?) } else { None };
 
-    match what.to_ascii_lowercase().as_str() {
-        "show" => {
+    match what {
+        CalAction::Show => {
             let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             return show_cal(&set, conn.json);
         }
-        "kit" => {
+        CalAction::Kit => {
             let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             if kit.is_empty() {
                 bail!("give kit parameters, e.g. --open-c 55 (fF) --short-l 0 --load-r 50");
@@ -1103,7 +1223,7 @@ fn cal(
             println!("kit updated in {}", file.display());
             return show_cal(&set, conn.json);
         }
-        "check" => {
+        CalAction::Check => {
             let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             let chk = set.check_lines(1e9)?;
             println!(
@@ -1138,7 +1258,7 @@ fn cal(
             println!("re-measure line-short with the cable flipped: if it changes, it is the connector, not the load.");
             return Ok(());
         }
-        "fit" => {
+        CalAction::Fit => {
             let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
             let f_min = parse_hz(f_min.as_deref().unwrap_or("300M"))?;
             let model = if as_delay { OpenModel::Delay } else { OpenModel::Capacitance };
@@ -1173,7 +1293,7 @@ fn cal(
             }
             return Ok(());
         }
-        "clear" => {
+        CalAction::Clear => {
             if file.exists() {
                 fs::remove_file(file)?;
                 println!("removed {}", file.display());
@@ -1182,11 +1302,7 @@ fn cal(
         }
         _ => {}
     }
-    let standard = Standard::parse(what).with_context(|| {
-        format!(
-            "unknown standard {what:?}; use open, short, load, through, isolation, line-open, line-short, show, kit, fit, check or clear"
-        )
-    })?;
+    let standard = what.standard().expect("every action that is not a standard returned above");
 
     // Grid: from the existing file unless this is the first standard.
     let mut set = match existing {

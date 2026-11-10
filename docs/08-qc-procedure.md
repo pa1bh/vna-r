@@ -155,7 +155,7 @@ frequentie. Klik in de grafiek (buiten een tekstveld) en druk ←: M1 schuift é
 
 **Zonder apparaat.**
 ```bash
-cargo run --release -p vna-cli -- tdr --from cal/sweep.s2p --csv - | head -3
+vna-cli tdr --from cal/sweep.s2p --csv - 2>/dev/null | head -3
 ls -- -
 ```
 Verwacht: drie CSV-regels op stdout (kop `distance_m,time_ns,…`) en `ls: -: No such file`.
@@ -663,4 +663,27 @@ referentie 1 met ×, sluit af: `ref-1.s2p` is weg en `ref-0.s2p` bevat de overge
 
 Let op: bij een autosave (elke 30 s) worden de bestanden alleen herschreven als er iets
 aan de referenties veranderd is.
+
+## Punt 41 — `cal`-acties, completions, opties die genegeerd werden (N17, U14)
+
+**Zonder apparaat.**
+```bash
+vna-cli cal --help | sed -n 8,22p
+vna-cli cal bogus --file x.json
+vna-cli cal show --file cal/n-6g3.cal.json --note test
+vna-cli cal show --file cal/n-6g3.cal.json --apply
+vna-cli cal thru --file cal/n-6g3.cal.json --help > /dev/null && echo "alias thru ok"
+vna-cli completions zsh | head -1
+vna-cli cal show --file cal/n-6g3.cal.json | head -1
+vna-cli tdr --from cal/sweep.s2p --csv - 2>/dev/null | head -2
+```
+Verwacht: de helptekst somt de twaalf waarden op met uitleg; `bogus` geeft "invalid value
+… [possible values: open, short, …]" (exitcode 2); `--note` en `--apply` bij `show` geven
+een fout met uitleg; `#compdef vna-cli`; de twee `head`-regels eindigen zonder "Broken
+pipe" of paniekmelding; de laatste toont de CSV-kop `distance_m,time_ns,…` als eerste
+regel (geen tabel ervoor).
+
+**Met apparaat.** `vna-cli cal open --file /tmp/qc.cal.json --start 1M --stop 30M --points
+51`, dan `short` en `load` zonder raster: werkt als voorheen; `vna-cli cal o --file …`
+(alias) ook.
 
