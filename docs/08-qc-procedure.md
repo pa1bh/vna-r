@@ -99,8 +99,8 @@ Sluit af met de **slotronde** onderaan: de hele GUI één keer van begin tot ein
 | 48 | Niet-eindige waarden, dubbele frequenties | ja | | | |
 | 49 | Return past toe, CLI weigert tegenstrijdige vlaggen | ja | ja | | |
 
-Niet gedaan en dus niet te controleren: 28 (wacht op een besluit, zie onderaan), 37, 39,
-42, 43, 44 en de meetpunten 45 tot 47; de reden staat per punt in de werklijst.
+Niet gedaan en dus niet te controleren: 28 (vervallen, de Help-links blijven bij de tag),
+37, 39, 42, 43, 44 en de meetpunten 45 tot 47; de reden staat per punt in de werklijst.
 
 ---
 
@@ -820,13 +820,11 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
 
 # Open vragen
 
-1. **Punt 28, Help lokaal openen.** Mijn eerdere advies klopte niet: de handleiding in
-   het release-archief is even oud als de tag, dus een correctie bereikt de gebruiker
-   daarmee net zo min zonder release, en het is markdown (een browser toont het als
-   platte tekst). Wat het doel wel dient: de Help-links naar `main` laten wijzen (altijd
-   de nieuwste tekst, met het risico dat die voorloopt op het programma), of naar de tag
-   blijven wijzen en documentatiecorrecties meenemen in de volgende release (zoals nu).
-   Ik heb niets veranderd; zeg welke je wilt.
+1. **Punt 28, Help lokaal openen: beantwoord.** Mijn eerdere advies klopte niet (de
+   handleiding in het release-archief is even oud als de tag, en het is markdown).
+   Besluit van 10 november: de Help-links blijven naar de tag van de eigen versie wijzen;
+   een correctie in de handleiding gaat mee met de volgende release. Er is niets
+   veranderd aan de code.
 2. **Versienummer en release.** Alles staat onder *Unreleased*. Er is nieuw gedrag
    (instellingenformaat, CLI weigert meer, nieuwe functies), dus 0.3.0 ligt meer voor de
    hand dan 0.2.6. Pas na jouw QC: versie in `Cargo.toml`, de kop in `CHANGELOG.md`,

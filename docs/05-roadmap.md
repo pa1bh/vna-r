@@ -246,8 +246,8 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 Op 10 november zijn in één doorlopende sessie de punten 1 tot 27, 29 tot 36, 38, 40, 41,
 48 en 49 gedaan, elk in een eigen commit, alles onder *Unreleased* in de CHANGELOG en
 niet gepusht. Hoe je elk punt controleert staat in
-[docs/08-qc-procedure.md](08-qc-procedure.md). Open staan: 28 (wacht op een besluit),
-37, 39, 42, 43, 44 en de meetpunten 45 tot 47; de reden staat in de statuskolom.
+[docs/08-qc-procedure.md](08-qc-procedure.md). Punt 28 is vervallen (de Help-links blijven bij de tag). Open staan: 37, 39, 42, 43, 44
+en de meetpunten 45 tot 47; de reden staat in de statuskolom.
 
 ## 0.2.6 — bugfix, geen nieuwe features
 
@@ -285,7 +285,7 @@ niet gepusht. Hoe je elk punt controleert staat in
 | 25 | Versieveld in bewaarde instellingen en calibratie-JSON; `Vec` in plaats van vaste arrays | D4 | S | gedaan 2026-11-10 (0.2.5-instellingen blijven leesbaar, getest) |
 | 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | gedaan 2026-11-10 in beperkte vorm: TDR-fout bij de TDR, korte bevestiging in de topbalk, lange fout afgekapt met hover. Geen algemeen `Notice`-type: de vijf plekken hebben elk hun eigen paneel en dat werkt |
 | 27 | Fouttype: `Parse { line }`, `NotConnected`, `Unsupported(Kind)`; "apparaat weg" ook bij `Timeout` | D7 | S | gedaan 2026-11-10 (`Parse`, `Unsupported`, poort-verdwenen-controle; geen `NotConnected`: de library kent geen verbindingsloze toestand) |
-| 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | **wacht op besluit**: de lokale kopie is even oud als de tag en lost "correctie zonder release" niet op; bovendien is het markdown, geen HTML. Zie de vraag onderaan docs/08 |
+| 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | vervallen 2026-11-10: de lokale kopie is even oud als de tag en lost "correctie zonder release" niet op. Besluit: de Help-links blijven bij de tag; documentatiecorrecties gaan mee met de volgende release |
 | 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache) |
 | 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | gedaan 2026-11-10 (protocolfuncties zoals `set_power`, `set_bandwidth`, `pause` blijven als driver-API; `probe_shell` blijft bewust los van de driver, met uitleg) |
 | 31 | `Arc<SweepResult>` voor shown en referenties; statusstring cachen | D9 | S | gedaan 2026-11-10, eenvoudiger dan gepland: één kopie per frame zonder ruwe records, status uit aanwezige standaarden. Geen `Arc`: de winst weegt niet op tegen de ingreep |

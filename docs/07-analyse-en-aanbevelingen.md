@@ -4,7 +4,7 @@
 > staat in de werklijst onderaan [docs/05-roadmap.md](05-roadmap.md); hoe je het
 > controleert in [docs/08-qc-procedure.md](08-qc-procedure.md). Eén advies hieronder
 > bleek onjuist: de handleiding lokaal openen (F7, besluit 6) lost "een correctie zonder
-> release" niet op, zie de open vragen in docs/08.
+> release" niet op. Besloten is de Help-links bij de tag te houden.
 
 Stand: versie 0.2.5, commit 94fe525, 10 november 2026. Een brede doorlichting van het
 project op UX/UI, bugs, functionaliteit, nieuwe features, veiligheid, duurzaamheid van de
@@ -408,8 +408,9 @@ De vragen uit de eerste versie van dit rapport zijn doorgenomen; dit is besloten
    buiten bereik verdwijnt de marker.
 5. **Stop-latentie (U4/F2)**: annuleerpunt per 255-record-chunk (LiteVNA) en per
    `scan_bin`-stuk (NanoVNA-F), via een `sweep_with`-variant in de library.
-6. **Help (F7)**: handleiding lokaal openen uit `docs/` naast de binary, GitHub bij de
-   tag als terugval.
+6. **Help (F7)**: eerst besloten tot lokaal openen uit `docs/` naast de binary; later
+   op dezelfde dag herzien, omdat de lokale kopie even oud is als de tag en het doel
+   (een correctie zonder release) dus niet dient. De Help-links blijven bij de tag.
 7. **Windows**: geen tester beschikbaar; blijft als bekende blinde vlek in de README.
 8. **Referenties (N12)**: bewaren met de sessie, als .s2p naast de instellingen.
 
