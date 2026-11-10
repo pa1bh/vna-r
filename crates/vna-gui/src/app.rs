@@ -154,7 +154,13 @@ struct CalState {
     solved: Option<(Vec<u64>, Calibration)>,
     apply: bool,
     pending: Option<Standard>,
+    /// What last happened to the set: "measured open", "loaded", "saved", a
+    /// fit result. Stays until the next action replaces it.
     message: Option<String>,
+    /// Why the set cannot be solved for the current grid, if it cannot.
+    /// Separate from `message` so a status line survives the re-solve that
+    /// follows every action.
+    solve_error: Option<String>,
     /// Plausibility warning about the last stored standard.
     warning: Option<String>,
     /// Warning about interpolating this calibration onto the current sweep grid.
@@ -184,13 +190,13 @@ impl CalState {
             match set.solve_for(freqs) {
                 Ok(cal) => {
                     self.solved = Some((freqs.to_vec(), cal));
-                    self.message = None;
+                    self.solve_error = None;
                     self.grid_warning = set.coarse_low_end_warning(freqs);
                 }
                 Err(e) => {
                     self.solved = None;
                     self.grid_warning = None;
-                    self.message = Some(e.to_string());
+                    self.solve_error = Some(e.to_string());
                     return None;
                 }
             }
@@ -1558,6 +1564,11 @@ impl App {
         }
         if let Some(m) = &self.cal.message {
             ui.small(RichText::new(m).color(Color32::from_rgb(200, 200, 120)));
+        }
+        if self.cal.apply && self.cal.set.is_some() {
+            if let Some(e) = &self.cal.solve_error {
+                ui.small(RichText::new(format!("not applied: {e}")).color(Color32::from_rgb(255, 150, 80)));
+            }
         }
         if let Some(w) = &self.cal.warning {
             ui.small(RichText::new(format!("⚠ {w}")).color(Color32::from_rgb(255, 150, 80)));

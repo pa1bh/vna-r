@@ -85,3 +85,19 @@ Verwacht: foutmelding "neither protocol answered on …" na ongeveer 4 s (LiteVN
 dit punt alleen door code-inspectie te controleren: `restore_on_drop: false` in `open`,
 `true` na `sync()`.
 
+## Punt 4 — Calibratiemeldingen blijven staan (B4, U2)
+
+**Veranderd.** `CalState` heeft naast `message` een `solve_error`; het paneel toont de
+status in geel en een niet-toepasbare calibratie in oranje als "not applied: …".
+
+**Met apparaat.** Verbind, Run, meet **open**: onder de calibratieregels verschijnt
+"measured open" en blijft staan tot de volgende actie. Meet short en load: "measured
+short", "measured load". **Load…** een bestand: "loaded". Kit fit ▸ Apply to kit: "kit
+updated … save to keep it" blijft zichtbaar.
+
+**Zonder apparaat.** File ▸ Open as trace met een .s2p van 1 – 30 MHz, dan File ▸ Load
+calibration met `cal/n-6g3.cal.json` (50 kHz – 6,3 GHz, dat kan) en daarna een .s2p van
+0 – 10 kHz of boven 6,3 GHz als trace: verwacht geel "loaded" én oranje "not applied:
+target grid … lies outside the calibrated span …". Vóór 0.2.6 verdrong de tweede melding
+de eerste.
+

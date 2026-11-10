@@ -14,6 +14,10 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: de statusregel van het calibratiepaneel ("measured open", "loaded", "kit updated …
+  save to keep it") werd direct na elke actie overschreven door het opnieuw oplossen van
+  de calibratie en was daardoor met **apply** aan nooit te zien. De reden waarom een
+  calibratie niet toegepast kan worden staat nu apart ("not applied: …").
 - Calibratie-interpolatie naar een ander raster gebeurt nu polair (grootte en fase apart)
   in plaats van lineair in reëel en imaginair deel. Dat laatste snijdt de hoek tussen twee
   fasoren af en maakte alle standaarden kleiner met cos(θ/2) per fasestap θ, zodat elke
