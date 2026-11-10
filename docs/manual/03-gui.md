@@ -31,7 +31,9 @@ as text. Paste that into an issue report (chapter 9). The choice is remembered.
    The list is refreshed every two seconds as long as you are not connected, so a device
    you plug in later appears by itself; **rescan** searches straight away.
 2. **Connect**. The top bar shows the model, firmware and battery voltage.
-3. **Run** starts continuous sweeping, **Single** does one sweep. Run again stops.
+3. **Run** starts continuous sweeping, **Single** does one sweep. While anything is
+   being measured (the continuous sweep, a single sweep or a calibration standard) the
+   Run button reads **Stop**.
    A sweep that takes more than a moment (a NanoVNA-F, many points) shows a bar with
    the points measured so far. **Stop**, **Disconnect** and **Apply sweep** do not wait
    for the sweep to finish: they take effect at the next block of data, within 255

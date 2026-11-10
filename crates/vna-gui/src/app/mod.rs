@@ -347,13 +347,13 @@ impl App {
         let pressed = |key: egui::Key| ctx.input(|i| i.key_pressed(key) && i.modifiers.is_none());
         if self.connected() {
             if pressed(egui::Key::Space) {
-                if self.running {
+                if self.sweeping() {
                     self.stop_sweep();
                 } else {
                     self.start_sweep(true);
                 }
             }
-            if pressed(egui::Key::S) && !self.running {
+            if pressed(egui::Key::S) && !self.sweeping() {
                 self.start_sweep(false);
             }
         }
@@ -595,14 +595,17 @@ impl App {
             }
             ui.separator();
             ui.add_enabled_ui(connected, |ui| {
-                if self.running {
+                // Stop is there for anything that is being measured, also a
+                // standard or a single sweep while Run is off.
+                let sweeping = self.sweeping();
+                if sweeping {
                     if ui.button("Stop").clicked() {
                         self.stop_sweep();
                     }
                 } else if ui.button("Run").clicked() {
                     self.start_sweep(true);
                 }
-                if ui.add_enabled(!self.running, egui::Button::new("Single")).clicked() {
+                if ui.add_enabled(!sweeping, egui::Button::new("Single")).clicked() {
                     self.start_sweep(false);
                 }
                 if ui.button("Screenshot").clicked() {
@@ -706,7 +709,8 @@ impl App {
                 }
                 ui.separator();
                 ui.add_enabled_ui(connected, |ui| {
-                    if self.running {
+                    let sweeping = self.sweeping();
+                    if sweeping {
                         if ui.button("Stop").clicked() {
                             ui.close();
                             self.stop_sweep();
@@ -715,7 +719,7 @@ impl App {
                         ui.close();
                         self.start_sweep(true);
                     }
-                    if ui.add_enabled(!self.running, egui::Button::new("Single sweep")).clicked() {
+                    if ui.add_enabled(!sweeping, egui::Button::new("Single sweep")).clicked() {
                         ui.close();
                         self.start_sweep(false);
                     }

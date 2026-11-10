@@ -31,7 +31,9 @@ dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
    lijst wordt elke twee seconden ververst zolang je niet verbonden bent, dus een
    apparaat dat je later aansluit verschijnt vanzelf; **rescan** zoekt direct.
 2. **Connect**. De bovenbalk toont model, firmware en batterijspanning.
-3. **Run** start continu sweepen, **Single** doet er één. Run nogmaals stopt.
+3. **Run** start continu sweepen, **Single** doet er één. Zolang er iets gemeten wordt
+   (de continue sweep, een enkele sweep of een calibratiestandaard) staat op de plaats
+   van Run de knop **Stop**.
    Een sweep die meer dan een ogenblik duurt (een NanoVNA-F, veel punten) toont een balk
    met de punten die al gemeten zijn. **Stop**, **Disconnect** en **Apply sweep** wachten
    niet tot de sweep klaar is: ze werken bij het volgende blok gegevens, binnen 255

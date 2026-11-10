@@ -70,6 +70,13 @@ impl App {
         }
     }
 
+    /// Something is being measured or waiting for its turn: the continuous
+    /// sweep, a calibration standard, or a single sweep that has reported
+    /// progress. This is when the Stop button has something to stop.
+    pub(super) fn sweeping(&self) -> bool {
+        self.running || self.cal.pending.is_some() || self.progress.is_some()
+    }
+
     pub(super) fn stop_sweep(&mut self) {
         self.running = false;
         self.progress = None;

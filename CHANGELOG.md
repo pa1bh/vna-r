@@ -14,6 +14,9 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Fixed
 
+- GUI: **Stop** is now also there while a calibration standard or a single sweep is being
+  measured with Run off; before, a long averaged standard could only be aborted by
+  starting Run. The space bar follows.
 - CLI: the comment line of a file written by `sweep --s2p` or `--s1p` now states a port
   extension and a time gate, as the GUI already did; the `.s1p` comment also says whether
   the data was calibrated.
