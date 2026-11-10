@@ -70,3 +70,18 @@ eindigt waar de laatste gegevens staan (geen lege rechterhelft), en het label
 "alias-free range" onder de TDR-instellingen noemt dezelfde afstand als het einde van de as.
 Vóór 0.2.6 stond de as tot het dubbele en was de rechterhelft leeg.
 
+## Punt 3 — Mislukte shell-open wacht niet dubbel (B3)
+
+**Veranderd.** `NanoVnaShell::open` zet `restore_on_drop` pas aan nadat het apparaat een
+prompt gaf.
+
+**Zonder VNA, wel een andere seriële poort** (bijvoorbeeld een Arduino of USB-serieel
+adapter zonder USB-id die vna-r kent):
+```bash
+time cargo run --release -p vna-cli -- --port /dev/cu.<die-poort> info
+```
+Verwacht: foutmelding "neither protocol answered on …" na ongeveer 4 s (LiteVNA-probe plus
+één shell-timeout van 3 s). Vóór 0.2.6 duurde het ongeveer 7 s. Zonder tweede apparaat is
+dit punt alleen door code-inspectie te controleren: `restore_on_drop: false` in `open`,
+`true` na `sync()`.
+

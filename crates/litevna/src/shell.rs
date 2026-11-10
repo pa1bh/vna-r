@@ -204,15 +204,19 @@ impl NanoVnaShell {
     /// Open the port and wait for a prompt. Fails when nothing answers with `ch> `.
     pub fn open(path: &str) -> Result<Self> {
         let port = serialport::new(path, 115_200).timeout(Duration::from_millis(100)).open()?;
+        // `restore_on_drop` stays off until the device has answered: dropping
+        // a handle whose `sync` failed must not send `resume` to whatever is
+        // on the port and wait another command timeout for its prompt.
         let mut dev = NanoVnaShell {
             port,
             trace: false,
-            restore_on_drop: true,
+            restore_on_drop: false,
             saved_sweep: None,
             saved_cal_apply: None,
             info: None,
         };
         dev.sync()?;
+        dev.restore_on_drop = true;
         Ok(dev)
     }
 

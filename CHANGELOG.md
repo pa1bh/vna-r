@@ -25,6 +25,9 @@ calibratiebestanden.
 - TDR: het gemelde eenduidige bereik ("alias-free range") was 1/Δf, het dubbele van wat de
   grafiek toont; de arrays en de gate liepen al tot 1/(2·Δf). GUI-label, CLI-regel en de
   as-limiet gebruiken nu de juiste waarde, en de gate-foutmelding noemt die direct.
+- Een poort zonder herkenbare USB-id die geen NanoVNA-shell blijkt te zijn kostte bij het
+  verbinden twee keer de commando-timeout (eerst de prompt afwachten, dan bij het opruimen
+  nog een `resume` sturen en weer wachten); nu één keer.
 
 ### Documentatie
 - De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
