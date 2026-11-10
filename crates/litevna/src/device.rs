@@ -85,8 +85,10 @@ impl SweepConfig {
         })
     }
 
+    /// The last frequency; `start_hz` for a (meaningless) zero-point config
+    /// rather than an underflow.
     pub fn stop_hz(&self) -> u64 {
-        self.start_hz + self.step_hz * (self.points as u64 - 1)
+        self.start_hz + self.step_hz * u64::from(self.points).saturating_sub(1)
     }
 
     pub fn frequencies(&self) -> Vec<u64> {
@@ -652,6 +654,19 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zero_point_config_does_not_underflow() {
+        let cfg = SweepConfig {
+            start_hz: 1_000_000,
+            step_hz: 1000,
+            points: 0,
+            values_per_freq: 1,
+            calibrated: false,
+        };
+        assert_eq!(cfg.stop_hz(), 1_000_000);
+        assert!(cfg.frequencies().is_empty());
+    }
 
     fn sweep_without_records(n: usize) -> SweepResult {
         SweepResult {

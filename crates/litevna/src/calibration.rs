@@ -831,6 +831,10 @@ impl CalibrationSet {
     /// Needs line-open and line-short on a uniform grid of ≥ 8 points.
     pub fn check_lines(&self, band_hz: f64) -> Result<LineCheck> {
         use crate::timedomain::{gate, tdr, Gate, GateKind, TdrConfig};
+        if !(band_hz > 0.0) || !band_hz.is_finite() {
+            // The band walk below steps by `band_hz`; zero or negative would never end.
+            return Err(Error::InvalidArgument(format!("ripple band must be positive, got {band_hz}")));
+        }
         let (lo_m, ls_m) = match (&self.line_open, &self.line_short) {
             (Some(o), Some(s)) => (o, s),
             _ => return Err(Error::Calibration("need line-open and line-short measurements".into())),
@@ -1291,6 +1295,15 @@ mod tests {
             set.set(std, &sweep_from(freqs, s11, s21)).unwrap();
         }
         set
+    }
+
+    #[test]
+    fn check_lines_rejects_a_non_positive_band() {
+        let set = CalibrationSet::new(vec![1_000_000, 2_000_000], CalKit::ideal());
+        for bad in [0.0, -1e9, f64::NAN, f64::INFINITY] {
+            let err = set.check_lines(bad).unwrap_err().to_string();
+            assert!(err.contains("positive"), "{bad}: {err}");
+        }
     }
 
     #[test]

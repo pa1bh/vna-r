@@ -213,3 +213,13 @@ en `tdr_max_m:…` in `tdr_max_m:NaN`. Start de GUI, kies TDR: velocity factor s
 0,70 en Max distance op 2,0 m, geen foutmelding. Herstel het bestand daarna, of laat de
 GUI het bij afsluiten overschrijven.
 
+## Punt 14 — Underflow en eindeloze lus afgevangen (B15, B16)
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna zero_point_config non_increasing_grid check_lines_rejects
+```
+Verwacht: drie tests groen. Praktijkcontrole: open een .s2p waarvan je twee regels hebt
+omgewisseld (niet-oplopend) als trace: de reader weigert hem al ("frequencies are not
+increasing"); de TDR-controle is de tweede verdedigingslinie voor samengevoegde segmenten.
+

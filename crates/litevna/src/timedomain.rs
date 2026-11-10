@@ -276,10 +276,14 @@ fn check_grid(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<Gr
     if n < 8 || s11.len() != n {
         return Err(Error::InvalidArgument("TDR needs at least 8 points with matching S11".into()));
     }
-    let df = (freqs_hz[1] - freqs_hz[0]) as f64;
-    if df <= 0.0 || freqs_hz.windows(2).any(|w| w[1] - w[0] != freqs_hz[1] - freqs_hz[0]) {
+    // Checked subtraction: a concatenated multi-segment sweep or a file can be
+    // non-increasing, and a u64 underflow would panic in debug and wrap in release.
+    let step = freqs_hz[1].checked_sub(freqs_hz[0]).filter(|s| *s > 0);
+    let uniform = step.is_some_and(|s| freqs_hz.windows(2).all(|w| w[1].checked_sub(w[0]) == Some(s)));
+    if !uniform {
         return Err(Error::InvalidArgument("TDR needs a uniformly spaced sweep".into()));
     }
+    let df = step.unwrap_or(0) as f64;
     if !(0.1..=1.0).contains(&cfg.velocity_factor) {
         return Err(Error::InvalidArgument("velocity factor must be within 0.1..=1".into()));
     }
@@ -451,6 +455,26 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_increasing_grid_is_an_error_not_a_panic() {
+        // Two segments concatenated in the wrong order: the step would underflow.
+        let freqs: Vec<u64> = (0..8).map(|i| 100_000_000 - i * 1_000_000).collect();
+        let s11 = vec![Complex64::new(0.5, 0.0); 8];
+        let err = tdr(&freqs, &s11, &TdrConfig::default()).unwrap_err().to_string();
+        assert!(err.contains("uniformly"), "{err}");
+        let mixed = vec![
+            1_000_000u64,
+            2_000_000,
+            3_000_000,
+            2_500_000,
+            5_000_000,
+            6_000_000,
+            7_000_000,
+            8_000_000,
+        ];
+        assert!(tdr(&mixed, &s11, &TdrConfig::default()).is_err());
+    }
 
     /// Two reflections: a small one at the reference plane and a lossy short
     /// 1 m down a VF-0.7 line, on a 1 MHz..1 GHz grid (1 ns resolution).

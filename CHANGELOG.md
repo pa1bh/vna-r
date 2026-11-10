@@ -14,6 +14,9 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- Library: een sweep-configuratie met nul punten, een niet-oplopend raster in de TDR en
+  een band van nul of negatief in `check_lines` gaven een rekenfout (overflow) of een
+  eindeloze lus; ze geven nu een foutmelding.
 - GUI: een calibratiestandaard wordt nu over evenveel sweeps gemiddeld als **Sweep avg**
   aangeeft; voorheen was elke standaard één ruwe sweep onder een gemiddelde trace.
 - GUI: het commentaar in een opgeslagen .s2p en de naam van een vastgehouden referentie
