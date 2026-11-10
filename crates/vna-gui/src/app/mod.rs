@@ -177,6 +177,8 @@ pub struct App {
     references: Vec<Reference>,
     /// Reference the difference trace is taken against.
     diff_ref: Option<usize>,
+    /// The references differ from what is on disk (see `store_references`).
+    references_changed: bool,
     /// Name of the Touchstone file currently shown as the trace (no device data).
     file_trace: Option<String>,
     /// Last file operation (saved/opened), shown under **Files**.
@@ -269,6 +271,7 @@ impl App {
             avg_buf: VecDeque::new(),
             references: Vec::new(),
             diff_ref: None,
+            references_changed: false,
             file_trace: None,
             file_message: None,
             tdr_cache: None,
@@ -1004,6 +1007,7 @@ impl App {
 
 impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        self.store_references();
         eframe::set_value(storage, eframe::APP_KEY, &self.settings());
     }
 

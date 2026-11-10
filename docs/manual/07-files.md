@@ -46,8 +46,11 @@ writes distance, time, impulse, step and impedance. For spreadsheets and your ow
 
 ## References
 
-References from **Hold** live only in the session. If you want to keep them: **Save
-Touchstone** while the measurement in question is live, and later **Open as reference…**.
+References from **Hold** are kept between sessions: vna-r writes them as `ref-0.s2p` to
+`ref-3.s2p` in the folder `references` next to its settings (on macOS
+`~/Library/Application Support/vna-r`, on Linux `~/.local/share/vna-r`, on Windows
+`%APPDATA%\vna-r`). To keep one for good or pass it on, copy that file, or **Save
+Touchstone** while the measurement is live and later **Open as reference…**.
 
 ## Screenshots
 

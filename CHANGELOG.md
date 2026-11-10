@@ -13,6 +13,9 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- GUI: references are kept between sessions (as `ref-N.s2p` files in a `references`
+  folder next to the settings) and come back at the next start with their names,
+  visibility and the Δ choice.
 - Port extension: move the reference plane outward by a one-way delay in picoseconds
   (**Port extension** in the calibration panel, `--port-extension <ps>` with `sweep` and
   `tdr`), for an adapter or fixture behind the calibration plane. It applies to

@@ -644,3 +644,23 @@ bevat "port extension … ps". Sluit af en start opnieuw: de waarde is onthouden
 daarna een standaard (open): de calibratie zelf is niet beïnvloed (het paneel toont
 dezelfde punten, en met extension 0 is alles als voorheen).
 
+## Punt 36 — Referenties blijven bewaard (N12)
+
+**Zonder apparaat.**
+```bash
+cargo test -p vna-gui references_survive
+```
+GUI: open `cal/sweep.s2p` als trace, **Hold** (referentie 1), hernoem hem naar "voor",
+File ▸ Open as reference… met een ander bestand (referentie 2), zet Δ bij referentie 1
+aan en vink referentie 2 uit. Sluit de GUI af (File ▸ Quit). Controleer:
+```bash
+ls ~/Library/Application\ Support/vna-r/references/
+```
+Verwacht: `ref-0.s2p` en `ref-1.s2p`. Start opnieuw: onder **Traces** staan beide
+referenties met hun naam, referentie 2 uitgevinkt, Δ bij "voor" actief. Verwijder
+referentie 1 met ×, sluit af: `ref-1.s2p` is weg en `ref-0.s2p` bevat de overgebleven
+(voormalige tweede) referentie. Verwijder de laatste: de map is leeg.
+
+Let op: bij een autosave (elke 30 s) worden de bestanden alleen herschreven als er iets
+aan de referenties veranderd is.
+

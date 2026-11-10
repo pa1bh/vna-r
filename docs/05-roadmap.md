@@ -292,7 +292,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 |---|------|------|---------|--------|
 | 34 | `--json` voor info, list, sweep, tdr, cal show | N4 | S | gedaan 2026-11-10 |
 | 35 | Poortverlenging / elektrische vertraging op de host | N5 | S | gedaan 2026-11-10 (één vertraging voor poort 1: S11 tweemaal, S21 eenmaal) |
-| 36 | Referenties bewaren met de sessie (besluit 8) | N12 | M | |
+| 36 | Referenties bewaren met de sessie (besluit 8) | N12 | M | gedaan 2026-11-10 |
 | 37 | Host-middeling via `valuesPerFrequency` | N6, F3 | S/M | |
 | 38 | Sneltoetsen, auto-connect, batterij verversen, TDR-marker nudgen | N7–N9, N11 | S | gedaan 2026-11-10 (auto-connect als optie, standaard uit) |
 | 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | |

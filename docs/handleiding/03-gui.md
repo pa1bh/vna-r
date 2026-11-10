@@ -107,8 +107,8 @@ grafiek, in de eenheid van die grafiek: dB, graden, SWR, ohm of nanoseconden. Zo
 direct wat een aanpassing aan een antenne doet. Let op dat een verschil in dB groot
 wordt waar beide traces diep in een dal zitten (twee kleine getallen); kijk daar naar
 het verschil in SWR of |Z|. Hoofdstuk 9 laat zo een vergelijking van twee apparaten
-op dezelfde antenne zien. Referenties verdwijnen bij het afsluiten; bewaar ze als Touchstone en open
-ze later weer als referentie.
+op dezelfde antenne zien. Referenties blijven bij het afsluiten bewaard en komen bij de
+volgende start terug, met hun naam; haal ze met **×** weg als je ermee klaar bent.
 
 ## Schermafbeelding van het apparaat
 
@@ -122,5 +122,5 @@ Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg, se
 het calibratiebestand en of het toegepast wordt, de weergavekeuzes, TDR- en
 gate-instellingen, markerfrequenties en de venstergrootte. Bij de volgende start komt dat
 terug; het calibratiebestand wordt automatisch geladen en de markers worden bij de eerste
-sweep op de dichtstbijzijnde frequentie gezet. Niet bewaard worden de meetdata zelf en de
-referenties.
+sweep op de dichtstbijzijnde frequentie gezet. Ook de referenties blijven bewaard, als
+bestanden naast de instellingen. Niet bewaard worden de meetdata van de live trace.

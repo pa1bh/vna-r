@@ -107,8 +107,8 @@ reference in every chart, in the unit of that chart: dB, degrees, SWR, ohms or
 nanoseconds. That way you see immediately what a change to an antenna does. Note that a
 difference in dB becomes large where both traces are deep in a dip (two small numbers);
 look at the difference in SWR or |Z| there. Chapter 9 shows a comparison of two devices on
-the same antenna done this way. References disappear when you quit; save them as
-Touchstone and open them again later as a reference.
+the same antenna done this way. References are kept when you quit and come back at the
+next start, with their names; remove them with **×** when you are done with them.
 
 ## Screenshot of the device
 
@@ -121,5 +121,5 @@ On quitting, the following are saved: port, start, stop, points, average, sweep 
 segments, the calibration file and whether it is applied, the view choices, TDR and gate
 settings, marker frequencies and the window size. At the next start that all comes back;
 the calibration file is loaded automatically and the markers are placed at the nearest
-frequency on the first sweep. Not saved are the measurement data themselves and the
-references.
+frequency on the first sweep. The references are kept too, as files next to the settings.
+Not saved are the measurement data of the live trace.

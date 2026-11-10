@@ -96,7 +96,7 @@ group. The port is `/dev/ttyACM*`; on macOS it is `/dev/cu.usbmodem…` and no d
 
 The menu bar has **File** (Touchstone and calibration files), **Device**, **View** and **Help**,
 with **Help ▸ About** showing the version and build. Settings (port, sweep, calibration file,
-views, TDR, markers, window size) are saved on exit and restored at the next start.
+views, TDR, markers, references, window size) are saved on exit and restored at the next start.
 
 The same from the command line:
 
@@ -145,8 +145,8 @@ device; `vna-cli release` does that on its own.
   the first two; arrow keys nudge the active one (shift: ten points), buttons jump to minimum SWR,
   maximum S21 or minimum S21.
 - **References and Δ.** Up to four held traces with name and colour; the difference trace is drawn
-  in the unit of each view (dB, degrees, SWR, ohm, nanoseconds). References are not saved: export
-  them as .s2p and open them as a reference later.
+  in the unit of each view (dB, degrees, SWR, ohm, nanoseconds). References are kept between
+  sessions; any .s1p/.s2p file can be opened as a reference too.
 - **Averaging.** The device's own averaging (LiteVNA, 1–80) and a complex software average of the
   last N sweeps, which lowers noise without biasing the magnitude the way averaging in dB does.
 - **Time domain.** TDR from the sweep (window, velocity factor, distance axis), and a draggable

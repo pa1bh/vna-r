@@ -40,6 +40,7 @@ impl App {
                         sweep,
                         visible: true,
                     });
+                    self.references_changed = true;
                 } else {
                     if self.running {
                         self.stop_sweep();

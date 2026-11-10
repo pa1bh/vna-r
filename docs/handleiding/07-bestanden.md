@@ -46,8 +46,11 @@ schrijft afstand, tijd, impuls, stap en impedantie. Voor spreadsheets en eigen s
 
 ## Referenties
 
-Referenties uit **Hold** leven alleen in de sessie. Wil je ze houden: **Save
-Touchstone** terwijl de betreffende meting live is, en later **Open as reference…**.
+Referenties uit **Hold** blijven tussen sessies bewaard: vna-r schrijft ze als
+`ref-0.s2p` tot `ref-3.s2p` in de map `references` naast zijn instellingen (op macOS
+`~/Library/Application Support/vna-r`, op Linux `~/.local/share/vna-r`, op Windows
+`%APPDATA%\vna-r`). Wil je er een voorgoed houden of doorgeven: kopieer dat bestand, of
+**Save Touchstone** terwijl de meting live is en later **Open as reference…**.
 
 ## Schermafbeeldingen
 

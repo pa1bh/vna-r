@@ -9,6 +9,56 @@ pub(super) struct Reference {
     pub(super) visible: bool,
 }
 
+/// Subdirectory of the settings directory that holds the references.
+pub(super) const REFERENCE_DIR: &str = "references";
+
+/// Where the references are kept between sessions: next to eframe's settings file.
+pub(super) fn references_dir() -> Option<PathBuf> {
+    eframe::storage_dir("vna-r").map(|d| d.join(REFERENCE_DIR))
+}
+
+fn reference_file(dir: &Path, position: usize) -> PathBuf {
+    dir.join(format!("ref-{position}.s2p"))
+}
+
+/// Write the references as `ref-0.s2p`, `ref-1.s2p`, … into `dir`, replacing
+/// what was there. Names and visibility are in the settings.
+pub(super) fn write_references(dir: &Path, references: &[Reference]) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    for k in 0..MAX_REFS.max(references.len()) {
+        let path = reference_file(dir, k);
+        match references.get(k) {
+            Some(r) => {
+                let f = std::io::BufWriter::new(std::fs::File::create(&path)?);
+                write_s2p(f, &r.sweep, Some(&format!("vna-r reference: {}", r.name)))?;
+            }
+            None if path.exists() => std::fs::remove_file(&path)?,
+            None => {}
+        }
+    }
+    Ok(())
+}
+
+/// Read back the references the settings list. One that cannot be read (file
+/// gone or damaged) ends the list there, so names and files stay paired.
+pub(super) fn read_references(dir: &Path, entries: &[ReferenceSettings]) -> Vec<Reference> {
+    let mut out = Vec::new();
+    for (k, entry) in entries.iter().enumerate().take(MAX_REFS) {
+        match litevna::touchstone::read_touchstone_file(&reference_file(dir, k)) {
+            Ok(sweep) => out.push(Reference {
+                name: entry.name.clone(),
+                sweep,
+                visible: entry.visible,
+            }),
+            Err(e) => {
+                log::warn!("reference {k} ({}) not restored: {e}", entry.name);
+                break;
+            }
+        }
+    }
+    out
+}
+
 /// Interpolation of a reference onto another grid (held at the ends outside
 /// the reference span), polar like the calibration (see
 /// `litevna::calibration::interpolate_complex`).
@@ -79,6 +129,20 @@ impl App {
             sweep,
             visible: true,
         });
+        self.references_changed = true;
+    }
+
+    /// Write the references to disk if they changed since the last time
+    /// (called when eframe saves the settings: every 30 s and at exit).
+    pub(super) fn store_references(&mut self) {
+        if !self.references_changed {
+            return;
+        }
+        let Some(dir) = references_dir() else { return };
+        match write_references(&dir, &self.references) {
+            Ok(()) => self.references_changed = false,
+            Err(e) => self.error = Some(format!("saving references to {}: {e}", dir.display())),
+        }
     }
 
     pub(super) fn references_panel(&mut self, ui: &mut egui::Ui) {
@@ -112,13 +176,14 @@ impl App {
         }
         if let Some(k) = remove {
             self.references.remove(k);
+            self.references_changed = true;
             self.diff_ref = match self.diff_ref {
                 Some(d) if d == k => None,
                 Some(d) if d > k => Some(d - 1),
                 other => other,
             };
         }
-        ui.small("References are not saved; export one as .s2p and open it later with Open as reference….");
+        ui.small("References are kept between sessions. To keep one for good, save it while it is the trace, or copy it from the references folder next to the settings.");
     }
 
     pub(super) fn central(&mut self, ui: &mut egui::Ui) {
@@ -475,5 +540,57 @@ impl App {
                 ui.end_row();
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reference(name: &str, points: u64) -> Reference {
+        let freqs: Vec<u64> = (0..points).map(|i| 1_000_000 + i * 500_000).collect();
+        Reference {
+            name: name.into(),
+            sweep: SweepResult {
+                s11: freqs.iter().map(|&f| Complex64::from_polar(0.5, f as f64 * 1e-7)).collect(),
+                s21: freqs.iter().map(|&f| Complex64::new(1e-3, f as f64 * 1e-9)).collect(),
+                freqs_hz: freqs,
+                points: Vec::new(),
+                checksum_ok: 0,
+                checksum_bad: 0,
+                duplicates: 0,
+                elapsed: Duration::ZERO,
+            },
+            visible: true,
+        }
+    }
+
+    #[test]
+    fn references_survive_a_round_trip_through_their_directory() {
+        let dir = std::env::temp_dir().join(format!("vna-r-test-references-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let refs = vec![reference("before tuning", 11), reference("after", 21)];
+        write_references(&dir, &refs).unwrap();
+        let entries: Vec<ReferenceSettings> = refs
+            .iter()
+            .map(|r| ReferenceSettings {
+                name: r.name.clone(),
+                visible: false,
+            })
+            .collect();
+        let back = read_references(&dir, &entries);
+        assert_eq!(back.len(), 2);
+        assert_eq!(back[1].name, "after");
+        assert!(!back[1].visible);
+        assert_eq!(back[1].sweep.freqs_hz, refs[1].sweep.freqs_hz);
+        for (a, b) in back[0].sweep.s11.iter().zip(&refs[0].sweep.s11) {
+            assert!((a - b).norm() < 1e-9);
+        }
+        // One reference fewer: its file goes, and a settings entry without a file ends the list.
+        write_references(&dir, &refs[..1]).unwrap();
+        assert!(!reference_file(&dir, 1).exists());
+        assert_eq!(read_references(&dir, &entries).len(), 1);
+        assert!(read_references(&dir.join("missing"), &entries).is_empty());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
