@@ -1,206 +1,206 @@
 # Changelog
 
-Alle noemenswaardige wijzigingen per versie. Het versienummer staat één keer in
-`Cargo.toml` (`[workspace.package] version`) en geldt voor library, CLI, GUI en de
-Nix-flake; de GUI toont het in de titelbalk en onder **Help ▸ About**, de CLI met
-`vna-cli --version`. Een release is een git-tag `vX.Y.Z` op `main` (zie "Een release
-maken" in de README).
+All notable changes per version. The version number lives once in `Cargo.toml`
+(`[workspace.package] version`) and applies to the library, the CLI, the GUI and the
+Nix flake; the GUI shows it in the title bar and under **Help ▸ About**, the CLI with
+`vna-cli --version`. A release is a git tag `vX.Y.Z` on `main` (see "Versions and
+releases" in the README).
 
-Opzet naar [Keep a Changelog](https://keepachangelog.com/nl/1.1.0/); versies volgen
-[SemVer](https://semver.org/lang/nl/): tot 1.0 kan een minor-versie (0.x) nog dingen
-veranderen die niet terugwerkend compatibel zijn, zoals het formaat van de
-calibratiebestanden.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions
+follow [SemVer](https://semver.org/): until 1.0 a minor version (0.x) may still change
+things that are not backwards compatible, such as the format of the calibration files.
 
 ## [Unreleased]
 
-### Gewijzigd
-- De udev-regel voor Linux heet nu `linux/70-litevna.rules` en geeft de poort aan de
-  ingelogde gebruiker (`uaccess`) en de groep `dialout` (`0660`) in plaats van aan
-  iedereen (`0666`). In het oude 99-bestand deed de `uaccess`-tag niets omdat hij na
-  `73-seat-late.rules` kwam. Verwijder `/etc/udev/rules.d/99-litevna.rules` als je die had.
+### Changed
+- The udev rule for Linux is now `linux/70-litevna.rules` and gives the port to the
+  logged-in user (`uaccess`) and the group `dialout` (`0660`) instead of to everyone
+  (`0666`). In the old 99- file the `uaccess` tag did nothing because it came after
+  `73-seat-late.rules`. Remove `/etc/udev/rules.d/99-litevna.rules` if you installed it.
+- This changelog is in English from here on, like the README and the release notes on
+  GitHub that are made from it.
 
-### Opgelost
-- Library: een sweep-configuratie met nul punten, een niet-oplopend raster in de TDR en
-  een band van nul of negatief in `check_lines` gaven een rekenfout (overflow) of een
-  eindeloze lus; ze geven nu een foutmelding.
-- GUI: een calibratiestandaard wordt nu over evenveel sweeps gemiddeld als **Sweep avg**
-  aangeeft; voorheen was elke standaard één ruwe sweep onder een gemiddelde trace.
-- GUI: het commentaar in een opgeslagen .s2p en de naam van een vastgehouden referentie
-  zeiden "host calibrated" of "raw" over een geopend bestand, op grond van de laatste
-  apparaatsweep; voor een bestand staat er nu "from file …".
-- GUI: snelheidsfactor, maximale TDR-afstand en gate-grenzen uit een beschadigd
-  instellingenbestand worden begrensd; 0 of NaN leidde tot een deling door nul en een
-  fout die elk frame terugkwam.
-- Een sweep uit een Touchstone-bestand kon niet als calibratiestandaard dienen ("n points
-  missing in sweep"): bestanden en NanoVNA-shell-sweeps codeerden "geen ruwe records"
-  verschillend. Nu één afspraak: geen records is een lege lijst, en dat telt niet als
-  ontbrekende punten.
-- GUI: **Set sweep for TDR** en een nieuw segment gingen altijd tot 6,3 GHz, ook op een
-  NanoVNA-F (1,5 GHz); ze nemen nu de bovengrens van het verbonden apparaat.
-- Een onzinnige schermafdruk-header (van een apparaat dat geen LiteVNA is of een gestoorde
-  verbinding) kon tot 17 GB laten reserveren voordat er iets gelezen was; de afmetingen
-  zijn nu begrensd op 4096×4096 en alleen 16 bits per pixel wordt geaccepteerd, wat de
-  omzetting toch al aannam.
-- CLI: `vna-cli tdr --csv -` schrijft naar stdout zoals de handleiding zegt (er ontstond
-  een bestand met de naam `-`); het commentaar in een .s2p van `sweep` noemt het echte
-  model in plaats van altijd "LiteVNA" en zegt "host calibration per segment" bij
-  `--segment …@cal.json` in plaats van "uncalibrated raw"; de regel "first raw record: …"
-  verschijnt alleen nog met `--trace`.
-- GUI: de pijltjestoetsen verplaatsten de actieve marker ook terwijl je in Start, Stop of
-  een referentienaam typte.
-- GUI: markers blijven op hun frequentie staan als het raster verandert (ander bereik,
-  ander aantal punten, een geopend bestand); voorheen bleven ze op hetzelfde puntnummer
-  staan en wezen daardoor een andere frequentie aan. Een marker buiten het nieuwe bereik
-  verdwijnt.
-- GUI: een mislukte schermafdruk of een mislukte **set** van de middeling stopte de
-  lopende sweep; alleen een sweep- of verbindingsfout doet dat nog.
-- GUI: de knoppen open/short/load maten op het raster dat in Start/Stop/Points getypt
-  stond, ook als dat nog niet met **Apply sweep** was toegepast; de weergave liep dan op
-  het oude raster en de calibratie werd stil geïnterpoleerd. Een standaard meten past nu
-  eerst de getypte sweep toe, en het paneel waarschuwt zolang de velden afwijken van de
-  lopende sweep.
-- GUI: de statusregel van het calibratiepaneel ("measured open", "loaded", "kit updated …
-  save to keep it") werd direct na elke actie overschreven door het opnieuw oplossen van
-  de calibratie en was daardoor met **apply** aan nooit te zien. De reden waarom een
-  calibratie niet toegepast kan worden staat nu apart ("not applied: …").
-- Calibratie-interpolatie naar een ander raster gebeurt nu polair (grootte en fase apart)
-  in plaats van lineair in reëel en imaginair deel. Dat laatste snijdt de hoek tussen twee
-  fasoren af en maakte alle standaarden kleiner met cos(θ/2) per fasestap θ, zodat elke
-  gecorrigeerde |Γ| te hoog uitkwam: verwaarloosbaar bij 1001 punten, maar +1,3 dB bij
-  11 punten met een lange kabel. De grens op de fasestap gaat van 90° naar 135° en geldt
-  nu ook voor short, through, line open en line short, niet alleen voor de open.
-- De Δ-trace tegen een referentie op een ander raster gebruikt dezelfde polaire
-  interpolatie.
-- TDR: het gemelde eenduidige bereik ("alias-free range") was 1/Δf, het dubbele van wat de
-  grafiek toont; de arrays en de gate liepen al tot 1/(2·Δf). GUI-label, CLI-regel en de
-  as-limiet gebruiken nu de juiste waarde, en de gate-foutmelding noemt die direct.
-- Een poort zonder herkenbare USB-id die geen NanoVNA-shell blijkt te zijn kostte bij het
-  verbinden twee keer de commando-timeout (eerst de prompt afwachten, dan bij het opruimen
-  nog een `resume` sturen en weer wachten); nu één keer.
+### Fixed
+- Library: a sweep configuration with zero points, a non-increasing grid in the TDR and
+  a zero or negative band in `check_lines` caused an arithmetic overflow or an endless
+  loop; they now return an error.
+- GUI: a calibration standard is averaged over as many sweeps as **Sweep avg** says;
+  before, every standard was one raw sweep under an averaged trace.
+- GUI: the comment in a saved .s2p and the name of a held reference said "host
+  calibrated" or "raw" about an opened file, going by the last device sweep; for a file
+  they now say "from file …".
+- GUI: velocity factor, maximum TDR distance and gate edges from a damaged settings file
+  are clamped; 0 or NaN led to a division by zero and an error that came back every
+  frame.
+- A sweep from a Touchstone file could not serve as a calibration standard ("n points
+  missing in sweep"): files and NanoVNA shell sweeps encoded "no raw records"
+  differently. One convention now: no records is an empty list, and that does not count
+  as missing points.
+- GUI: **Set sweep for TDR** and a new segment always went up to 6.3 GHz, also on a
+  NanoVNA-F (1.5 GHz); they now take the upper limit of the connected device.
+- A nonsensical screenshot header (from a device that is not a LiteVNA, or a disturbed
+  link) could reserve up to 17 GB before anything was read; the dimensions are now
+  limited to 4096×4096 and only 16 bits per pixel is accepted, which the conversion
+  assumed anyway.
+- CLI: `vna-cli tdr --csv -` writes to stdout as the manual says (it created a file
+  named `-`); the comment in an .s2p from `sweep` names the real model instead of always
+  "LiteVNA" and says "host calibration per segment" for `--segment …@cal.json` instead
+  of "uncalibrated raw"; the line "first raw record: …" only appears with `--trace`.
+- GUI: the arrow keys also moved the active marker while you typed in Start, Stop or a
+  reference name.
+- GUI: markers stay at their frequency when the grid changes (another range, another
+  number of points, an opened file); before, they stayed at the same point number and so
+  pointed at another frequency. A marker outside the new range disappears.
+- GUI: a failed screenshot or a failed **set** of the averaging stopped the running
+  sweep; only a sweep or connection error does that now.
+- GUI: the open/short/load buttons measured on the grid typed into Start/Stop/Points,
+  even when it had not been applied with **Apply sweep**; the display then ran on the
+  old grid and the calibration was silently interpolated. Measuring a standard now
+  applies the typed sweep first, and the panel warns as long as the fields differ from
+  the running sweep.
+- GUI: the status line of the calibration panel ("measured open", "loaded", "kit updated
+  … save to keep it") was overwritten right after every action by the re-solve of the
+  calibration, so with **apply** on it was never visible. The reason a calibration
+  cannot be applied is now shown separately ("not applied: …").
+- Calibration interpolation to another grid is now polar (magnitude and phase
+  separately) instead of linear in real and imaginary part. The latter cuts the corner
+  between two phasors and shrank every standard by cos(θ/2) per phase step θ, so every
+  corrected |Γ| came out too high: negligible at 1001 points, but +1.3 dB at 11 points
+  with a long cable. The limit on the phase step goes from 90° to 135° and now also
+  applies to the short, the through, line open and line short, not only to the open.
+- The Δ trace against a reference on another grid uses the same polar interpolation.
+- TDR: the reported unambiguous range ("alias-free range") was 1/Δf, twice what the
+  chart shows; the arrays and the gate already ran to 1/(2·Δf). The GUI label, the CLI
+  line and the axis limit now use the right value, and the gate error names it directly.
+- A port without a recognisable USB id that turns out not to be a NanoVNA shell cost
+  twice the command timeout when connecting (first waiting for the prompt, then sending
+  a `resume` while cleaning up and waiting again); now once.
 
-### Documentatie
-- GTK was geen afhankelijkheid: de bestandsdialogen lopen via de xdg-desktop-portal.
-  README, handleidingen, CI en flake noemden `libgtk-3-dev`/`gtk3` toch; die zijn weg en
-  de echte eis (een draaiende portal) staat er nu. README noemde nog versie 0.2.0 en
-  archiefnamen van 0.2.3; docs/04 beschreef de DC-term van vóór 0.2.5.
-- De TDR-schermafdruk in hoofdstuk 5 toont nu een short in plaats van een open: met de
-  duik naar 0 Ω blijft de 50 Ω-lijn leesbaar, bij de open zat die onderin een as tot
+### Documentation
+- GTK was never a dependency: the file dialogs go through the xdg desktop portal. The
+  README, the manuals, CI and the flake mentioned `libgtk-3-dev`/`gtk3` anyway; those
+  are gone and the real requirement (a running portal) is stated. The README still said
+  version 0.2.0 and used archive names of 0.2.3; docs/04 described the DC term from
+  before 0.2.5.
+- The TDR screenshot in chapter 5 now shows a short instead of an open: with the dip to
+  0 Ω the 50 Ω line stays readable, with the open it sat at the bottom of an axis up to
   500 Ω.
-- Schermafdruk van een weerstand van 25 Ω achter 5 m coax bij het kabelrecept in
-  hoofdstuk 6: de impedantiegrafiek stapt van 50 naar 26 Ω.
+- Screenshot of a 25 Ω resistor behind 5 m of coax with the cable recipe in chapter 6:
+  the impedance chart steps from 50 to 26 Ω.
 
 ## [0.2.5] - 2026-11-05
 
-TDR-impedantie bij lange kabels, en twee nieuwe schermafdrukken in de handleidingen.
+TDR impedance on long cables, and two new screenshots in the manuals.
 
-### Opgelost
-- TDR: de impedantie langs de lijn lag bij kabels van meer dan een paar meter te laag en
-  liep scheef (25 Ω voor een 50 Ω-kabel van 4 m). Het DC-punt van de stapresponsie werd
-  uit de laagste meetpunten geëxtrapoleerd, wat faalt zodra S11 daarbinnen een volle
-  cirkel draait; het volgt nu uit de eis dat er vóór het referentievlak niets reflecteert.
-  Bij het herbemonsteren wordt S11 bovendien in grootte en fase geïnterpoleerd, zodat de
-  eindpiek van een lange kabel niet meer te laag uitvalt.
+### Fixed
+- TDR: the impedance along the line was too low and tilted on cables of more than a few
+  metres (25 Ω for a 50 Ω cable of 4 m). The DC point of the step response was
+  extrapolated from the lowest measured points, which fails as soon as S11 turns a full
+  circle within them; it now follows from the requirement that nothing reflects before
+  the reference plane. When resampling, S11 is also interpolated in magnitude and phase,
+  so the end peak of a long cable no longer comes out too low.
 
-### Documentatie
-- Schermafdruk van een S21-meting (FM-notchfilter FLT201A/N) bij het filterrecept in
-  beide handleidingen, en een TDR van een 5 m kabel met open eind in hoofdstuk 5.
+### Documentation
+- Screenshot of an S21 measurement (FM notch filter FLT201A/N) with the filter recipe in
+  both manuals, and a TDR of a 5 m cable with an open end in chapter 5.
 
 ## [0.2.4] - 2026-11-05
 
-Downloads voor meer platforms.
+Downloads for more platforms.
 
-### Toegevoegd
-- Releases voor Intel-Mac (`x86_64-macos`) en Windows (`x86_64-windows`, zip) naast Apple
-  Silicon en Linux; de CI bouwt en test nu ook op Windows. De Windows-build is nog niet
-  met een apparaat geprobeerd. Op Windows opent de GUI geen consolevenster meer.
-- README en handleiding leggen uit hoe je op macOS langs Gatekeeper komt (uitpakken in de
-  Terminal of `xattr -dr com.apple.quarantine`) en op Windows langs SmartScreen.
-- Issue-sjabloon op GitHub dat om de uitvoer van **Copy diagnostics** vraagt.
+### Added
+- Releases for Intel Mac (`x86_64-macos`) and Windows (`x86_64-windows`, zip) next to
+  Apple Silicon and Linux; CI now also builds and tests on Windows. The Windows build
+  has not been tried with a device yet. On Windows the GUI no longer opens a console
+  window.
+- The README and the manual explain how to get past Gatekeeper on macOS (unpack in the
+  Terminal or `xattr -dr com.apple.quarantine`) and past SmartScreen on Windows.
+- Issue template on GitHub that asks for the output of **Copy diagnostics**.
 
 ## [0.2.3] - 2026-11-05
 
-Zes punten uit een externe code-review, alle in de meetketen en het GUI-toestandsbeheer.
+Six points from an external code review, all in the measurement chain and the GUI's
+state handling.
 
-### Opgelost
-- Een LiteVNA-record met een foute checksum wordt niet meer als meetpunt gebruikt; het punt
-  blijft leeg en komt bij de volgende FIFO-doorgang opnieuw.
-- Crash bij een NanoVNA-F met meerdere segmenten en calibratie aan (de shell levert geen
-  ruwe records, het opdelen per segment ging daarvan uit).
-- Na **Clear** in het calibratiepaneel bleef het label CAL staan terwijl de data ruw waren.
-- De software-middeling (**Sweep avg**) wordt gewist bij verbinden en verbreken, zodat sweeps
-  van een vorig apparaat niet meetellen.
-- Calibratiebestanden worden bij het laden gecontroleerd (raster oplopend, minstens twee
-  punten, per standaard evenveel waarden als rasterpunten, eindige getallen); een kapot
-  bestand geeft een melding in plaats van een crash. Frequenties als `nan` of `inf`
-  worden geweigerd.
-- Touchstone-bestanden met een andere referentie-impedantie dan 50 Ω (`R 75`) worden
-  voor S11 omgerekend; voorheen werd de waarde genegeerd.
-- TDR weigert een sweep die te smal is voor zijn topfrequentie (FFT groter dan 4 Mi
-  punten) met een melding, in plaats van gigabytes te alloceren op de GUI-thread.
+### Fixed
+- A LiteVNA record with a bad checksum is no longer used as a measurement point; the
+  point stays empty and comes again on the next pass of the FIFO.
+- Crash with a NanoVNA-F with several segments and calibration on (the shell delivers no
+  raw records, and splitting per segment assumed it did).
+- After **Clear** in the calibration panel the CAL label stayed while the data were raw.
+- The software average (**Sweep avg**) is cleared on connect and disconnect, so sweeps
+  of a previous device do not count.
+- Calibration files are checked when loaded (grid increasing, at least two points, as
+  many values per standard as grid points, finite numbers); a broken file gives a
+  message instead of a crash. Frequencies such as `nan` or `inf` are refused.
+- Touchstone files with a reference impedance other than 50 Ω (`R 75`) are converted for
+  S11; before, the value was ignored.
+- TDR refuses a sweep that is too narrow for its top frequency (FFT larger than 4 Mi
+  points) with a message, instead of allocating gigabytes on the GUI thread.
 
 ## [0.2.2] - 2026-11-05
 
-Eerste terugkoppeling van een tester op Fedora verwerkt.
+First feedback from a tester on Fedora.
 
-### Toegevoegd
-- **About**, **Copy diagnostics** en het log tonen de tekenlaag (Vulkan/Metal/OpenGL, adapter,
-  driver, Wayland of X11); `RUST_LOG=info` laat de keuze van wgpu op de terminal zien.
-  Handleiding: wat te doen bij een haperende GUI op Linux.
+### Added
+- **About**, **Copy diagnostics** and the log show the rendering layer (Vulkan/Metal/
+  OpenGL, adapter, driver, Wayland or X11); `RUST_LOG=info` shows wgpu's choice on the
+  terminal. Manual: what to do about a stuttering GUI on Linux.
 
-### Opgelost
-- Haperende menu's op een Fedora-werkstation met een oudere NVIDIA-kaart (nouveau): wgpu
-  koos daar de experimentele NVK-Vulkan-driver. De GUI kiest de adapter nu zelf en mijdt
-  NVK en software-rendering zodra er een alternatief is; `WGPU_BACKEND` dwingt nog steeds.
+### Fixed
+- Stuttering menus on a Fedora workstation with an older NVIDIA card (nouveau): wgpu
+  picked the experimental NVK Vulkan driver there. The GUI now chooses the adapter itself
+  and avoids NVK and software rendering as soon as there is an alternative;
+  `WGPU_BACKEND` still forces a backend.
 
 ## [0.2.1] - 2026-11-05
 
-Voor testers buiten Nederland: Engelse README en handleiding.
+For testers outside the Netherlands: English README and manual.
 
-### Toegevoegd
-- Engelse handleiding in `docs/manual`, naast de Nederlandse in `docs/handleiding`. De
-  release-tarball bevat nu beide, met de afbeeldingen.
-- **Help** opent de Engelse of de Nederlandse handleiding op GitHub bij de tag van de
-  eigen versie, zodat de tekst bij de knoppen van het draaiende programma past.
+### Added
+- English manual in `docs/manual`, next to the Dutch one in `docs/handleiding`. The
+  release tarball now contains both, with the images.
+- **Help** opens the English or the Dutch manual on GitHub at the tag of its own
+  version, so the text matches the buttons of the running program.
 
-### Gewijzigd
-- README in het Engels, met downloadinstructies, snelstart en apparatentabel.
-- Handleiding: de drempel voor een losse open of short is −8 dB (was −3 dB in de tekst);
-  de OCF-alinea koppelt het teken van X niet meer aan de lengte als je door de
-  voedingslijn meet.
+### Changed
+- README in English, with download instructions, quick start and device table.
+- Manual: the threshold for a loose open or short is −8 dB (the text said −3 dB); the
+  OCF paragraph no longer ties the sign of X to the length when you measure through the
+  feed line.
 
 ## [0.2.0] - 2026-11-05
 
-Eerste versie die aan anderen gegeven wordt om te testen.
+First version given to others to test.
 
-### Toegevoegd
-- Menubalk in de GUI (File, Device, View, Help) met **About vna-r**: versie,
-  build-revisie, auteur en de link naar GitHub.
-- **View ▸ Developer tools** zet een Developer-menu aan met een logvenster
-  (verbindingen, fouten, bestandsbewerkingen, sweeps) en **Copy diagnostics**, dat
-  versie, apparaat, sweep, calibratie en het log naar het klembord zet voor een
-  probleemmelding. Standaard uit.
-- Eén versienummer voor het hele project; `vna-cli --version` en About tonen ook de
-  git-revisie. De release-workflow weigert een tag die niet bij het versienummer in
-  `Cargo.toml` past en gebruikt de bijbehorende sectie uit dit bestand als release-notes.
-- NanoVNA-F (tekst-shell, USB 0483:5740) naast de LiteVNA 64/67: sweeps via `scan_bin`,
-  schermafbeelding, info en batterij; CLI en GUI kiezen het protocol op de USB-id.
-- Δ-trace (live min referentie) in elke weergave: dB, graden, SWR, ohm, nanoseconden.
-- Automatisch poorten verversen zolang er geen verbinding is.
-- Nix-flake (`nix run github:pa1bh/vna-r`) met udev-regel, release-workflow voor
-  x86_64-Linux en Apple Silicon, CI die ook de flake bouwt.
-- Nederlandse handleiding in `docs/handleiding` met schermafbeeldingen.
+### Added
+- Menu bar in the GUI (File, Device, View, Help) with **About vna-r**: version, build
+  revision, author and the link to GitHub.
+- **View ▸ Developer tools** turns on a Developer menu with a log window (connections,
+  errors, file operations, sweeps) and **Copy diagnostics**, which puts version, device,
+  sweep, calibration and the log on the clipboard for a problem report. Off by default.
+- One version number for the whole project; `vna-cli --version` and About also show the
+  git revision. The release workflow refuses a tag that does not match the version in
+  `Cargo.toml` and uses the matching section of this file as release notes.
+- NanoVNA-F (text shell, USB 0483:5740) next to the LiteVNA 64/67: sweeps through
+  `scan_bin`, screenshot, info and battery; CLI and GUI choose the protocol by USB id.
+- Δ trace (live minus reference) in every view: dB, degrees, SWR, ohm, nanoseconds.
+- Ports refresh automatically while there is no connection.
+- Nix flake (`nix run github:pa1bh/vna-r`) with the udev rule, release workflow for
+  x86_64 Linux and Apple Silicon, CI that also builds the flake.
+- Dutch manual in `docs/handleiding` with screenshots.
 
-### Gewijzigd
-- Knoppen gebruiken tekst in plaats van symbolen die Linux als blokjes tekende.
-- De melding na het opslaan van een Touchstone-bestand staat onder **Files**.
-- Plausibiliteitscontrole van open/short houdt rekening met de −3 dB ruwe
-  reflectie van een NanoVNA-F.
+### Changed
+- Buttons use text instead of symbols that Linux drew as boxes.
+- The message after saving a Touchstone file is under **Files**.
+- The plausibility check of open/short takes the −3 dB raw reflection of a NanoVNA-F
+  into account.
 
 ## [0.1.0] - 2026-11-03
 
-Interne versie: LiteVNA 64/67 via het binaire registerprotocol, SOLT-calibratie met
-kit-fit en interpolatie, Smith-chart en zeven weergaven, markers, referenties,
-segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functies.
+Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calibration
+with kit fit and interpolation, Smith chart and seven views, markers, references,
+segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
 [Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.2.5...HEAD
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
@@ -209,4 +209,4 @@ segmenten, TDR met gating, Touchstone-export en -import, CLI met dezelfde functi
 [0.2.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.2
 [0.2.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.1
 [0.2.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.0
-[0.1.0]: https://github.com/pa1bh/vna-r/commit/e7c82a4
+[0.1.0]: https://github.com/pa1bh/vna-r/commit/1a78b67

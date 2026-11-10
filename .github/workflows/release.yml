@@ -111,7 +111,7 @@ jobs:
         run: |
           v=${GITHUB_REF_NAME#v}
           awk -v v="$v" '/^## /{p = index($0, "[" v "]") > 0} p' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "Zie CHANGELOG.md." > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
           cat notes.md
       - uses: softprops/action-gh-release@v2
         with:

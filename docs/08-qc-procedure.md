@@ -260,3 +260,14 @@ Verwacht: GUI start en File ▸ Open as trace… toont een dialoog (de portal va
 File ▸ Open… toont de dialoog van de desktop. Op een kale X11-windowmanager zonder
 `xdg-desktop-portal` verschijnt geen dialoog; dat staat nu in README en handleiding.
 
+## Punt 17 — CHANGELOG in het Engels (L3)
+
+**Zonder apparaat.** Lees `CHANGELOG.md` door: alle versies Engels, kopjes Added / Changed
+/ Fixed / Documentation, de link `[0.1.0]` wijst naar commit `1a78b67` (laatste commit van
+3 november). Controleer dat de release-workflow zijn sectie nog vindt:
+```bash
+awk -v v="0.2.5" '/^## /{p = index($0, "[" v "]") > 0} p' CHANGELOG.md | head -5
+```
+Verwacht: de kop `## [0.2.5] - 2026-11-05` en de eerste regels van die sectie. Bij de
+volgende release moet de GitHub-releasetekst Engels zijn.
+
