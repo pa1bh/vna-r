@@ -14,6 +14,10 @@ calibratiebestanden.
 ## [Unreleased]
 
 ### Opgelost
+- GUI: markers blijven op hun frequentie staan als het raster verandert (ander bereik,
+  ander aantal punten, een geopend bestand); voorheen bleven ze op hetzelfde puntnummer
+  staan en wezen daardoor een andere frequentie aan. Een marker buiten het nieuwe bereik
+  verdwijnt.
 - GUI: een mislukte schermafdruk of een mislukte **set** van de middeling stopte de
   lopende sweep; alleen een sweep- of verbindingsfout doet dat nog.
 - GUI: de knoppen open/short/load maten op het raster dat in Start/Stop/Points getypt

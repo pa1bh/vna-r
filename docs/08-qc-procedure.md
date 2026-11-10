@@ -131,3 +131,17 @@ de sweep door (Stop-knop blijft zichtbaar). Vóór 0.2.6 stond de sweep stil en 
 opnieuw. Als geen enkele capture faalt, controleer de code: `warn` in `worker.rs` bij
 Screenshot en SetAverage, `fail` alleen bij Connect en in `sweep_once`.
 
+## Punt 7 — Markers blijven op hun frequentie (B6)
+
+**Veranderd.** Bij elke nieuwe sweep of geopend bestand met een ander raster worden de
+markers op hun oude frequentie naar het dichtstbijzijnde nieuwe punt gezet; buiten het
+nieuwe bereik verdwijnen ze.
+
+**Zonder apparaat.** Open een .s2p van 1 – 30 MHz als trace, zet M1 op ongeveer 14 MHz
+(tabel toont de frequentie). Open een .s2p van 1 – 60 MHz: M1 staat nog op ~14 MHz.
+Open een .s2p van 100 – 200 MHz: M1 is weg.
+
+**Met apparaat.** 1 – 30 MHz, 201 punten, M1 op 14,2 MHz; Apply met 401 punten: M1 blijft
+op 14,2 MHz (vóór 0.2.6: 7,6 MHz, hetzelfde puntnummer). Apply met 1 – 60 MHz: M1 blijft
+op ~14,2 MHz.
+

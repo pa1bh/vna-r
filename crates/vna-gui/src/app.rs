@@ -768,6 +768,9 @@ impl App {
                         self.last_plan = cfgs;
                         self.file_trace = None;
                         self.sweep_count += 1;
+                        if let Some(old) = self.raw.as_ref().map(|r| r.freqs_hz.clone()) {
+                            self.remap_markers(&old, &result.freqs_hz);
+                        }
                         let result = self.push_average(result);
                         let corrected = self.corrected(&result);
                         self.set_shown(corrected);
@@ -817,6 +820,22 @@ impl App {
     fn set_shown(&mut self, sweep: SweepResult) {
         self.shown = Some(sweep);
         self.shown_rev += 1;
+    }
+
+    /// Markers are point indices. When the grid changes, keep each marker at
+    /// the frequency it stood on (nearest new point); a marker whose
+    /// frequency lies outside the new grid is dropped.
+    fn remap_markers(&mut self, old: &[u64], new: &[u64]) {
+        if old == new || new.is_empty() {
+            return;
+        }
+        let (lo, hi) = (*new.iter().min().unwrap(), *new.iter().max().unwrap());
+        for m in &mut self.markers {
+            *m = m
+                .and_then(|i| old.get(i).copied())
+                .filter(|f| (lo..=hi).contains(f))
+                .map(|f| nearest_index(new, f));
+        }
     }
 
     /// Round-trip seconds for a one-way distance at the current VF.
@@ -1976,9 +1995,11 @@ impl App {
                     self.last_plan_cals.clear();
                     self.avg_buf.clear();
                     self.file_trace = Some(name);
+                    if let Some(old) = self.raw.as_ref().map(|r| r.freqs_hz.clone()) {
+                        self.remap_markers(&old, &sweep.freqs_hz);
+                    }
                     self.raw = Some(sweep.clone());
                     self.set_shown(sweep);
-                    self.markers = [None; MARKERS];
                 }
             }
             Err(e) => self.error = Some(format!("opening {}: {e}", path.display())),
