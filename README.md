@@ -178,6 +178,7 @@ Two protocols behind one `Vna` handle, chosen by USB id:
   (NanoVNA-F shell), [docs/03-calibratie.md](docs/03-calibratie.md) (calibration model with
   measurements), [docs/04-tdr.md](docs/04-tdr.md) (TDR mathematics), [docs/05-roadmap.md](docs/05-roadmap.md).
 - **Changes**: [CHANGELOG.md](CHANGELOG.md).
+- **Working on the code**: [CONTRIBUTING.md](CONTRIBUTING.md) (layout, conventions, checks).
 
 ## Reporting problems
 

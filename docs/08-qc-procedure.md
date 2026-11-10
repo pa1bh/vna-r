@@ -402,3 +402,9 @@ Verwacht: test groen; precies één treffer (`crates/litevna/src/lib.rs`). In de
 trace met een punt waar |S21| = 0 (bijvoorbeeld een .s1p, S21 is daar nul) tekent in
 log mag een vlakke lijn op −200 dB (was −240 dB); de markertabel toont −200.00.
 
+## Punt 33 — CONTRIBUTING.md (D12)
+
+Lees `CONTRIBUTING.md` door en controleer of de conventies kloppen met hoe jij wilt
+werken (dit is jouw project; de tekst legt vast wat we tot nu toe deden). De drie
+commando's bovenaan moeten op een schone checkout werken.
+
