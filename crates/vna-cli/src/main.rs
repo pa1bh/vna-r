@@ -914,6 +914,11 @@ fn sweep(
     };
 
     apply_port_extension(&mut result, port_extension)?;
+    // What was done to the data after the calibration, for the file comments.
+    let mut processing = String::new();
+    if let Some(ps) = port_extension.filter(|ps| *ps != 0.0) {
+        processing.push_str(&format!(", port extension {ps:.1} ps"));
+    }
     if let Some(spec) = &gate_arg {
         let (start_m, stop_m) = parse_distance_range(spec).context("--gate")?;
         let kind = if gate_notch { GateKind::Notch } else { GateKind::BandPass };
@@ -931,7 +936,14 @@ fn sweep(
             format_hz(gated.edge_hz as u64)
         );
         result.s11 = gated.s11;
+        processing.push_str(&format!(", S11 time-gated {start_m:.2}..{stop_m:.2} m {}", g.kind.name()));
     }
+    let state = match (calibrated, &cal_file, cfg.calibrated) {
+        (true, Some(c), _) => format!("host calibration {}", c.display()),
+        (true, None, _) => "host calibration per segment".to_string(),
+        (_, _, true) => "device calibrated".to_string(),
+        _ => "uncalibrated raw".to_string(),
+    };
 
     if conn.json {
         let points: Vec<_> = (0..result.freqs_hz.len())
@@ -964,22 +976,13 @@ fn sweep(
 
     if let Some(path) = &s2p {
         let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
-        let comment = format!(
-            "{model} sweep, {} points, {}",
-            result.freqs_hz.len(),
-            match (calibrated, &cal_file, cfg.calibrated) {
-                (true, Some(c), _) => format!("host calibration {}", c.display()),
-                (true, None, _) => "host calibration per segment".to_string(),
-                (_, _, true) => "device calibrated".to_string(),
-                _ => "uncalibrated raw".to_string(),
-            }
-        );
+        let comment = format!("{model} sweep, {} points, {state}{processing}", result.freqs_hz.len());
         write_s2p(f, &result, Some(&comment))?;
         eprintln!("wrote {}", path.display());
     }
     if let Some(path) = &s1p {
         let f = BufWriter::new(File::create(path).with_context(|| format!("creating {}", path.display()))?);
-        let comment = format!("{model} sweep, {} points, S11 only", result.freqs_hz.len());
+        let comment = format!("{model} sweep, {} points, S11 only, {state}{processing}", result.freqs_hz.len());
         write_s1p(f, &result, Some(&comment))?;
         eprintln!("wrote {}", path.display());
     }

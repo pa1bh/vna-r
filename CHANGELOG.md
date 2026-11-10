@@ -12,6 +12,12 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Fixed
+
+- CLI: the comment line of a file written by `sweep --s2p` or `--s1p` now states a port
+  extension and a time gate, as the GUI already did; the `.s1p` comment also says whether
+  the data was calibrated.
+
 ## [0.3.0-rc.1] - 2026-11-10
 
 Release candidate: the result of a review of the whole project (bugs in the calibration
