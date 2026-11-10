@@ -41,7 +41,7 @@ vna-gui
 ```
 
 Verwacht: de GUI start met je oude instellingen, de titelbalk toont de versie, Help ▸
-About toont versie en git-revisie (`v0.2.5-` gevolgd door het aantal commits sinds de tag en de hash).
+About toont versie en git-revisie (`v0.3.0-rc.1`, na latere commits gevolgd door het aantal commits sinds de tag en de hash).
 
 ## Volgorde: vier rondes
 
@@ -106,6 +106,40 @@ Sluit af met de **slotronde** onderaan: de hele GUI één keer van begin tot ein
 
 Niet gedaan en dus niet te controleren: 28 (vervallen, de Help-links blijven bij de tag),
 37, 39, 42, 43, 44 en de meetpunten 45 tot 47; de reden staat per punt in de werklijst.
+
+## Logboek van de QC
+
+### 10 november 2026, macOS, LiteVNA 67 (firmware 2.2, hw 2)
+
+**Door Claude gedraaid, met het apparaat aan deze Mac en poort 1 open.** Alle
+commando's van ronde A (zonder apparaat) en de CLI-delen van ronde B tegen de
+release-build: uitkomst zoals beschreven, tenzij hieronder genoemd.
+
+| Punt | Wat | Uitkomst |
+|---|---|---|
+| voorbereiding | fmt, clippy, tests (85 + 4), handleidingcheck | goed |
+| 2, 9, 16, 18, 19, 20, 23, 27, 29, 30, 32, 34, 35, 41, 48, 49 | delen zonder apparaat (CLI) | goed |
+| 21 | `info`; sweep 1–30 MHz/201 en 50 kHz–6,3 GHz/1001 (2,8 s, 0 ontbrekend, 0 dubbel, checksum 1001/1001) | goed |
+| 10, 21 | `screenshot`: 1024×600, 16 bpp, geldige PNG | goed |
+| 9 | geen "first raw record" zonder `--trace`, wel met; commentaar noemt model en calibratie | goed |
+| 34 | `--json info`, `--json sweep`, weigering met `--csv -` | goed |
+| 40 | `--s1p` en CSV met vier extra kolommen | goed |
+| 41 | `cal open/short/load` en alias `o` (alleen de mechaniek, geen echte standaarden) | goed |
+| 23 | `--gate 0.2:0.7` meldt de gate | goed |
+| 35 | `--port-extension` | **bevinding 1** |
+
+**Bevindingen.**
+
+1. *CLI-bestandscommentaar noemde poortverlenging en gate niet* (en `--s1p` de calibratie
+   niet), terwijl de handleiding dat belooft en de GUI het doet. Gerepareerd in commit
+   `b0ba881`; gecontroleerd met het apparaat: `! LiteVNA sweep, 201 points, host
+   calibration cal/n-6g3.cal.json, port extension 100.0 ps, S11 time-gated 0.20..0.70 m
+   band pass`.
+2. *Dit document*: de schermafdruk van de 67 is 1024×600 (stond 800×480), de foutmelding
+   bij een onvolledig segment luidt anders dan hier stond, en de `sed`-regels bij punt 35
+   telden de stderr-regel mee. Verbeterd.
+
+**Nog te doen, samen:** alles in de GUI (ronde A en B) en de slotronde.
 
 ---
 
@@ -267,7 +301,7 @@ segmentversie zegt `host calibration per segment`. Met `--trace` verschijnt de r
 ## Punt 10 — Schermafdruk-header begrensd (B11)
 
 **Met apparaat.** `vna-cli screenshot --out /tmp/qc.png` op LiteVNA 64 en 67 en de GUI-knop
-**Screenshot**: werkt als voorheen (480×320 resp. 800×480, 16 bpp). Een negatieve test
+**Screenshot**: werkt als voorheen (480×320 op de 64, 1024×600 op de 67, 16 bpp). Een negatieve test
 vraagt een apparaat dat een foute header stuurt; controleer anders de code: `bpp != 16`
 en `MAX_SIDE` in `device.rs::screenshot`.
 
@@ -584,8 +618,8 @@ cargo run -q --release -p vna-cli -- sweep --segment 1M:30M 2>&1 | tail -3
 cargo run -q --release -p vna-cli -- tdr --from cal/sweep.s2p --csv - | head -2
 ```
 Verwacht: tests groen; de eerste sweep faalt met "segments overlap: 1.000 MHz–30.000 MHz
-and 20.000 MHz–50.000 MHz" (vóór de poort geopend wordt), de tweede met "--segment wants
-START:STOP:POINTS[@cal.json]".
+and 20.000 MHz–50.000 MHz" (vóór de poort geopend wordt), de tweede met "a segment is
+START:STOP:POINTS, got "1M:30M"".
 
 **GUI zonder apparaat.** Segments ▸ + segment met een start onder de Stop van het eerste
 segment en Apply sweep (vereist een verbinding; zonder apparaat is de knop uit): met
@@ -720,8 +754,8 @@ geen foutmelding, de poortlijst wacht. Zet de optie weer uit als je hem niet wil
 **Zonder apparaat.**
 ```bash
 cargo test -p litevna port_extension
-vna-cli tdr --from cal/sweep.s2p | sed -n 3,4p
-vna-cli tdr --from cal/sweep.s2p --port-extension 100000 | sed -n 4,5p
+vna-cli tdr --from cal/sweep.s2p 2>/dev/null | sed -n 3p
+vna-cli tdr --from cal/sweep.s2p --port-extension 100000 2>/dev/null | sed -n 3p
 ```
 Verwacht: test groen; de eerste reflectie schuift van 336,8 ns naar 137,9 ns (2 × 100 ns
 eerder). GUI: open `cal/sweep.s2p`, TDR, zet Port extension op 100000 ps: de piek schuift
