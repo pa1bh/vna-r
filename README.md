@@ -227,8 +227,8 @@ To cut a release:
    release with the changelog section as its text.
 
 A release candidate works the same way with a version such as `0.3.0-rc.1` and the tag
-`v0.3.0-rc.1`; a tag with a suffix is published as a pre-release. When it is approved, rename
-its changelog section to the final number and release that.
+`v0.3.0-rc.1`; a tag with a suffix is published as a pre-release. When it is approved, merge
+the changelog sections of the candidates into one for the final number and release that.
 
 ## Licence
 

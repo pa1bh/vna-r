@@ -1,8 +1,10 @@
 # QC-procedure werklijst november 2026
 
-Stand: 10 november 2026: alles staat op GitHub en is uitgebracht als release candidate
-**0.3.0-rc.1** (pre-release, met archieven voor Linux, beide Macs en Windows), op jouw
-verzoek vóór de QC, om het testen op andere platforms makkelijker te maken. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+Stand: 10 november 2026: na het eerste deel van de QC op macOS met de LiteVNA 67 is
+**0.3.0-rc.2** uitgebracht (pre-release, met archieven voor Linux, beide Macs en Windows),
+met de twee reparaties uit het logboek hieronder en een bijgewerkte README en
+handleiding. 0.3.0-rc.1 was op jouw verzoek vóór de QC uitgebracht, om het testen op
+andere platforms makkelijker te maken. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
 
@@ -22,7 +24,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.1> (pre-release), uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.2> (pre-release), uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
@@ -41,7 +43,7 @@ vna-gui
 ```
 
 Verwacht: de GUI start met je oude instellingen, de titelbalk toont de versie, Help ▸
-About toont versie en git-revisie (`v0.3.0-rc.1`, na latere commits gevolgd door het aantal commits sinds de tag en de hash).
+About toont versie en git-revisie (`v0.3.0-rc.2`, na latere commits gevolgd door het aantal commits sinds de tag en de hash).
 
 ## Volgorde: vier rondes
 
@@ -170,8 +172,22 @@ ongepland gezien: fout in de topbalk, knop terug op Connect, opnieuw verbinden w
    voor later: die sweeppunten niet tekenen, of een calibratieraster dat onderin dichter
    is.
 
-**Nog te doen, samen:** de rest van blok 3 (uitkomst stap 1 tot 4, Stop opnieuw,
-screenshot, kabel lostrekken), daarna referenties, TDR, gate, bestanden en de slotronde.
+**Afsluiting van deze ronde.** PA1BH heeft blok 3 afgemaakt met de gerepareerde build
+(revisie `v0.3.0-rc.1-5-ga4e502f`) en meldde dat alles in orde is; het logboek van de GUI
+toont de bewust losgetrokken kabel om 16:50:36 en de nieuwe Connect zeven seconden later.
+De uitkomst van de afzonderlijke stappen (grove calibratie binnen ±0,2 dB, Stop bij een
+standaard, screenshot tijdens Run) is niet per stap gemeld.
+
+5. *README en handleidingen nagelopen* tegen de code en tegen elkaar (Engels en
+   Nederlands, alinea voor alinea). De afwijkingen staan in de changelog onder
+   0.3.0-rc.2, Documentation. Niet op te lossen zonder apparaat en antenne: de
+   schermafbeeldingen zijn van 0.2.3 en 0.2.4 (werklijst punt 50).
+
+Daarna uitgebracht als **0.3.0-rc.2**.
+
+**Nog niet gedaan met deze versie:** in de GUI de referenties, TDR, gate en bestanden
+(blok 4) en de slotronde; ronde C (NanoVNA-F, vooral punt 11 en 22); ronde D (Linux,
+punt 15 en 16 op de laptop); Windows.
 
 ---
 
@@ -900,10 +916,12 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
    Besluit van 10 november: de Help-links blijven naar de tag van de eigen versie wijzen;
    een correctie in de handleiding gaat mee met de volgende release. Er is niets
    veranderd aan de code.
-2. **Versienummer en release: beantwoord.** Uitgebracht als 0.3.0-rc.1, een
-   pre-release. Vindt de QC fouten, dan volgt rc.2. Is alles goed: hernoem de sectie
-   `## [0.3.0-rc.1]` in `CHANGELOG.md` naar `## [0.3.0] - <datum>`, zet `0.3.0` in
-   `Cargo.toml`, pas de twee links onderaan de changelog aan, commit, tag `v0.3.0`, push.
+2. **Versienummer en release: beantwoord.** Uitgebracht als 0.3.0-rc.1 en, na de eerste
+   QC-ronde, als 0.3.0-rc.2; beide zijn pre-releases. Vindt de rest van de QC fouten, dan
+   volgt rc.3. Is alles goed: voeg in `CHANGELOG.md` de secties `## [0.3.0-rc.2]` en
+   `## [0.3.0-rc.1]` samen tot één sectie `## [0.3.0] - <datum>` (de releasetekst komt uit
+   die ene sectie), zet `0.3.0` in `Cargo.toml`, pas de links onderaan de changelog aan,
+   commit, tag `v0.3.0`, push.
 3. **Pushen: gedaan.** De CI heeft gedraaid; zie punt 16 en 29 voor wat je daarin
    naloopt.
 4. **Punt 42, kit-bestanden.** Welk formaat wil je kunnen lezen (NanoVNA-Saver, een

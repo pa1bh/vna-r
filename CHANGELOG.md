@@ -12,14 +12,36 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.0-rc.2] - 2026-11-10
+
+Second release candidate. 0.3.0-rc.1 was taken through the first part of its test
+procedure on macOS with a LiteVNA 67: the whole CLI, and in the GUI connecting, sweeping,
+calibrating, interpolating a coarse calibration, the progress bar and losing the cable.
+That found the two faults below; a review of the README and both manuals found the rest.
+**Not yet tried with this version**: the NanoVNA-F, Linux and Windows, and in the GUI the
+references, TDR, gate and file functions. Everything listed under 0.3.0-rc.1 is part of
+this version.
+
 ### Fixed
 
+- CLI: the help of `tdr` gave the range as 1/step; it is 1/(2·step).
 - GUI: **Stop** is now also there while a calibration standard or a single sweep is being
   measured with Run off; before, a long averaged standard could only be aborted by
   starting Run. The space bar follows.
 - CLI: the comment line of a file written by `sweep --s2p` or `--s1p` now states a port
   extension and a time gate, as the GUI already did; the `.s1p` comment also says whether
   the data was calibrated.
+
+### Documentation
+
+- README and both manuals checked against the program and against each other. Corrected:
+  the TDR range of a 50 kHz–6.3 GHz sweep in 1001 points (8 m, not 17 m), an error message
+  that no longer exists, the label of a sweep outside the calibrated span (RAW), the two
+  thresholds for the load check, the dips in the antenna example and the arithmetic of
+  the 25 Ω example. Added: Return applies the sweep, Stop during a standard, what is
+  remembered, `--port-extension` with `tdr`, the short forms of the `cal` actions, and what
+  to do when the connection drops.
+- The screenshots in the manual date from 0.2.3 and 0.2.4; the manual now says so.
 
 ## [0.3.0-rc.1] - 2026-11-10
 
@@ -312,7 +334,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0-rc.1...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0-rc.2...HEAD
+[0.3.0-rc.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.2
 [0.3.0-rc.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.1
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
 [0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
