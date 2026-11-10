@@ -15,5 +15,4 @@ path = "src/main.rs"
 litevna = { path = "../litevna" }
 anyhow = { workspace = true }
 clap = { workspace = true }
-num-complex = { workspace = true }
 png = { workspace = true }

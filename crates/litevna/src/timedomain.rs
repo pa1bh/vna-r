@@ -221,7 +221,7 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
     // buffer. A DC value `dc` adds `dc/nfft` to every sample; pick the one that
     // zeroes the mean of the far negative quarter, t ∈ [−T/2, −T/4), well
     // away from the window kernel of a reflection at t = 0, and only
-    // disturbed by reflections beyond half the alias-free range, which would
+    // disturbed by reflections beyond the alias-free range T/2, which would
     // already be folded into the picture anyway.
     let quiet = nfft / 2..3 * nfft / 4;
     let quiet_mean = spec[quiet.clone()].iter().map(|c| c.re * scale).sum::<f64>() / quiet.len() as f64;

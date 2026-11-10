@@ -271,3 +271,17 @@ awk -v v="0.2.5" '/^## /{p = index($0, "[" v "]") > 0} p' CHANGELOG.md | head -5
 Verwacht: de kop `## [0.2.5] - 2026-11-05` en de eerste regels van die sectie. Bij de
 volgende release moet de GitHub-releasetekst Engels zijn.
 
+## Punt 18 — Kleine ballast en UI-teksten (L5, U10)
+
+**Zonder apparaat.** Open een .s2p van 1 – 30 MHz als trace. File ▸ Save Touchstone: de
+voorgestelde naam is `sweep-1MHz-30MHz.s2p`. Laad `cal/n-6g3.cal.json` en kies Save…
+in het calibratiepaneel: voorgestelde naam `50kHz-6.3GHz.cal.json`. Onder **Traces**
+zonder referenties: "Hold (in the marker bar above the charts) keeps …"; met een
+referentie: "References are not saved; export one as .s2p and open it later with Open as
+reference…."
+
+```bash
+cargo tree -p vna-cli --depth 1 | grep -c num-complex
+```
+Verwacht: `0`.
+

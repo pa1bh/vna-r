@@ -3921,7 +3921,6 @@ dependencies = [
  "anyhow",
  "clap",
  "litevna",
- "num-complex",
  "png",
 ]
 

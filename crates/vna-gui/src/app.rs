@@ -47,7 +47,6 @@ const REF_COLORS: [Color32; 4] = [
     Color32::from_rgb(160, 210, 150),
 ];
 const MAX_REFS: usize = 4;
-const MARKER_COLOR: Color32 = Color32::from_rgb(255, 90, 90);
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 const MARKERS: usize = 4;
 const MARKER_COLORS: [Color32; MARKERS] = [
@@ -1472,7 +1471,7 @@ impl App {
                 ui.small(format!("resolution {:.3} m, alias-free range {:.1} m", res_m, range_m));
                 // Resolution is 1/span: a narrow HF sweep smears a cable into one blob.
                 if res_m > self.tdr_max_m / 10.0 {
-                    let needed_span = litevna::timedomain::C0 * self.tdr_vf / (2.0 * self.tdr_max_m / 20.0);
+                    let needed_span = C0 * self.tdr_vf / (2.0 * self.tdr_max_m / 20.0);
                     let stop = needed_span.min(self.device_max_hz() as f64);
                     ui.colored_label(
                         Color32::from_rgb(230, 150, 80),
@@ -1734,7 +1733,7 @@ impl App {
 
     fn references_panel(&mut self, ui: &mut egui::Ui) {
         if self.references.is_empty() {
-            ui.small("Hold (top bar) keeps the current trace as a reference to compare against.");
+            ui.small("Hold (in the marker bar above the charts) keeps the current trace as a reference to compare against.");
             return;
         }
         ui.label("References");
@@ -1769,7 +1768,7 @@ impl App {
                 other => other,
             };
         }
-        ui.small("References are not saved; export them as s2p to keep them (step 8 will read them back).");
+        ui.small("References are not saved; export one as .s2p and open it later with Open as reference….");
     }
 
     fn standard_buttons(&mut self, ui: &mut egui::Ui, standards: &[Standard], connected: bool) {
@@ -1961,7 +1960,11 @@ impl App {
         let Some(set) = &self.cal.set else { return };
         let Some(path) = rfd::FileDialog::new()
             .add_filter("calibration", &["json"])
-            .set_file_name("litevna.cal.json")
+            .set_file_name(format!(
+                "{}-{}.cal.json",
+                compact_hz(set.freqs_hz[0]),
+                compact_hz(*set.freqs_hz.last().unwrap())
+            ))
             .save_file()
         else {
             return;
@@ -2027,7 +2030,11 @@ impl App {
         let Some(sweep) = self.freq_sweep() else { return };
         let Some(path) = rfd::FileDialog::new()
             .add_filter("Touchstone", &["s2p"])
-            .set_file_name("sweep.s2p")
+            .set_file_name(format!(
+                "sweep-{}-{}.s2p",
+                compact_hz(sweep.freqs_hz[0]),
+                compact_hz(*sweep.freqs_hz.last().unwrap())
+            ))
             .save_file()
         else {
             return;
@@ -2345,7 +2352,7 @@ impl App {
                     ui.label(
                         RichText::new(format!("M  {:.3} m  {:.2} ns", t.distance_m[i], t.time_s[i] * 1e9))
                             .strong()
-                            .color(MARKER_COLOR),
+                            .color(MARKER_COLORS[0]),
                     );
                     ui.separator();
                     ui.label(RichText::new(format!("|Γ| {:.1} dB", db(t.impulse_mag[i]))).color(S11_COLOR));
@@ -2399,7 +2406,7 @@ impl App {
             .show(ui, |pui| {
                 pui.line(Line::new("impulse", series(dist, t.impulse_mag[..n].iter().map(|m| db(*m).max(-100.0)))).color(S11_COLOR));
                 if let Some(x) = marker_x {
-                    pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                    pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
                 }
                 GateEvent::read(pui, gate_x)
             });
@@ -2417,7 +2424,7 @@ impl App {
             .show(ui, |pui| {
                 pui.line(Line::new("Z", series(dist, t.impedance_ohm[..n].iter().map(|z| z.min(500.0)))).color(S21_COLOR));
                 if let Some(x) = marker_x {
-                    pui.vline(VLine::new("marker", x).color(MARKER_COLOR));
+                    pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
                 }
                 GateEvent::read(pui, gate_x)
             });
@@ -2746,6 +2753,19 @@ fn nearest_index(freqs: &[u64], f: u64) -> usize {
         .min_by_key(|(_, x)| x.abs_diff(f))
         .map(|(i, _)| i)
         .unwrap_or(0)
+}
+
+/// A frequency for a file name: `50kHz`, `14.2MHz`, `6.3GHz` (no space, no trailing zeros).
+fn compact_hz(hz: u64) -> String {
+    let text = format_hz(hz).replace(' ', "");
+    let split = text.find(|c: char| c.is_ascii_alphabetic()).unwrap_or(text.len());
+    let (number, unit) = text.split_at(split);
+    let number = if number.contains('.') {
+        number.trim_end_matches('0').trim_end_matches('.')
+    } else {
+        number
+    };
+    format!("{number}{unit}")
 }
 
 fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
