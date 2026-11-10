@@ -3922,6 +3922,7 @@ dependencies = [
  "clap",
  "litevna",
  "png",
+ "serde_json",
 ]
 
 [[package]]

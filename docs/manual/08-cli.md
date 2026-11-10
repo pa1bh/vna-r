@@ -6,6 +6,11 @@ any command gives the full list.
 
 Frequencies: `50k`, `1M`, `14.2M`, `1.3G`, `6.3G` (a decimal comma is accepted too). Points: 2 to 65535.
 
+With `--json`, the commands `list`, `info`, `sweep`, `tdr` and `cal show` print one JSON
+document on stdout instead of a table, for use in scripts; progress and warnings stay on
+stderr. A sweep gives every point as `{"freq_hz": …, "s11": [re, im], "s21": [re, im]}`,
+`tdr` the listed reflections under `peaks` and the whole curve under `trace`.
+
 ## list
 
 Shows the serial ports and marks the VNA.

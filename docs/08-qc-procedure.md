@@ -563,3 +563,29 @@ Verwacht: beide een clap-fout "the argument '--segment …' cannot be used with 
 weergave begint bij 2 MHz) zonder de knop. Zonder verbinding doet Return niets. Hover
 boven **Apply sweep** en boven **Clear** in het calibratiepaneel toont de uitleg.
 
+---
+
+# Later — features
+
+## Punt 34 — `--json` (N4)
+
+**Zonder apparaat.**
+```bash
+vna-cli --json list
+vna-cli --json tdr --from cal/sweep.s2p --max-distance 50 | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['peaks'][0], len(d['trace']))"
+vna-cli --json cal show --file cal/n-6g3.cal.json | head -12
+```
+Verwacht: geldige JSON; `list` een array met per poort `path`, `vna` (LiteVNA/NanoVNA of
+null) en `usb`; `tdr` met `peaks` en `trace`; `cal show` met `points`, `measured`,
+`missing`, `kit`.
+
+**Met apparaat.**
+```bash
+vna-cli --json info
+vna-cli --json sweep --start 1M --stop 30M --points 11 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['device'], d['calibrated'], len(d['points']), d['points'][0])"
+vna-cli --json sweep --start 1M --stop 30M --points 11 --csv -
+```
+Verwacht: `info` met `model`, `firmware`, `battery_mv`, `range_hz`; de sweep 11 punten met
+`freq_hz`, `s11`, `s21`; de laatste regel weigert ("--json and --csv - both write to
+stdout").
+

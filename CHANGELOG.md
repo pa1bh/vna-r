@@ -13,6 +13,8 @@ things that are not backwards compatible, such as the format of the calibration 
 ## [Unreleased]
 
 ### Added
+- CLI: `--json` makes `list`, `info`, `sweep`, `tdr` and `cal show` print one JSON document
+  on stdout instead of a table, for scripts.
 - GUI: **Stop**, **Disconnect** and **Apply sweep** no longer wait for a running sweep to
   finish; they take effect at the next block of data (255 points on a LiteVNA, 301 points
   or about three seconds on a NanoVNA-F, where a long sweep used to make Stop look dead

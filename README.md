@@ -124,8 +124,8 @@ vna-cli tdr --cal hf.cal.json --vf 0.70 --max-distance 3                  # refl
 vna-cli screenshot --out screen.png
 ```
 
-`vna-cli --help` and `vna-cli <command> --help` list every option. `--trace` prints each byte sent
-and received, `peek F0` reads a LiteVNA register. After a sweep the CLI hands the screen back to the
+`vna-cli --help` and `vna-cli <command> --help` list every option. `--json` gives machine-readable
+output for scripts, `--trace` prints each byte sent and received, `peek F0` reads a LiteVNA register. After a sweep the CLI hands the screen back to the
 device; `vna-cli release` does that on its own.
 
 ## What it does

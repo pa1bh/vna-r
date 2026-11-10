@@ -29,6 +29,11 @@ struct Cli {
     /// Print every byte sent and received.
     #[arg(long, global = true)]
     trace: bool,
+    /// Machine-readable output: `list`, `info`, `sweep`, `tdr` and `cal show`
+    /// print one JSON document on stdout instead of a table. Progress and
+    /// warnings stay on stderr.
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -282,6 +287,17 @@ impl KitArgs {
 struct Conn {
     port: Option<String>,
     trace: bool,
+    json: bool,
+}
+
+/// A complex number as JSON: `[re, im]`.
+fn complex_json(re: f64, im: f64) -> serde_json::Value {
+    serde_json::json!([re, im])
+}
+
+fn print_json(value: &serde_json::Value) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -289,10 +305,11 @@ fn main() -> Result<()> {
     let conn = Conn {
         port: cli.port.clone(),
         trace: cli.trace,
+        json: cli.json,
     };
     match cli.cmd {
-        Cmd::List => list(),
-        Cmd::Info => info(&mut open(&conn)?),
+        Cmd::List => list(conn.json),
+        Cmd::Info => info(&mut open(&conn)?, conn.json),
         Cmd::Peek { addr, size } => peek(&mut open(&conn)?, &addr, size),
         Cmd::Sweep {
             grid,
@@ -376,8 +393,27 @@ fn lite<'a>(dev: &'a mut Vna, what: &str) -> Result<&'a mut litevna::LiteVna> {
     Ok(dev.require_lite(what)?)
 }
 
-fn list() -> Result<()> {
+fn list(json: bool) -> Result<()> {
     let ports = discovery::list_ports()?;
+    if json {
+        let rows: Vec<_> = ports
+            .iter()
+            .map(|p| {
+                serde_json::json!({
+                    "path": p.path,
+                    "vna": p.kind().map(|k| k.name()),
+                    "usb": p.usb.as_ref().map(|u| serde_json::json!({
+                        "vid": format!("{:04X}", u.vid),
+                        "pid": format!("{:04X}", u.pid),
+                        "manufacturer": u.manufacturer,
+                        "product": u.product,
+                        "serial_number": u.serial_number,
+                    })),
+                })
+            })
+            .collect();
+        return print_json(&serde_json::Value::Array(rows));
+    }
     if ports.is_empty() {
         println!("no serial ports found");
         return Ok(());
@@ -404,8 +440,28 @@ fn list() -> Result<()> {
     Ok(())
 }
 
-fn info(dev: &mut Vna) -> Result<()> {
+fn info(dev: &mut Vna, json: bool) -> Result<()> {
     let vi = dev.info()?;
+    if json {
+        return print_json(&serde_json::json!({
+            "device": vi.kind.name(),
+            "model": vi.model,
+            "firmware": vi.firmware,
+            "detail": vi.detail,
+            "battery_mv": dev.battery_millivolts().ok(),
+            "range_hz": [vi.limits.min_hz, vi.limits.max_hz],
+            "max_points_per_scan": vi.limits.max_points_per_scan,
+            "device_average": vi.limits.has_device_average,
+            "registers": vi.lite.as_ref().map(|i| serde_json::json!({
+                "variant": i.variant,
+                "protocol_version": i.protocol_version,
+                "hardware_revision": i.hardware_revision,
+                "fw_major": i.fw_major,
+                "fw_minor": i.fw_minor,
+                "dfu": i.in_dfu_mode(),
+            })),
+        }));
+    }
     let Some(i) = vi.lite else {
         println!("device             : {} (NanoVNA text shell)", vi.model);
         println!("firmware           : {}", vi.firmware);
@@ -701,6 +757,9 @@ fn sweep(
     vf: f64,
     segments: Vec<String>,
 ) -> Result<()> {
+    if conn.json && csv.as_deref().is_some_and(|p| p.as_os_str() == "-") {
+        bail!("--json and --csv - both write to stdout; give the CSV a file name");
+    }
     let Acquired {
         cfg,
         raw,
@@ -732,7 +791,27 @@ fn sweep(
         result.s11 = gated.s11;
     }
 
-    print_table(&result, rows);
+    if conn.json {
+        let points: Vec<_> = (0..result.freqs_hz.len())
+            .map(|i| {
+                serde_json::json!({
+                    "freq_hz": result.freqs_hz[i],
+                    "s11": complex_json(result.s11[i].re, result.s11[i].im),
+                    "s21": complex_json(result.s21[i].re, result.s21[i].im),
+                })
+            })
+            .collect();
+        print_json(&serde_json::json!({
+            "device": model,
+            "calibrated": calibrated,
+            "gated": gate_arg.is_some(),
+            "z0_ohm": 50.0,
+            "elapsed_ms": raw.elapsed.as_millis() as u64,
+            "points": points,
+        }))?;
+    } else {
+        print_table(&result, rows);
+    }
     if let Some(p) = raw.points.iter().flatten().next().filter(|_| conn.trace) {
         eprintln!(
             "first raw record: fwd0=({},{}) rev0=({},{}) rev1=({},{}) reserved={:02X?} checksum=0x{:02X}",
@@ -808,15 +887,17 @@ fn tdr_cmd(
     let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
 
     let limit_m = max_distance.unwrap_or(t.max_distance_m());
-    println!(
-        "TDR: resolution ≈ {:.3} m ({:.0} ps), alias-free range {:.1} m ({:.0} ns), VF {:.2}, {} window",
-        t.resolution_m(),
-        t.resolution_s * 1e12,
-        t.max_distance_m(),
-        t.max_time_s * 1e9,
-        vf,
-        window.name()
-    );
+    if !conn.json {
+        println!(
+            "TDR: resolution ≈ {:.3} m ({:.0} ps), alias-free range {:.1} m ({:.0} ns), VF {:.2}, {} window",
+            t.resolution_m(),
+            t.resolution_s * 1e12,
+            t.max_distance_m(),
+            t.max_time_s * 1e9,
+            vf,
+            window.name()
+        );
+    }
     let dt = t.time_s[1] - t.time_s[0];
     let min_sep = ((t.resolution_s / dt).ceil() as usize).max(2);
     let peaks: Vec<_> = t
@@ -825,8 +906,43 @@ fn tdr_cmd(
         .filter(|(i, _)| t.distance_m[*i] <= limit_m)
         .take(n_peaks)
         .collect();
-    println!("{:>4} {:>10} {:>10} {:>9} {:>10}", "#", "distance", "time", "|Γ| dB", "Z behind");
-    for (k, (i, mag)) in peaks.iter().enumerate() {
+    if conn.json {
+        let peaks: Vec<_> = peaks
+            .iter()
+            .map(|(i, mag)| {
+                let j = (i + min_sep).min(t.impedance_ohm.len() - 1);
+                serde_json::json!({
+                    "distance_m": t.distance_m[*i],
+                    "time_ns": t.time_s[*i] * 1e9,
+                    "gamma_db": db(*mag),
+                    "z_behind_ohm": t.impedance_ohm[j],
+                })
+            })
+            .collect();
+        let trace: Vec<_> = (0..t.time_s.len())
+            .take_while(|&i| t.distance_m[i] <= limit_m)
+            .map(|i| {
+                serde_json::json!({
+                    "distance_m": t.distance_m[i],
+                    "time_ns": t.time_s[i] * 1e9,
+                    "impulse_db": db(t.impulse_mag[i]),
+                    "step": t.step[i],
+                    "z_ohm": t.impedance_ohm[i],
+                })
+            })
+            .collect();
+        print_json(&serde_json::json!({
+            "resolution_m": t.resolution_m(),
+            "alias_free_range_m": t.max_distance_m(),
+            "velocity_factor": vf,
+            "window": window.name(),
+            "peaks": peaks,
+            "trace": trace,
+        }))?;
+    } else {
+        println!("{:>4} {:>10} {:>10} {:>9} {:>10}", "#", "distance", "time", "|Γ| dB", "Z behind");
+    }
+    for (k, (i, mag)) in peaks.iter().enumerate().filter(|_| !conn.json) {
         // impedance a little beyond the edge, where the step has settled
         let j = (i + min_sep).min(t.impedance_ohm.len() - 1);
         println!(
@@ -921,7 +1037,7 @@ fn cal(
     match what.to_ascii_lowercase().as_str() {
         "show" => {
             let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
-            return show_cal(&set);
+            return show_cal(&set, conn.json);
         }
         "kit" => {
             let mut set = existing.with_context(|| format!("{} does not exist", file.display()))?;
@@ -934,7 +1050,7 @@ fn cal(
             }
             save_cal(file, &set)?;
             println!("kit updated in {}", file.display());
-            return show_cal(&set);
+            return show_cal(&set, conn.json);
         }
         "check" => {
             let set = existing.with_context(|| format!("{} does not exist", file.display()))?;
@@ -1081,12 +1197,38 @@ fn cal(
     set.set(standard, &sweep)?;
     save_cal(file, &set)?;
     println!("stored {} in {}", standard.name(), file.display());
-    show_cal(&set)
+    show_cal(&set, conn.json)
 }
 
 /// Catch the classic mistakes (loose standard, wrong standard) before they
 /// poison a calibration: medians of the raw magnitude over the sweep.
-fn show_cal(set: &CalibrationSet) -> Result<()> {
+fn show_cal(set: &CalibrationSet, json: bool) -> Result<()> {
+    if json {
+        let have: Vec<_> = Standard::ALL
+            .iter()
+            .chain(Standard::LINE.iter())
+            .filter(|s| set.has(**s))
+            .map(|s| s.name())
+            .collect();
+        return print_json(&serde_json::json!({
+            "format": set.format,
+            "points": set.freqs_hz.len(),
+            "start_hz": set.freqs_hz[0],
+            "stop_hz": set.freqs_hz.last(),
+            "note": set.note,
+            "measured": have,
+            "missing": set.missing_standards().iter().map(|s| s.name()).collect::<Vec<_>>(),
+            "kit": {
+                "name": set.kit.name,
+                "open_c0_farad": set.kit.open_c0(),
+                "open_delay_s": set.kit.open.offset_delay_s,
+                "short_l0_henry": set.kit.short_l0(),
+                "short_delay_s": set.kit.short.offset_delay_s,
+                "load_ohm": set.kit.load_r(),
+                "through_delay_s": set.kit.through_delay_s,
+            },
+        }));
+    }
     println!(
         "grid     : {} points, {} → {} (step {})",
         set.freqs_hz.len(),

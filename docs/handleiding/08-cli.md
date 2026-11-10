@@ -6,6 +6,12 @@ elk commando geeft de volledige lijst.
 
 Frequenties: `50k`, `1M`, `14.2M`, `1.3G`, `6,3G`. Punten: 2 tot 65535.
 
+Met `--json` geven de commando's `list`, `info`, `sweep`, `tdr` en `cal show` één
+JSON-document op stdout in plaats van een tabel, voor gebruik in scripts; voortgang en
+waarschuwingen blijven op stderr. Een sweep geeft elk punt als
+`{"freq_hz": …, "s11": [re, im], "s21": [re, im]}`, `tdr` de gevonden reflecties onder
+`peaks` en de hele curve onder `trace`.
+
 ## list
 
 Toont de seriële poorten en markeert de VNA.
