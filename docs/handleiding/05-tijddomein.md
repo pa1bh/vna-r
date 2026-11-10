@@ -46,7 +46,7 @@ Twee getallen onder de instellingen bepalen wat je kunt zien:
   kabel meten, neem dan meer punten.
 
 De regel: breed sweepen voor detail, fijn (veel punten) voor bereik. 50 kHz tot 6,3 GHz in
-1001 punten doet beide redelijk: 1,7 cm resolutie en 17 m bereik.
+1001 punten doet beide redelijk: 1,7 cm resolutie en 8 m bereik.
 
 ## Het venster
 

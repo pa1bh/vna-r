@@ -30,7 +30,7 @@ This is what that looks like for an off-centre-fed wire antenna (OCF) for HF, me
 through the feed line from the shack, 3 to 30 MHz with 1001 points and the HF calibration
 from chapter 4. The four markers sit in the SWR dips: 3.51 MHz (SWR 1.28), 6.78 MHz
 (1.45), 14.07 MHz (1.09) and 17.15 MHz (1.41); further to the right there are more dips
-around 21 and 28 MHz. That the resonances lie at multiples of the lowest one is exactly
+around 24 and 28 MHz. That the resonances lie at multiples of the lowest one is exactly
 the idea of an OCF: by placing the feed point away from the centre, the impedance there is
 usable on most harmonics, and the balun brings it to 50 Ω. On 40 m it sits a little low
 (6.78 instead of 7.1 MHz, so on the band it is just too long; the sign of X says little
@@ -74,7 +74,7 @@ read off directly. Without a second port: short at the end and divide S11 in dB 
 
 **What is at the end.** The impedance graph of the TDR says what terminates the cable,
 not just where. Here a 25 Ω resistor sits behind 5 m of coax: the peak is −10.8 dB
-(a reflection of one third is −9.5 dB, plus 1.6 dB of cable loss there and back), and
+(a reflection of one third is −9.5 dB; the remaining 1.3 dB is cable loss there and back), and
 the impedance runs flat at 50 Ω up to the end and then drops to about 26 Ω. The marker
 sits on the slope and reads a value in between; a few centimetres further it reads the
 resistor.

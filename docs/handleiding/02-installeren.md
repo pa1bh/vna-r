@@ -2,7 +2,7 @@
 
 ## Bouwen
 
-vna-r is geschreven in Rust. Je hebt een recente stabiele Rust-toolchain nodig
+vna-r is geschreven in Rust. Je hebt een stabiele Rust-toolchain nodig, 1.95 of nieuwer
 ([rustup](https://rustup.rs)). Haal de broncode op en bouw de drie onderdelen:
 
 ```bash

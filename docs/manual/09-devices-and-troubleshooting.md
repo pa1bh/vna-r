@@ -13,7 +13,7 @@ vna-r chooses the protocol by the USB id and has been verified on all three.
 | screen | 1024×600 | 480×320 | 800×480 |
 | USB id and name | 04B4:0008 ZeenKo.tech LiteVNA6 | 04B4:0008 Black Sphere Technologies CDC-ACM Demo | 0483:5740 DEEPELEC.COM NanoVNA-F |
 | port on macOS | /dev/cu.usbmodemv1_01 | /dev/cu.usbmodemDEMO1 | /dev/cu.usbmodem\<serial number\> |
-| speed | 340–600 points/s | ~300 points/s | ~115 points/s (S11+S21), 301 per chunk |
+| speed | 300–600 points/s | ~300 points/s | ~115 points/s (S11+S21), 301 per chunk |
 | not available | | | Average/channel, `peek`, USB MODE |
 
 What the NanoVNA-F does differently: its screen keeps working during a measurement, longer
@@ -68,14 +68,16 @@ port has been chosen, move the window to another screen: on a macOS setup with t
 screens of different scale, clicks on one of the two did not arrive (a quirk of the
 window framework, not of vna-r).
 
-**"device did not answer INDICATE"**, **"no NanoVNA shell prompt"** or a timeout. Another
+**"timeout while reading from device"**, **"no NanoVNA shell prompt"** or a serial port
+error that says the port is busy. Another
 program has the port (GUI connected while you use the CLI, or NanoVNA-Saver open).
 Close that first. If it happens occasionally right after plugging in, try again; the
 device sometimes needs a second.
 
 **"target grid lies outside the calibrated span"**. The sweep falls outside the span of
 the loaded calibration file. Load the right file or adjust the sweep. Until then the
-segment is shown raw (label CAL\*).
+sweep is shown raw: the panel says "not applied" with this message and the label is RAW,
+or CAL\* when other segments are calibrated.
 
 **"calibration grid too coarse to interpolate"**. Too few points in the calibration for
 these frequencies; calibrate with more points.
@@ -86,6 +88,10 @@ HF calibration or segments (chapter 4).
 
 **Orange warning next to a standard**. The measured standard does not look like what it
 should be: loose connector, wrong standard, or broken. Check and measure again.
+
+**"I/O error"** in the top bar during a sweep, and the button is back on **Connect**. The
+connection dropped: the cable was moved or unplugged, or the device was switched off.
+Plug it back in, wait for the port to appear in the list and click **Connect**.
 
 **The LiteVNA stays in USB MODE**, or the NanoVNA-F stays on the grid of the last
 measurement. `vna-cli release`, or switch it off and on.
@@ -104,8 +110,8 @@ clipboard, ready to paste. For a CLI problem, the output with `--trace` helps.
 A good habit is to check three things after calibrating and before every serious
 measurement:
 
-1. **Load on the reference plane**: S11 below −50 dB across the band. If not, something
-   is wrong with the calibration or the load.
+1. **Load on the reference plane**: S11 below −60 dB on HF and below −40 dB above 1 GHz
+   (chapter 4). If not, something is wrong with the calibration or the load.
 2. **Open or short on the reference plane**: 0 dB flat, phase 0° or 180° respectively and
    slowly rotating.
 3. **Repeatability**: unscrewing and reconnecting changes less than 0.05 dB.

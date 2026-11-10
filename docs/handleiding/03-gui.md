@@ -45,9 +45,10 @@ trace vast als referentie, `G` schakelt de gate, `T` wisselt tussen frequentie- 
 tijddomein. De batterijspanning in de bovenbalk wordt elke minuut opnieuw gelezen.
 
 Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met **Apply
-sweep**; tijdens Run herstart de sweep dan met de nieuwe instellingen. Frequenties typ je
-als `50k`, `14.2M`, `1.3G` of `6,3G`. De LiteVNA meet 50 kHz tot 6,3 GHz; meer punten
-geeft fijner detail maar duurt langer (ongeveer 300 tot 600 punten per seconde).
+sweep** of met Return in Start of Stop; tijdens Run herstart de sweep dan met de nieuwe
+instellingen. Frequenties typ je als `50k`, `14.2M`, `1.3G` of `6.3G` (een decimale komma
+mag ook). De LiteVNA meet 50 kHz tot 6,3 GHz; meer punten geeft fijner detail maar duurt
+langer (ongeveer 300 tot 600 punten per seconde).
 
 **Average** (alleen LiteVNA) is de bandbreedte-instelling van het apparaat zelf (1 tot 80): hoger is
 rustiger maar trager, en de instelling blijft in het apparaat staan. **Sweep avg** is iets
@@ -114,15 +115,15 @@ volgende start terug, met hun naam; haal ze met **×** weg als je ermee klaar be
 
 ## Schermafbeelding van het apparaat
 
-**Screenshot** haalt de inhoud van het LCD van de LiteVNA op en toont hem in een
+**Screenshot** haalt de inhoud van het LCD van het apparaat op en toont hem in een
 venster, met een knop om hem als PNG te bewaren. Handig voor documentatie van wat het
 apparaat zelf liet zien.
 
 ## Wat bewaard blijft
 
 Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg, segmenten,
-het calibratiebestand en of het toegepast wordt, de weergavekeuzes, TDR- en
-gate-instellingen, markerfrequenties en de venstergrootte. Bij de volgende start komt dat
+het calibratiebestand en of het toegepast wordt, de poortverlenging, de weergavekeuzes,
+TDR- en gate-instellingen, markerfrequenties, **Connect at start** en de venstergrootte. Bij de volgende start komt dat
 terug; het calibratiebestand wordt automatisch geladen en de markers worden bij de eerste
 sweep op de dichtstbijzijnde frequentie gezet. Ook de referenties blijven bewaard, als
 bestanden naast de instellingen. Niet bewaard worden de meetdata van de live trace.

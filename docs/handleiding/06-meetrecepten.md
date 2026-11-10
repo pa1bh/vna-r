@@ -29,7 +29,7 @@ M2−M1 geeft het verschil.
 Zo ziet dat eruit bij een off-center gevoede draadantenne (OCF) voor HF, gemeten door de
 voedingslijn vanuit de shack, 3 tot 30 MHz met 1001 punten en de HF-calibratie van
 hoofdstuk 4. De vier markers staan in de SWR-dalen: 3,51 MHz (SWR 1,28), 6,78 MHz
-(1,45), 14,07 MHz (1,09) en 17,15 MHz (1,41); verder naar rechts liggen nog dalen rond 21
+(1,45), 14,07 MHz (1,09) en 17,15 MHz (1,41); verder naar rechts liggen nog dalen rond 24
 en 28 MHz. Dat de resonanties in veelvouden van de laagste liggen is precies het idee van
 een OCF: door het voedingspunt uit het midden te leggen, is de impedantie daar op de
 meeste harmonischen bruikbaar, en de balun brengt die naar 50 Ω. Op 40 m zit hij iets te
@@ -74,8 +74,8 @@ delen door twee (heen en terug), met de kanttekening dat een short zelf niet per
 
 **Wat er aan het eind zit.** De impedantiegrafiek van de TDR zegt waarmee de kabel is
 afgesloten, niet alleen waar. Hier zit een weerstand van 25 Ω achter 5 m coax: de piek is
-−10,8 dB (een reflectie van een derde is −9,5 dB, plus 1,6 dB kabelverlies heen en
-terug), en de impedantie loopt vlak op 50 Ω tot aan het eind en zakt dan naar ongeveer
+−10,8 dB (een reflectie van een derde is −9,5 dB; de overige 1,3 dB is kabelverlies heen
+en terug), en de impedantie loopt vlak op 50 Ω tot aan het eind en zakt dan naar ongeveer
 26 Ω. De marker staat op de flank en leest een waarde ertussenin; een paar centimeter
 verder leest hij de weerstand.
 

@@ -135,7 +135,7 @@ enum Cmd {
     ///
     /// Sweeps (ideally with --cal), inverse-transforms S11 and lists the
     /// strongest reflections with distance, |Γ| and the impedance behind them.
-    /// Resolution ≈ 1/span, range ≈ 1/step: sweep wide for detail, fine for reach.
+    /// Resolution ≈ 1/span, range ≈ 1/(2·step): sweep wide for detail, fine for reach.
     Tdr {
         #[command(flatten)]
         grid: GridArgs,

@@ -13,7 +13,7 @@ vna-r kiest het protocol aan het USB-id en is op alle drie geverifieerd.
 | scherm | 1024×600 | 480×320 | 800×480 |
 | USB-id en naam | 04B4:0008 ZeenKo.tech LiteVNA6 | 04B4:0008 Black Sphere Technologies CDC-ACM Demo | 0483:5740 DEEPELEC.COM NanoVNA-F |
 | poort op macOS | /dev/cu.usbmodemv1_01 | /dev/cu.usbmodemDEMO1 | /dev/cu.usbmodem\<serienummer\> |
-| snelheid | 340–600 punten/s | ~300 punten/s | ~115 punten/s (S11+S21), 301 per stuk |
+| snelheid | 300–600 punten/s | ~300 punten/s | ~115 punten/s (S11+S21), 301 per stuk |
 | niet beschikbaar | | | Average/kanaal, `peek`, USB MODE |
 
 Wat de NanoVNA-F anders doet: zijn scherm blijft werken tijdens een meting, langere
@@ -69,14 +69,16 @@ poort wel gekozen is, verplaats het venster dan naar een ander scherm: op een ma
 opstelling met twee schermen van verschillende schaal kwamen klikken op één van de twee
 niet aan (een eigenaardigheid van het vensterframework, niet van vna-r).
 
-**"device did not answer INDICATE"**, **"no NanoVNA shell prompt"** of een timeout. Een
+**"timeout while reading from device"**, **"no NanoVNA shell prompt"** of een fout van de
+seriële poort die zegt dat hij bezet is. Een
 ander programma heeft de poort (GUI verbonden terwijl je de CLI gebruikt, of
 NanoVNA-Saver open). Sluit dat eerst. Komt het incidenteel voor direct na het
 aansluiten, probeer dan opnieuw; het apparaat heeft soms een seconde nodig.
 
 **"target grid lies outside the calibrated span"**. De sweep valt buiten het bereik van
-het geladen calibratiebestand. Laad het juiste bestand of pas de sweep aan. Het segment
-wordt tot die tijd ruw getoond (label CAL\*).
+het geladen calibratiebestand. Laad het juiste bestand of pas de sweep aan. De sweep
+wordt tot die tijd ruw getoond: het paneel zegt "not applied" met deze melding en het
+label is RAW, of CAL\* als andere segmenten wel gecalibreerd zijn.
 
 **"calibration grid too coarse to interpolate"**. Te weinig punten in de calibratie voor
 deze frequenties; calibreer met meer punten.
@@ -87,6 +89,10 @@ een HF-calibratie of segmenten (hoofdstuk 4).
 
 **Oranje waarschuwing bij een standaard**. De gemeten standaard lijkt niet op wat hij
 hoort te zijn: losse connector, verkeerde standaard, of stuk. Controleer en meet opnieuw.
+
+**"I/O error"** in de bovenbalk tijdens een sweep, en de knop staat weer op **Connect**.
+De verbinding is weggevallen: de kabel is bewogen of losgetrokken, of het apparaat is
+uitgezet. Steek hem terug, wacht tot de poort in de lijst verschijnt en klik **Connect**.
 
 **De LiteVNA blijft in USB MODE**, of de NanoVNA-F blijft op het raster van de laatste
 meting staan. `vna-cli release`, of uit en aan.
@@ -105,8 +111,8 @@ klembord, klaar om te plakken. Bij een CLI-probleem helpt de uitvoer met `--trac
 Een goede gewoonte is om na het calibreren en voor elke serieuze meting drie dingen te
 controleren:
 
-1. **Load op het referentievlak**: S11 onder −50 dB over de band. Zo niet, dan is er iets
-   mis met de calibratie of de load.
+1. **Load op het referentievlak**: S11 onder −60 dB op HF en onder −40 dB boven 1 GHz
+   (hoofdstuk 4). Zo niet, dan is er iets mis met de calibratie of de load.
 2. **Open of short op het referentievlak**: 0 dB vlak, fase 0° resp. 180° en langzaam
    draaiend.
 3. **Herhaalbaarheid**: los- en vastdraaien verandert minder dan 0,05 dB.

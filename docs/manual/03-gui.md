@@ -45,9 +45,10 @@ trace as a reference, `G` switches the gate, `T` switches between frequency and 
 domain. The battery voltage in the top bar is read again every minute.
 
 Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Apply
-sweep**; during Run the sweep then restarts with the new settings. You type frequencies
-as `50k`, `14.2M`, `1.3G` or `6.3G` (a decimal comma is accepted too). The LiteVNA measures 50 kHz to 6.3 GHz; more points
-gives finer detail but takes longer (roughly 300 to 600 points per second).
+sweep** or with Return in Start or Stop; during Run the sweep then restarts with the new
+settings. You type frequencies as `50k`, `14.2M`, `1.3G` or `6.3G` (a decimal comma is
+accepted too). The LiteVNA measures 50 kHz to 6.3 GHz; more points gives finer detail but
+takes longer (roughly 300 to 600 points per second).
 
 **Average** (LiteVNA only) is the bandwidth setting of the device itself (1 to 80): higher is
 quieter but slower, and the setting stays in the device. **Sweep avg** is something
@@ -114,14 +115,15 @@ next start, with their names; remove them with **×** when you are done with the
 
 ## Screenshot of the device
 
-**Screenshot** fetches the contents of the LiteVNA's LCD and shows it in a window, with a
+**Screenshot** fetches the contents of the device's LCD and shows it in a window, with a
 button to save it as PNG. Handy for documenting what the device itself was showing.
 
 ## What is remembered
 
 On quitting, the following are saved: port, start, stop, points, average, sweep avg,
-segments, the calibration file and whether it is applied, the view choices, TDR and gate
-settings, marker frequencies and the window size. At the next start that all comes back;
+segments, the calibration file and whether it is applied, the port extension, the view
+choices, TDR and gate settings, marker frequencies, **Connect at start** and the window
+size. At the next start that all comes back;
 the calibration file is loaded automatically and the markers are placed at the nearest
 frequency on the first sweep. The references are kept too, as files next to the settings.
 Not saved are the measurement data of the live trace.

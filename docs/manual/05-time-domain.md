@@ -46,7 +46,7 @@ Two numbers below the settings determine what you can see:
   a long cable, take more points.
 
 The rule: sweep wide for detail, fine (many points) for range. 50 kHz to 6.3 GHz in
-1001 points does both reasonably: 1.7 cm resolution and 17 m range.
+1001 points does both reasonably: 1.7 cm resolution and 8 m range.
 
 ## The window
 

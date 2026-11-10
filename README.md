@@ -1,7 +1,7 @@
 # vna-r
 
-Desktop software for the **LiteVNA 64/67** and the **NanoVNA-F** vector network analysers on macOS
-and Linux, written in Rust: a device library, a command line tool (`vna-cli`) and a GUI (`vna-gui`).
+Desktop software for the **LiteVNA 64/67** and the **NanoVNA-F** vector network analysers on macOS,
+Linux and Windows, written in Rust: a device library, a command line tool (`vna-cli`) and a GUI (`vna-gui`).
 Sweeps, SOLT calibration with kit fit, Smith chart and seven trace views, markers, references with a
 difference trace, segments, time-domain reflectometry (TDR) with gating, and Touchstone import and
 export. Hobby project by Bas Hendriks, PA1BH.
@@ -84,9 +84,10 @@ group. The port is `/dev/ttyACM*`; on macOS it is `/dev/cu.usbmodem…` and no d
 
 1. Connect the analyser over USB and start `vna-gui`. The port list marks a VNA with `*` and
    selects it; it rescans every two seconds until you connect.
-2. **Connect**, then **Run** (continuous) or **Single**. The top bar shows model, firmware and battery.
-3. Set **Start**, **Stop** and **Points** under **Sweep** and press **Apply sweep**. Frequencies are
-   typed as `50k`, `14.2M`, `1.3G`.
+2. **Connect**, then **Run** (continuous) or **Single**; while something is being measured the
+   button reads **Stop**. The top bar shows model, firmware and battery.
+3. Set **Start**, **Stop** and **Points** under **Sweep** and press **Apply sweep** (or Return in
+   Start or Stop). Frequencies are typed as `50k`, `14.2M`, `1.3G`.
 4. Calibrate: under **Calibration**, measure **open**, **short** and **load** (optionally **through**
    and **isolation**) on the current grid, tick **apply**, and **Save…** the calibration as JSON. The
    same file works with `vna-cli sweep --cal`. An implausible standard (a loose open, a forgotten
@@ -125,8 +126,9 @@ vna-cli screenshot --out screen.png
 ```
 
 `vna-cli --help` and `vna-cli <command> --help` list every option. `--json` gives machine-readable
-output for scripts, `--trace` prints each byte sent and received, `peek F0` reads a LiteVNA register. After a sweep the CLI hands the screen back to the
-device; `vna-cli release` does that on its own.
+output for scripts, `--trace` prints each byte sent and received, `peek F0` reads a LiteVNA
+register. After a sweep the CLI hands the screen back to the device; `vna-cli release` does that on
+its own.
 
 ## What it does
 

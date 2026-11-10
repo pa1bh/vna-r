@@ -1,6 +1,6 @@
 # 8. Command line: vna-cli
 
-All commands accept `-p, --port <PORT>` (otherwise the LiteVNA is found automatically)
+All commands accept `-p, --port <PORT>` (otherwise the VNA is found automatically)
 and `--trace` (prints every byte that goes over USB, for troubleshooting). `--help` on
 any command gives the full list.
 
@@ -54,7 +54,7 @@ One sweep, printed as a table and exported if desired.
 | `--s2p <file>`, `--s1p <file>`, `--csv <file>` | export (`--s1p` is S11 only); `--csv -` to stdout |
 | `--port-extension <ps>` | move the reference plane outward by this one-way delay (chapter 4) |
 | `--rows <n>` | number of table rows, 0 is all |
-| `--average <1..80>` | bandwidth of the device (stays set); LiteVNA only |
+| `--average <1..80>` | bandwidth of the device; put back afterwards as far as the device lets it be read back (chapter 2); LiteVNA only |
 | `--channel s11\|s21` | measure one channel; LiteVNA only |
 | `--gate START:STOP`, `--gate-notch`, `--vf` | time gate on S11, in metres one way |
 | `--calibrated` | let the device apply its own calibration (LiteVNA mode 3, NanoVNA-F without mask bit 8) |
@@ -96,7 +96,8 @@ Measure calibration standards into a file, or inspect and edit the file.
 | `clear` | delete the file |
 
 `--note "text"` stores a note in the file. An implausible standard measurement gives a
-WARNING on stderr.
+WARNING on stderr. Short forms are accepted: `thru` for `through`, and `o`, `s`, `l`, `t`
+and `i` for the first five standards.
 
 ```bash
 vna-cli cal open --file cal/n-hf.cal.json --start 100k --stop 50M --points 1001
@@ -123,6 +124,7 @@ reflections with distance, |Γ| and the impedance behind them.
 | `--peaks <n>` | number of reflections, default 5 |
 | `--max-distance <m>` | do not look further than this |
 | `--csv <file>` | distance/time/impulse/step/impedance |
+| `--port-extension <ps>` | move the reference plane outward before the transform (chapter 4) |
 | `--from <file>` | S11 from an .s1p/.s2p instead of sweeping |
 
 ```bash

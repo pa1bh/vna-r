@@ -3,8 +3,8 @@
 *English version: [docs/manual](../manual/README.md).*
 
 Een vectornetwerkanalyzer (VNA) meet hoe een antenne, kabel, filter of ander
-RF-onderdeel zich gedraagt per frequentie. vna-r is een programma voor de macOS- en
-Linux-desktop dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, de metingen zelf calibreert en
+RF-onderdeel zich gedraagt per frequentie. vna-r is een programma voor macOS, Linux
+en Windows dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, de metingen zelf calibreert en
 ze toont, met markers, tijddomein (TDR), gating, referenties en export. Deze handleiding
 legt uit wat je meet, hoe je het programma bedient en waar de valkuilen zitten.
 
@@ -30,9 +30,9 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
    en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, een
    probleem melden, wat je kunt vertrouwen.
 
-Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/06` de onderzoeks- en
-ontwikkelnotities: het USB-protocol, het calibratiemodel met metingen, de TDR-wiskunde en
-de roadmap.
+Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/08` de onderzoeks- en
+ontwikkelnotities: de USB-protocollen, het calibratiemodel met metingen, de TDR-wiskunde,
+de roadmap, en de doorlichting en testprocedure van versie 0.3.
 
 ## Conventies
 
@@ -40,5 +40,9 @@ de roadmap.
 - dB-waarden van S11 en S21 zijn negatief of nul: 0 dB is alles terug of alles door,
   −20 dB is 1 % van het vermogen.
 - Afstanden in TDR zijn enkele reis (de lengte van de kabel), tijden zijn heen en terug.
+- De schermafbeeldingen zijn gemaakt met versie 0.2.3 en 0.2.4. De panelen hebben sindsdien
+  een paar velden erbij gekregen, en het eenduidige bereik in de TDR-afbeeldingen is het
+  dubbele van wat de huidige versie voor dezelfde sweep meldt (hoofdstuk 5 geeft de
+  huidige definitie).
 - "Referentievlak" is het punt waar de calibratie de meting op legt: bij standaarden
   direct op poort 1 is dat de N-connector van het apparaat.

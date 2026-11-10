@@ -2,7 +2,7 @@
 
 ## Building
 
-vna-r is written in Rust. You need a recent stable Rust toolchain
+vna-r is written in Rust. You need a stable Rust toolchain, 1.95 or later
 ([rustup](https://rustup.rs)). Fetch the source code and build the three parts:
 
 ```bash
@@ -141,8 +141,8 @@ channel. After a session the LiteVNA's menu may therefore show a different bandw
 before; set it back if you wish.
 
 A **NanoVNA-F** has no USB MODE: its screen simply keeps working. During a
-measurement by vna-r its own sweep is temporarily set to the grid of the last segment that
-vna-r measured (at most 301 points per segment; longer sweeps are done in pieces), and
+measurement by vna-r its own sweep is temporarily set to the grid of the last chunk that
+vna-r measured (at most 301 points per chunk; longer sweeps are done in chunks), and
 after **Disconnect**, the end of a CLI command or `vna-cli release`, vna-r restores the
 original sweep. Its bandwidth is set on the device itself; the
 **Average** box in the GUI is disabled for this device.

@@ -1,10 +1,10 @@
-*Nederlandse versie: [docs/handleiding](../handleiding/README.md).*
-
 # vna-r manual
 
+*Nederlandse versie: [docs/handleiding](../handleiding/README.md).*
+
 A vector network analyser (VNA) measures how an antenna, cable, filter or other
-RF component behaves as a function of frequency. vna-r is a program for the macOS and
-Linux desktop that drives a LiteVNA 64 or 67 or a NanoVNA-F over USB, calibrates the measurements itself and
+RF component behaves as a function of frequency. vna-r is a program for the macOS, Linux
+and Windows desktop that drives a LiteVNA 64 or 67 or a NanoVNA-F over USB, calibrates the measurements itself and
 displays them, with markers, time domain (TDR), gating, references and export. This manual
 explains what you are measuring, how to operate the program and where the pitfalls are.
 
@@ -31,8 +31,8 @@ The chapters build on one another, but can also be read on their own:
    reporting a problem, what you can trust.
 
 Those who want the background will find the research and development notes in `docs/01`
-to `docs/06` (Dutch): the USB protocol, the calibration model with measurements, the TDR
-mathematics and the roadmap.
+to `docs/08` (Dutch): the USB protocols, the calibration model with measurements, the TDR
+mathematics, the roadmap, and the review and test procedure of version 0.3.
 
 ## Conventions
 
@@ -40,5 +40,8 @@ mathematics and the roadmap.
 - dB values of S11 and S21 are negative or zero: 0 dB is everything reflected or everything passed,
   −20 dB is 1% of the power.
 - Distances in TDR are one way (the length of the cable), times are round trip.
+- The screenshots were made with versions 0.2.3 and 0.2.4. The panels have gained a few
+  fields since, and the alias-free range in the TDR screenshots is twice what the current
+  version reports for the same sweep (chapter 5 has the current definition).
 - "Reference plane" is the point at which the calibration places the measurement: with standards
   directly on port 1 that is the N connector of the device.

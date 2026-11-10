@@ -1,10 +1,10 @@
 # 8. Commandoregel: vna-cli
 
-Alle commando's accepteren `-p, --port <PORT>` (anders wordt de LiteVNA automatisch
+Alle commando's accepteren `-p, --port <PORT>` (anders wordt de VNA automatisch
 gevonden) en `--trace` (print elke byte die over USB gaat, voor foutzoeken). `--help` bij
 elk commando geeft de volledige lijst.
 
-Frequenties: `50k`, `1M`, `14.2M`, `1.3G`, `6,3G`. Punten: 2 tot 65535.
+Frequenties: `50k`, `1M`, `14.2M`, `1.3G`, `6.3G` (een decimale komma mag ook). Punten: 2 tot 65535.
 
 Met `--json` geven de commando's `list`, `info`, `sweep`, `tdr` en `cal show` één
 JSON-document op stdout in plaats van een tabel, voor gebruik in scripts; voortgang en
@@ -55,7 +55,7 @@ Eén sweep, afgedrukt als tabel en desgewenst geëxporteerd.
 | `--s2p <bestand>`, `--s1p <bestand>`, `--csv <bestand>` | export (`--s1p` is alleen S11); `--csv -` naar stdout |
 | `--port-extension <ps>` | referentievlak naar buiten schuiven met deze enkele-weg-vertraging (hoofdstuk 4) |
 | `--rows <n>` | aantal tabelregels, 0 is alles |
-| `--average <1..80>` | bandbreedte van het apparaat (blijft staan); alleen LiteVNA |
+| `--average <1..80>` | bandbreedte van het apparaat; wordt daarna teruggezet voor zover het apparaat hem laat teruglezen (hoofdstuk 2); alleen LiteVNA |
 | `--channel s11\|s21` | één kanaal meten; alleen LiteVNA |
 | `--gate START:STOP`, `--gate-notch`, `--vf` | tijd-gate op S11 in meters enkele reis |
 | `--calibrated` | de calibratie van het apparaat zelf laten toepassen (LiteVNA mode 3, NanoVNA-F zonder maskerbit 8) |
@@ -97,7 +97,8 @@ Calibratiestandaarden meten in een bestand, of het bestand inspecteren en bewerk
 | `clear` | het bestand verwijderen |
 
 `--note "tekst"` bewaart een notitie in het bestand. Een onwaarschijnlijke
-standaardmeting geeft een WARNING op stderr.
+standaardmeting geeft een WARNING op stderr. Korte vormen mogen ook: `thru` voor
+`through`, en `o`, `s`, `l`, `t` en `i` voor de eerste vijf standaarden.
 
 ```bash
 vna-cli cal open --file cal/n-hf.cal.json --start 100k --stop 50M --points 1001
@@ -124,6 +125,7 @@ reflecties op met afstand, |Γ| en de impedantie erachter.
 | `--peaks <n>` | aantal reflecties, standaard 5 |
 | `--max-distance <m>` | niet verder kijken dan dit |
 | `--csv <bestand>` | afstand/tijd/impuls/stap/impedantie |
+| `--port-extension <ps>` | referentievlak naar buiten schuiven vóór de transformatie (hoofdstuk 4) |
 | `--from <bestand>` | S11 uit een .s1p/.s2p in plaats van sweepen |
 
 ```bash
