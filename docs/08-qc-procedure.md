@@ -139,7 +139,24 @@ release-build: uitkomst zoals beschreven, tenzij hieronder genoemd.
    bij een onvolledig segment luidt anders dan hier stond, en de `sed`-regels bij punt 35
    telden de stderr-regel mee. Verbeterd.
 
-**Nog te doen, samen:** alles in de GUI (ronde A en B) en de slotronde.
+**Door PA1BH in de GUI, met Claude als loods** (revisie `v0.3.0-rc.1-2-g2bda786`).
+
+| Blok | Punten | Uitkomst |
+|---|---|---|
+| 1: starten, verbinden, eerste sweep | 25 (instellingen van 0.2.5 gelezen, `version:1` geschreven), 38 (spatie, S), 49 (Return past toe), 7 (marker op frequentie), 8 (pijltjes in tekstveld) | goed |
+| 2: calibreren 1–50 MHz, 201 punten, vervangende load | 5 (standaard past getypt raster toe), 4 (meldingen blijven staan), 13 (gemiddelde standaard), 18 (voorgestelde naam `1MHz-50MHz.cal.json`), 49 (uitleg bij Clear) | goed |
+
+Bij blok 2, laatste stap: na **Load…** van `cal/n-1g.cal.json` op de sweep 1–50 MHz staat
+er geel "loaded" en oranje "⚠ 20 sweep points lie between the first two calibration
+points …". Dat is juist: die calibratie dekt 1–50 MHz en wordt toegepast, maar haar
+tweede punt ligt op 5,995 MHz. De regel "not applied" komt pas bij een sweep buiten
+1 MHz–1 GHz; punt 4 hieronder beschrijft nu beide.
+
+Het logboek van de GUI toont om 16:15:53 "sweep: I/O error: Broken pipe" en twee seconden
+later een nieuwe Connect: nog na te vragen wat daar gebeurde.
+
+**Nog te doen, samen:** de rest van de GUI (grove calibratie, voortgangsbalk, kabel
+lostrekken, referenties, TDR, gate, bestanden) en de slotronde.
 
 ---
 
@@ -224,9 +241,12 @@ updated … save to keep it" blijft zichtbaar.
 calibratieregels staat geel "loaded" en het blijft staan. (Op een geopend bestand wordt
 geen calibratie toegepast, dus de oranje regel hieronder zie je alleen met een apparaat.)
 
-**Niet toepasbaar (met apparaat).** Laad `cal/n-1g.cal.json` en sweep 1 M – 2 G: geel
-"loaded" blijft staan en daaronder oranje "not applied: target grid … lies outside the
-calibrated span …"; het label is RAW. Vóór 0.2.6 verdrong de tweede melding de eerste.
+**Niet toepasbaar (met apparaat).** Laad `cal/n-1g.cal.json` (1 MHz – 1 GHz, 201 punten).
+Op een sweep binnen dat bereik met een fijner raster, bijvoorbeeld 1 – 50 MHz, wordt hij
+toegepast en staat er onder het gele "loaded" een oranje waarschuwing "⚠ N sweep points
+lie between the first two calibration points …". Sweep daarna 1 M – 2 G: geel "loaded"
+blijft staan en daaronder oranje "not applied: target grid … lies outside the calibrated
+span …"; het label is RAW. Vóór 0.2.6 verdrong de tweede melding de eerste.
 
 ## Punt 5 — Standaarden en weergave op één raster (U1)
 
