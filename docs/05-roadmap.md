@@ -243,6 +243,12 @@ Stand: 2026-11-10, na de doorlichting in [docs/07-analyse-en-aanbevelingen.md](0
 De codes (B1, U2, D3 …) verwijzen naar dat rapport; de besluiten staan in §10 daarvan.
 Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 
+Op 10 november zijn in één doorlopende sessie de punten 1 tot 27, 29 tot 36, 38, 40, 41,
+48 en 49 gedaan, elk in een eigen commit, alles onder *Unreleased* in de CHANGELOG en
+niet gepusht. Hoe je elk punt controleert staat in
+[docs/08-qc-procedure.md](08-qc-procedure.md). Open staan: 28 (wacht op een besluit),
+37, 39, 42, 43, 44 en de meetpunten 45 tot 47; de reden staat in de statuskolom.
+
 ## 0.2.6 — bugfix, geen nieuwe features
 
 | # | Werk | Code | Grootte | Status |
@@ -293,12 +299,12 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 | 34 | `--json` voor info, list, sweep, tdr, cal show | N4 | S | gedaan 2026-11-10 |
 | 35 | Poortverlenging / elektrische vertraging op de host | N5 | S | gedaan 2026-11-10 (één vertraging voor poort 1: S11 tweemaal, S21 eenmaal) |
 | 36 | Referenties bewaren met de sessie (besluit 8) | N12 | M | gedaan 2026-11-10 |
-| 37 | Host-middeling via `valuesPerFrequency` | N6, F3 | S/M | |
+| 37 | Host-middeling via `valuesPerFrequency` | N6, F3 | S/M | open: eerst met het apparaat vaststellen hoe de records bij `valuesPerFrequency > 1` binnenkomen; de nep-LiteVNA kan het daarna nabootsen |
 | 38 | Sneltoetsen, auto-connect, batterij verversen, TDR-marker nudgen | N7–N9, N11 | S | gedaan 2026-11-10 (auto-connect als optie, standaard uit) |
-| 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | |
+| 39 | Smith-chart hover-uitlezing en frequentielabels | N10 | M | open: tekenwerk dat alleen op het scherm te beoordelen is; samen doen |
 | 40 | CSV met afgeleide kolommen; `.s1p`-export; Touchstone v2 | N15, N16 | S | gedaan 2026-11-10: `.s1p` en vier CSV-kolommen erbij. Niet gedaan: Touchstone v2 lezen (pas doen als er een bestand is dat het nodig heeft) |
 | 41 | `cal` als subcommando's met completions | N17 | M | gedaan 2026-11-10: de actie is een gevalideerde keuzelijst met uitleg per waarde (zelfde schrijfwijze als voorheen, geen echte subcommando's), `completions`, genegeerde opties zijn een fout, stil einde bij een gesloten pijp |
-| 42 | Kit-bestanden lezen, load serie-L | N14 | S/M | |
+| 42 | Kit-bestanden lezen, load serie-L | N14 | S/M | open: welk formaat? Een voorbeeldbestand nodig |
 | 43 | Tekst-`scan` voor NanoVNA-H/H4 zonder `scan_bin` | N13 | M | alleen met hardware |
 | 44 | 12-term 2-poorts via omdraaien van de DUT | N18 | L | alleen met hardware |
 
@@ -313,6 +319,6 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 
 | # | Werk | Code | Status |
 |---|------|------|--------|
-| 45 | FIFO-timeouts bij average 80 en lage shell-bandbreedte | B18 | |
-| 46 | Stale records na een configuratiewijziging (zelfde aantal punten, ander raster) | B20 | |
+| 45 | FIFO-timeouts bij average 80 en lage shell-bandbreedte | B18 | open: `vna-cli sweep --average 80 --points 1001` op de LiteVNA; lukt dat, of komt er "timeout while reading"? |
+| 46 | Stale records na een configuratiewijziging (zelfde aantal punten, ander raster) | B20 | open: de test `records_in_flight_after_the_clear…` legt het huidige gedrag vast; of de records van vóór de wijziging zijn moet de hardware zeggen |
 | 47 | Windows met een apparaat (`list`, `info`, `sweep`, `screenshot --trace`) | — | geen tester |

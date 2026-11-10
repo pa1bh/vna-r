@@ -138,12 +138,16 @@ device; `vna-cli release` does that on its own.
   open/short asymmetry of the kit from a cable measured with open and short at the far end (as a
   capacitance or an offset delay) and **Apply to kit** puts it into the calibration.
   `vna-cli cal check` reports what a calibration leaves over on a cable measurement.
+  **Port extension** moves the reference plane by a delay, for an adapter or fixture behind
+  the calibration plane.
 - **Segments.** Extra frequency ranges swept after the first and shown as one trace, each with its
   own calibration file if you like, for example 100 kHz–50 MHz with an HF calibration next to
   50 MHz–6.3 GHz with a wide one. CLI: `--segment 100k:50M:1001@hf.cal.json`.
 - **Markers.** Four markers with a table of frequency, S11, Z, SWR and S21 and the difference between
   the first two; arrow keys nudge the active one (shift: ten points), buttons jump to minimum SWR,
-  maximum S21 or minimum S21.
+  maximum S21 or minimum S21. Markers keep their frequency when the sweep changes.
+- **Keys.** Space is Run or Stop, `S` a single sweep, `1`–`4` choose the marker, `H` holds a
+  reference, `G` switches the gate, `T` switches between frequency and time domain.
 - **References and Δ.** Up to four held traces with name and colour; the difference trace is drawn
   in the unit of each view (dB, degrees, SWR, ohm, nanoseconds). References are kept between
   sessions; any .s1p/.s2p file can be opened as a reference too.
@@ -153,7 +157,8 @@ device; `vna-cli release` does that on its own.
   **Gate** that keeps or removes (*notch*) the reflections between two distances; the frequency
   view then shows the gated S11. CLI: `vna-cli sweep --gate 0.9:1.2`, `vna-cli tdr --from file.s2p`.
 - **Files.** Touchstone .s1p/.s2p export and import (RI/MA/DB, Hz to GHz, including files written by
-  the analyser itself), as the live trace or as a reference; device screenshots as PNG.
+  the analyser itself), as the live trace or as a reference; device screenshots as PNG. The CLI
+  also writes CSV (with impedance and group delay) and, with `--json`, machine-readable output.
 - **Developer tools.** Off by default; **View ▸ Developer tools** adds a log window and
   **Copy diagnostics** for bug reports.
 

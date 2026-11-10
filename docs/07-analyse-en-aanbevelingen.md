@@ -1,5 +1,11 @@
 # Analyse en aanbevelingen, november 2026
 
+> **Vervolg.** Dit rapport beschrijft de toestand van 0.2.5. Wat er daarna mee gedaan is
+> staat in de werklijst onderaan [docs/05-roadmap.md](05-roadmap.md); hoe je het
+> controleert in [docs/08-qc-procedure.md](08-qc-procedure.md). Eén advies hieronder
+> bleek onjuist: de handleiding lokaal openen (F7, besluit 6) lost "een correctie zonder
+> release" niet op, zie de open vragen in docs/08.
+
 Stand: versie 0.2.5, commit 94fe525, 10 november 2026. Een brede doorlichting van het
 project op UX/UI, bugs, functionaliteit, nieuwe features, veiligheid, duurzaamheid van de
 code en overbodige ballast. Bedoeld als grondstof voor een werklijst; de nummers (U1, B3,
