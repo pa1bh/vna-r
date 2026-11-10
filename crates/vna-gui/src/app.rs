@@ -7,8 +7,9 @@ use std::time::{Duration, Instant};
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
 use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
+use litevna::device::plan_segments;
 use litevna::discovery::{self, PortCandidate};
-use litevna::freq::{format_hz, parse_hz};
+use litevna::freq::{format_hz, nearest_index, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
 use litevna::touchstone::{read_touchstone_file_full, write_s2p};
 use litevna::traces::{self, db, impedance, swr, Param, TraceKind};
@@ -700,22 +701,21 @@ impl App {
                 }
             }
         }
-        plan.sort_by_key(|(c, _)| c.start_hz);
-        for w in plan.windows(2) {
-            // Touching (stop == next start) is fine: one shared point, deduplicated on export.
-            if w[1].0.start_hz < w[0].0.stop_hz() {
-                self.sweep_error = Some(format!(
-                    "segments overlap: {}–{} and {}–{}",
-                    format_hz(w[0].0.start_hz),
-                    format_hz(w[0].0.stop_hz()),
-                    format_hz(w[1].0.start_hz),
-                    format_hz(w[1].0.stop_hz())
-                ));
-                return None;
+        // Sorted by start; touching (stop == next start) is fine, overlap is not.
+        match plan_segments(plan) {
+            Ok(plan) => {
+                self.sweep_error = None;
+                Some(plan)
+            }
+            Err(litevna::Error::InvalidArgument(msg)) => {
+                self.sweep_error = Some(msg);
+                None
+            }
+            Err(e) => {
+                self.sweep_error = Some(e.to_string());
+                None
             }
         }
-        self.sweep_error = None;
-        Some(plan)
     }
 
     fn start_sweep(&mut self, continuous: bool) {
@@ -739,16 +739,7 @@ impl App {
     /// (TDR needs a uniform grid). The whole sweep when there is one segment.
     fn tdr_range(&self) -> std::ops::Range<usize> {
         let total = self.shown.as_ref().map_or(0, |s| s.freqs_hz.len());
-        let ranges = SweepResult::segment_ranges(&self.last_plan);
-        if ranges.len() <= 1 || ranges.last().map_or(0, |r| r.end) != total {
-            return 0..total;
-        }
-        ranges
-            .into_iter()
-            .zip(&self.last_plan)
-            .max_by_key(|(_, c)| c.stop_hz() - c.start_hz)
-            .map(|(r, _)| r)
-            .unwrap_or(0..total)
+        SweepResult::widest_segment(&self.last_plan, total)
     }
 
     /// Correct one segment with its own calibration file (loaded on first use).
@@ -938,11 +929,6 @@ impl App {
         }
     }
 
-    /// Round-trip seconds for a one-way distance at the current VF.
-    fn gate_time(&self, d_m: f64) -> f64 {
-        2.0 * d_m / (C0 * self.tdr_vf)
-    }
-
     /// Gated S11 of the shown sweep (cached), with the unreliable band-edge width in Hz.
     fn gated_s11(&mut self) -> Option<(Vec<Complex64>, f64)> {
         if !self.gate_on {
@@ -964,11 +950,8 @@ impl App {
                 velocity_factor: self.tdr_vf,
                 fft_size: 0,
             };
-            let g = Gate {
-                start_s: self.gate_time(self.gate_start_m),
-                stop_s: self.gate_time(self.gate_stop_m),
-                kind: if self.gate_notch { GateKind::Notch } else { GateKind::BandPass },
-            };
+            let kind = if self.gate_notch { GateKind::Notch } else { GateKind::BandPass };
+            let g = Gate::from_distance(self.gate_start_m, self.gate_stop_m, self.tdr_vf, kind);
             match gate(&sweep.freqs_hz[range.clone()], &sweep.s11[range.clone()], &cfg, &g) {
                 Ok(r) => {
                     // Splice the gated segment back into the full sweep.
@@ -2840,15 +2823,6 @@ fn display_server() -> &'static str {
         Some(v) if !v.is_empty() => ", on Wayland",
         _ => ", on X11",
     }
-}
-
-fn nearest_index(freqs: &[u64], f: u64) -> usize {
-    freqs
-        .iter()
-        .enumerate()
-        .min_by_key(|(_, x)| x.abs_diff(f))
-        .map(|(i, _)| i)
-        .unwrap_or(0)
 }
 
 /// A frequency for a file name: `50kHz`, `14.2MHz`, `6.3GHz` (no space, no trailing zeros).

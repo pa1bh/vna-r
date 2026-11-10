@@ -40,6 +40,10 @@ things that are not backwards compatible, such as the format of the calibration 
   of markers or plots no longer resets every setting.
 
 ### Development
+- Rules that the CLI and the GUI each had a copy of now live in the library with tests:
+  ordering and overlap check of segments (`plan_segments`, `SweepConfig::parse_segment`),
+  the segment TDR works on (`SweepResult::widest_segment`), distance to round-trip time
+  (`Gate::from_distance`), nearest frequency point, the complex average of sweeps.
 - The drivers can be tested without hardware: `LiteVna::from_port` and
   `NanoVnaShell::from_port` take any serial port, and the tests drive them with a fake
   LiteVNA and a fake NanoVNA-F (sweep loop, checksum and duplicate accounting, chunked

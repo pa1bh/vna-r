@@ -7,11 +7,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use clap::{Args, Parser, Subcommand};
 use litevna::calibration::{plausibility_warning, CalKit, Calibration, CalibrationSet, OpenModel, Standard};
+use litevna::device::plan_segments;
 use litevna::discovery;
 use litevna::discovery::Kind;
 use litevna::freq::{format_hz, parse_hz};
 use litevna::protocol::{reg, Channel};
-use litevna::timedomain::{gate as compute_gate, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
+use litevna::timedomain::{gate as compute_gate, parse_distance_range, tdr as compute_tdr, Gate, GateKind, TdrConfig, Window};
 use litevna::touchstone::{write_csv, write_s2p};
 use litevna::traces::{db, swr};
 use litevna::{SweepConfig, SweepResult, Vna};
@@ -564,29 +565,11 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
             Some((g, c)) => (g, Some(PathBuf::from(c))),
             None => (spec.as_str(), None),
         };
-        let parts: Vec<&str> = grid_part.split(':').collect();
-        if parts.len() != 3 {
-            bail!("--segment wants START:STOP:POINTS[@cal.json], got {spec:?}");
-        }
-        let cfg = SweepConfig::linear(
-            parse_hz(parts[0])?,
-            parse_hz(parts[1])?,
-            parts[2].trim().parse().context("segment points")?,
-        )?;
+        let cfg =
+            SweepConfig::parse_segment(grid_part).with_context(|| format!("--segment wants START:STOP:POINTS[@cal.json], got {spec:?}"))?;
         plan.push((cfg, cal_part));
     }
-    plan.sort_by_key(|(c, _)| c.start_hz);
-    for w in plan.windows(2) {
-        if w[1].0.start_hz < w[0].0.stop_hz() {
-            bail!(
-                "segments overlap: {}–{} and {}–{}",
-                format_hz(w[0].0.start_hz),
-                format_hz(w[0].0.stop_hz()),
-                format_hz(w[1].0.start_hz),
-                format_hz(w[1].0.stop_hz())
-            );
-        }
-    }
+    let plan = plan_segments(plan)?;
     // Solve the calibrations first so a bad file fails before touching the device.
     let mut cals: Vec<Option<Calibration>> = Vec::new();
     for (cfg, path) in &plan {
@@ -730,16 +713,9 @@ fn sweep(
     };
 
     if let Some(spec) = &gate_arg {
-        let (a, b) = spec
-            .split_once(':')
-            .with_context(|| format!("--gate wants START:STOP in metres, got {spec:?}"))?;
-        let (start_m, stop_m): (f64, f64) = (a.trim().parse().context("gate start")?, b.trim().parse().context("gate stop")?);
-        let to_s = |d: f64| 2.0 * d / (litevna::timedomain::C0 * vf);
-        let g = Gate {
-            start_s: to_s(start_m),
-            stop_s: to_s(stop_m),
-            kind: if gate_notch { GateKind::Notch } else { GateKind::BandPass },
-        };
+        let (start_m, stop_m) = parse_distance_range(spec).context("--gate")?;
+        let kind = if gate_notch { GateKind::Notch } else { GateKind::BandPass };
+        let g = Gate::from_distance(start_m, stop_m, vf, kind);
         let tcfg = TdrConfig {
             velocity_factor: vf,
             ..Default::default()

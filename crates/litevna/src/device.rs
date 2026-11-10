@@ -61,6 +61,20 @@ impl SweepConfig {
         })
     }
 
+    /// Parse one segment written as `START:STOP:POINTS`, e.g. `100k:50M:1001`
+    /// (frequencies as [`crate::freq::parse_hz`] takes them).
+    pub fn parse_segment(spec: &str) -> Result<Self> {
+        let parts: Vec<&str> = spec.split(':').collect();
+        let [start, stop, points] = parts.as_slice() else {
+            return Err(Error::InvalidArgument(format!("a segment is START:STOP:POINTS, got {spec:?}")));
+        };
+        let points: u16 = points
+            .trim()
+            .parse()
+            .map_err(|_| Error::InvalidArgument(format!("segment {spec:?}: {points:?} is not a number of points")))?;
+        SweepConfig::linear(crate::freq::parse_hz(start)?, crate::freq::parse_hz(stop)?, points)
+    }
+
     /// Rebuild a config from a uniformly spaced frequency list (e.g. from a
     /// saved calibration).
     pub fn from_frequencies(freqs: &[u64]) -> Result<Self> {
@@ -94,6 +108,27 @@ impl SweepConfig {
     pub fn frequencies(&self) -> Vec<u64> {
         (0..self.points as u64).map(|i| self.start_hz + i * self.step_hz).collect()
     }
+}
+
+/// Put the segments of a multi-segment sweep in sweep order (by start
+/// frequency) and check that none overlaps the next. Segments may touch: the
+/// shared point is measured twice and written once on export. `T` is whatever
+/// travels with a segment, such as its calibration file.
+pub fn plan_segments<T>(mut segments: Vec<(SweepConfig, T)>) -> Result<Vec<(SweepConfig, T)>> {
+    segments.sort_by_key(|(c, _)| c.start_hz);
+    for w in segments.windows(2) {
+        let (a, b) = (&w[0].0, &w[1].0);
+        if b.start_hz < a.stop_hz() {
+            return Err(Error::InvalidArgument(format!(
+                "segments overlap: {}–{} and {}–{}",
+                crate::freq::format_hz(a.start_hz),
+                crate::freq::format_hz(a.stop_hz()),
+                crate::freq::format_hz(b.start_hz),
+                crate::freq::format_hz(b.stop_hz())
+            )));
+        }
+    }
+    Ok(segments)
 }
 
 /// What a sweep calls while it runs: after every block of data, with the
@@ -206,6 +241,24 @@ impl SweepResult {
             duplicates: self.duplicates,
             elapsed: self.elapsed,
         }
+    }
+
+    /// Point range of the segment with the widest span, of a sweep of
+    /// `total_points` made of `cfgs` in sweep order: the part TDR and gating
+    /// work on, because they need one uniform grid and resolution goes with
+    /// span. The whole sweep when there is one segment, or when `cfgs` does
+    /// not describe a sweep of this size (a file, an older plan).
+    pub fn widest_segment(cfgs: &[SweepConfig], total_points: usize) -> std::ops::Range<usize> {
+        let ranges = Self::segment_ranges(cfgs);
+        if ranges.len() <= 1 || ranges.last().map_or(0, |r| r.end) != total_points {
+            return 0..total_points;
+        }
+        ranges
+            .into_iter()
+            .zip(cfgs)
+            .max_by_key(|(_, c)| c.stop_hz() - c.start_hz)
+            .map(|(r, _)| r)
+            .unwrap_or(0..total_points)
     }
 
     /// Point ranges of the segments that make up this sweep, given the
@@ -1099,6 +1152,28 @@ mod tests {
         let back = SweepConfig::from_frequencies(&c.frequencies()).unwrap();
         assert_eq!((back.start_hz, back.step_hz, back.points), (c.start_hz, c.step_hz, c.points));
         assert!(SweepConfig::from_frequencies(&[1, 2, 4]).is_err());
+    }
+
+    #[test]
+    fn segments_are_parsed_ordered_and_checked() {
+        let hf = SweepConfig::parse_segment("100k:50M:1001").unwrap();
+        assert_eq!((hf.start_hz, hf.points), (100_000, 1001));
+        let wide = SweepConfig::parse_segment(" 50M : 6.3G : 501 ").unwrap();
+        for bad in ["1M:30M", "1M:30M:x", "1M:30M:201:9", "30M:1M:201", "abc:30M:201"] {
+            assert!(SweepConfig::parse_segment(bad).is_err(), "{bad}");
+        }
+        // Given in the wrong order: sorted by start, and what travels along stays with its segment.
+        let plan = plan_segments(vec![(wide, "wide"), (hf, "hf")]).unwrap();
+        assert_eq!(plan.iter().map(|(_, n)| *n).collect::<Vec<_>>(), ["hf", "wide"]);
+        // Touching is fine, overlapping is not.
+        let overlapping = SweepConfig::parse_segment("40M:1G:101").unwrap();
+        let err = plan_segments(vec![(hf, ()), (overlapping, ())]).unwrap_err().to_string();
+        assert!(err.contains("segments overlap: 100.000 kHz"), "{err}");
+        // TDR takes the widest segment; a plan that does not fit the data means the whole sweep.
+        assert_eq!(SweepResult::widest_segment(&[hf, wide], 1502), 1001..1502);
+        assert_eq!(SweepResult::widest_segment(&[hf], 1001), 0..1001);
+        assert_eq!(SweepResult::widest_segment(&[hf, wide], 300), 0..300);
+        assert_eq!(SweepResult::widest_segment(&[], 300), 0..300);
     }
 
     #[test]

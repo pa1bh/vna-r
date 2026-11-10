@@ -34,6 +34,16 @@ pub fn parse_hz(text: &str) -> Result<u64> {
     Ok(hz.round() as u64)
 }
 
+/// Index of the frequency in `freqs_hz` closest to `f_hz` (0 for an empty list).
+pub fn nearest_index(freqs_hz: &[u64], f_hz: u64) -> usize {
+    freqs_hz
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, x)| x.abs_diff(f_hz))
+        .map(|(i, _)| i)
+        .unwrap_or(0)
+}
+
 /// Format Hz compactly, e.g. `14.200 MHz`.
 pub fn format_hz(hz: u64) -> String {
     let f = hz as f64;
@@ -51,6 +61,16 @@ pub fn format_hz(hz: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nearest_index_picks_the_closest_point() {
+        let f = [1_000_000u64, 2_000_000, 3_000_000];
+        assert_eq!(nearest_index(&f, 0), 0);
+        assert_eq!(nearest_index(&f, 1_400_000), 0);
+        assert_eq!(nearest_index(&f, 1_600_000), 1);
+        assert_eq!(nearest_index(&f, 9_000_000), 2);
+        assert_eq!(nearest_index(&[], 5), 0);
+    }
 
     #[test]
     fn rejects_non_finite_and_absurd_values() {

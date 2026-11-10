@@ -478,3 +478,30 @@ bestand van een ander programma dat een frequentie dubbel bevat (aansluitende se
 wordt nu geweigerd; vna-r zelf schrijft zulke bestanden niet. Als je zo'n bestand
 tegenkomt dat je wel wilt lezen, is dat het moment om hierover te beslissen.
 
+## Punt 23 — Gedeelde regels in de library (D3)
+
+**Veranderd.** Segmentplanning, breedste segment, afstand→tijd, dichtstbijzijnde punt en
+middeling staan in `litevna` met tests; CLI en GUI roepen ze aan. Gedrag hoort gelijk te
+zijn.
+
+**Zonder apparaat.**
+```bash
+cargo test -p litevna segments_are_parsed distances_convert nearest_index
+cargo run -q --release -p vna-cli -- sweep --segment 1M:30M:51 --segment 20M:50M:51 2>&1 | tail -2
+cargo run -q --release -p vna-cli -- sweep --segment 1M:30M 2>&1 | tail -3
+cargo run -q --release -p vna-cli -- tdr --from cal/sweep.s2p --csv - | head -2
+```
+Verwacht: tests groen; de eerste sweep faalt met "segments overlap: 1.000 MHz–30.000 MHz
+and 20.000 MHz–50.000 MHz" (vóór de poort geopend wordt), de tweede met "--segment wants
+START:STOP:POINTS[@cal.json]".
+
+**GUI zonder apparaat.** Segments ▸ + segment met een start onder de Stop van het eerste
+segment en Apply sweep (vereist een verbinding; zonder apparaat is de knop uit): met
+apparaat verschijnt in rood "segments overlap: …" onder de sweepvelden.
+
+**Met apparaat.** Twee segmenten (bijv. 1 – 30 MHz/201 en 30 MHz – 1 GHz/401), Run, TDR:
+de regel "TDR and gate use the widest segment: 30.000 MHz → 1.000000 GHz" staat onder
+de TDR-instellingen; Gate aan met 0,2 – 0,7 m: gedrag als in 0.2.5. CLI:
+`vna-cli sweep --start 50k --stop 3G --points 1001 --gate 0.2:0.7 --vf 0.7` meldt dezelfde
+gate als voorheen.
+

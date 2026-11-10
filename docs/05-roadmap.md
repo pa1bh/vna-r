@@ -274,7 +274,7 @@ Grootte als hierboven: S = een avond, M = een paar sessies, L = meerdere dagen.
 |---|------|------|---------|--------|
 | 21 | `SerialLink` met injecteerbare nep-poort; tests voor `LiteVna::sweep`, `scan_bin`, `command`, screenshots | D1, D6 | M/L | gedaan 2026-11-10: `from_port` + `fakeport.rs`, 29 drivertests, resync na mislukte sweep (B19). Niet gedaan: één gedeelde `SerialLink` (D6); beide drivers houden hun eigen leeslus |
 | 22 | Annuleren en voortgang: `sweep_with(cfg, callback)` per chunk; worker en Stop erdoorheen (besluit 5) | F2, N2, U4 | M | gedaan 2026-11-10 (library getest met de nep-apparaten; de worker zelf alleen met hardware te controleren) |
-| 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | |
+| 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | gedaan 2026-11-10, op de per-segment-correctie na: die is in de GUI verweven met het laden en cachen van bestanden en verhuist mee met punt 24 |
 | 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | |
 | 25 | Versieveld in bewaarde instellingen en calibratie-JSON; `Vec` in plaats van vaste arrays | D4 | S | gedaan 2026-11-10 (0.2.5-instellingen blijven leesbaar, getest) |
 | 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | |

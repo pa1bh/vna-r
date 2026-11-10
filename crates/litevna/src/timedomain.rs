@@ -335,6 +335,24 @@ impl GateKind {
     }
 }
 
+/// Round-trip time (s) of a reflection at one-way distance `distance_m` on a
+/// line with this velocity factor; the inverse of what [`TdrResult::distance_m`] shows.
+pub fn distance_to_time(distance_m: f64, velocity_factor: f64) -> f64 {
+    2.0 * distance_m / (C0 * velocity_factor)
+}
+
+/// Parse a distance range written as `START:STOP` in metres, e.g. `0.9:1.2`
+/// or `-0.1:0.5` (the command line's `--gate`).
+pub fn parse_distance_range(spec: &str) -> Result<(f64, f64)> {
+    let bad = || Error::InvalidArgument(format!("a distance range is START:STOP in metres, got {spec:?}"));
+    let (a, b) = spec.split_once(':').ok_or_else(bad)?;
+    let (start, stop): (f64, f64) = (a.trim().parse().map_err(|_| bad())?, b.trim().parse().map_err(|_| bad())?);
+    if !start.is_finite() || !stop.is_finite() {
+        return Err(bad());
+    }
+    Ok((start, stop))
+}
+
 /// A time gate on the band-pass impulse response. Times are round-trip,
 /// seconds, like [`TdrResult::time_s`]; `start_s` may be negative to include
 /// the reference plane itself. The flanks are raised-cosine, each
@@ -345,6 +363,18 @@ pub struct Gate {
     pub start_s: f64,
     pub stop_s: f64,
     pub kind: GateKind,
+}
+
+impl Gate {
+    /// A gate between two one-way distances (m) on a line with this velocity
+    /// factor, as the TDR axis shows them.
+    pub fn from_distance(start_m: f64, stop_m: f64, velocity_factor: f64, kind: GateKind) -> Gate {
+        Gate {
+            start_s: distance_to_time(start_m, velocity_factor),
+            stop_s: distance_to_time(stop_m, velocity_factor),
+            kind,
+        }
+    }
 }
 
 /// Width of each gate flank in units of the TDR resolution (1/span).
@@ -455,6 +485,20 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn distances_convert_to_round_trip_time() {
+        // 1 m at VF 0.70: 2 m of travel at 0.7·c = 9.53 ns.
+        assert!((distance_to_time(1.0, 0.70) - 9.5301e-9).abs() < 1e-12);
+        let g = Gate::from_distance(-0.1, 0.5, 0.66, GateKind::Notch);
+        assert!(g.start_s < 0.0 && g.stop_s > 0.0);
+        assert!((g.stop_s / g.start_s + 5.0).abs() < 1e-9);
+        assert_eq!(parse_distance_range("0.9:1.2").unwrap(), (0.9, 1.2));
+        assert_eq!(parse_distance_range(" -0.1 : 0.5 ").unwrap(), (-0.1, 0.5));
+        for bad in ["0.9", "a:b", "0.9:", "nan:1"] {
+            assert!(parse_distance_range(bad).is_err(), "{bad}");
+        }
+    }
 
     #[test]
     fn non_increasing_grid_is_an_error_not_a_panic() {
