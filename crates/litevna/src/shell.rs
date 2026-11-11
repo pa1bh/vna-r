@@ -48,6 +48,9 @@ pub mod mask {
 // Short under `cargo test`: the fake port answers at once, and a test of a
 // device that stays silent should not take seconds.
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(if cfg!(test) { 150 } else { 3000 });
+/// Longest time `sync` keeps dropping leftover output; it normally stops
+/// after one quiet port timeout (100 ms).
+const DRAIN_LIMIT: Duration = Duration::from_millis(1000);
 /// Per point: the device needs ~9 ms for S11 + S21 at the default bandwidth;
 /// narrower bandwidths are slower, so be generous.
 const PER_POINT_BUDGET: Duration = Duration::from_millis(60);
@@ -237,7 +240,63 @@ impl NanoVnaShell {
             Error::Timeout { .. } => Error::protocol("no NanoVNA shell prompt (`ch> `) on this port"),
             e => e,
         })?;
+        // The prompt just read can be an old one: on Linux, output the device
+        // produced before the port was open arrives after the buffer was
+        // cleared, and the answer to our return is then still under way.
+        self.drain(DRAIN_LIMIT)
+    }
+
+    /// Read and drop input until the line has been quiet for one port
+    /// timeout, for at most `limit`.
+    fn drain(&mut self, limit: Duration) -> Result<()> {
+        let deadline = Instant::now() + limit;
+        let mut buf = [0u8; 4096];
+        while Instant::now() < deadline {
+            match self.port.read(&mut buf) {
+                Ok(n) if n > 0 => {}
+                Ok(_) => break,
+                Err(e) if e.kind() == io::ErrorKind::TimedOut => break,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e.into()),
+            }
+        }
         Ok(())
+    }
+
+    /// Read up to and including the echo of `cmd`. Anything in front of it is
+    /// output from before the command (a late prompt, for example) and is
+    /// dropped, so the reply that follows starts where it should.
+    fn read_echo(&mut self, cmd: &str, timeout: Duration) -> Result<()> {
+        let echo = [cmd.as_bytes(), b"\r\n"].concat();
+        let deadline = Instant::now() + timeout;
+        let mut seen = Vec::new();
+        // One byte at a time: what follows the echo can be binary and must stay in the port.
+        let mut byte = [0u8; 1];
+        loop {
+            match self.port.read(&mut byte) {
+                Ok(n) if n > 0 => {
+                    seen.push(byte[0]);
+                    if seen.ends_with(&echo) {
+                        if self.trace && seen.len() > echo.len() {
+                            let skipped = &seen[..seen.len() - echo.len()];
+                            eprintln!("rx: skipped {:?} in front of the echo", String::from_utf8_lossy(skipped));
+                        }
+                        return Ok(());
+                    }
+                }
+                Ok(_) => {}
+                Err(e) if matches!(e.kind(), io::ErrorKind::TimedOut | io::ErrorKind::Interrupted) => {}
+                Err(e) => return Err(e.into()),
+            }
+            if Instant::now() >= deadline {
+                let name = cmd.split_whitespace().next().unwrap_or(cmd);
+                seen.truncate(80);
+                return Err(Error::protocol(format!(
+                    "{name}: unexpected echo {:?}",
+                    String::from_utf8_lossy(&seen)
+                )));
+            }
+        }
     }
 
     fn read_until_prompt(&mut self, timeout: Duration) -> Result<Vec<u8>> {
@@ -254,6 +313,41 @@ impl NanoVnaShell {
                 }
                 Ok(_) => {}
                 Err(e) if matches!(e.kind(), io::ErrorKind::TimedOut | io::ErrorKind::Interrupted) => {}
+                Err(e) => return Err(e.into()),
+            }
+            if Instant::now() >= deadline {
+                return Err(Error::Timeout {
+                    expected: PROMPT.len(),
+                    got: out.len(),
+                });
+            }
+        }
+    }
+
+    /// [`NanoVnaShell::read_until_prompt`] for a text command: the reply ends
+    /// at a prompt that comes after the echo. A prompt before the echo is
+    /// left over from earlier; reading goes on past it. A shell that does not
+    /// echo is still served: its prompt counts once the line has gone quiet.
+    fn read_reply(&mut self, echo: &[u8], timeout: Duration) -> Result<Vec<u8>> {
+        let deadline = Instant::now() + timeout;
+        let mut out = Vec::new();
+        let mut buf = [0u8; 4096];
+        let echoed = |out: &[u8]| out.windows(echo.len()).any(|w| w == echo);
+        loop {
+            match self.port.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    out.extend_from_slice(&buf[..n]);
+                    if out.ends_with(PROMPT) && echoed(&out) {
+                        return Ok(out);
+                    }
+                }
+                Ok(_) => {}
+                Err(e) if e.kind() == io::ErrorKind::TimedOut => {
+                    if out.ends_with(PROMPT) {
+                        return Ok(out);
+                    }
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
                 Err(e) => return Err(e.into()),
             }
             if Instant::now() >= deadline {
@@ -298,13 +392,15 @@ impl NanoVnaShell {
     /// Run a text command and return its reply without the echo and the prompt.
     pub fn command(&mut self, cmd: &str, timeout: Duration) -> Result<String> {
         self.send_line(cmd)?;
-        let raw = self.read_until_prompt(timeout)?;
+        // The shell echoes the command line first. A prompt in front of that
+        // echo is not the end of this reply, see `read_reply`.
+        let echo = format!("{}\r\n", cmd.trim());
+        let raw = self.read_reply(echo.as_bytes(), timeout)?;
         let text = String::from_utf8_lossy(&raw);
         let body = text.strip_suffix("ch> ").unwrap_or(&text);
-        // The shell echoes the command line first.
-        let body = match body.split_once("\r\n") {
-            Some((first, rest)) if first.trim() == cmd.trim() => rest,
-            _ => body,
+        let body = match body.find(&echo) {
+            Some(at) => &body[at + echo.len()..],
+            None => body,
         };
         let body = body.trim_end_matches(['\r', '\n']).to_string();
         if self.trace {
@@ -389,15 +485,7 @@ impl NanoVnaShell {
         let cmd = format!("scan_bin {} {} {} {}", cfg.start_hz, cfg.stop_hz(), cfg.points, m);
         self.send_line(&cmd)?;
         let timeout = (PER_POINT_BUDGET * cfg.points as u32).max(MIN_SCAN_TIMEOUT);
-        // Echo line.
-        let mut echo = vec![0u8; cmd.len() + 2];
-        self.read_exact_timeout(&mut echo, COMMAND_TIMEOUT)?;
-        if &echo[..cmd.len()] != cmd.as_bytes() {
-            return Err(Error::protocol(format!(
-                "scan_bin: unexpected echo {:?}",
-                String::from_utf8_lossy(&echo)
-            )));
-        }
+        self.read_echo(&cmd, COMMAND_TIMEOUT)?;
         let mut header = [0u8; 4];
         self.read_exact_timeout(&mut header, timeout)?;
         let (got_mask, got_points) = parse_scan_header(&header);
@@ -475,8 +563,7 @@ impl NanoVnaShell {
     pub fn screenshot(&mut self) -> Result<Screenshot> {
         let model = self.info().map(|i| i.model).unwrap_or_default();
         self.send_line("capture")?;
-        let mut echo = [0u8; 9]; // "capture\r\n"
-        self.read_exact_timeout(&mut echo, COMMAND_TIMEOUT)?;
+        self.read_echo("capture", COMMAND_TIMEOUT)?;
         let (width, height, data) = match screen_size_for_model(&model) {
             Some((w, h)) => {
                 let mut data = vec![0u8; w as usize * h as usize * 2];
@@ -553,6 +640,9 @@ mod tests {
         garbled_echo: bool,
         /// Size of the `capture` reply in bytes.
         capture_bytes: usize,
+        /// Output from before the next command that reaches the host only now,
+        /// in front of that command's echo.
+        leftover: Option<&'static [u8]>,
     }
 
     impl FakeShell {
@@ -568,12 +658,16 @@ mod tests {
                 scan_error: None,
                 garbled_echo: false,
                 capture_bytes: 800 * 480 * 2,
+                leftover: None,
             };
             (dev, commands)
         }
 
         fn reply(&mut self, cmd: &str, rx: &mut VecDeque<u8>) {
             let words: Vec<&str> = cmd.split_whitespace().collect();
+            if let Some(old) = self.leftover.take() {
+                rx.extend(old);
+            }
             let mut echo = cmd.as_bytes().to_vec();
             if self.garbled_echo {
                 echo.fill(b'x');
@@ -792,6 +886,37 @@ mod tests {
         let err = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap_err();
         assert!(err.to_string().contains("unexpected echo"), "{err}");
         sh.restore_on_drop = false;
+    }
+
+    /// Seen on Linux with a NanoVNA-F: a prompt from before the command arrived
+    /// after the input was cleared and ended up in front of the echo.
+    #[test]
+    fn leftover_output_before_the_echo_is_skipped() {
+        let (mut dev, commands) = FakeShell::new();
+        dev.leftover = Some(b"\nch> ");
+        let (mut sh, _) = shell(dev);
+        // The first command of a sweep is the text query `sweep`.
+        let r = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap();
+        assert_eq!(r.freqs_hz.len(), 5);
+        assert_eq!(sh.saved_sweep, Some((1_000_000, 30_000_000, 101)));
+        assert_eq!(commands.lock().unwrap()[0], "sweep");
+
+        // The same in front of a binary scan and in front of a screenshot.
+        let (mut dev, _) = FakeShell::new();
+        dev.leftover = Some(b"\r\nch> ");
+        let (mut sh, _) = shell(dev);
+        sh.saved_sweep = Some((1_000_000, 30_000_000, 101));
+        sh.saved_cal_apply = Some(false);
+        let r = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap();
+        assert_eq!(r.s21[0], Complex64::new(0.25, -(2_000_000f32 / 1e9) as f64));
+        let (mut dev, _) = FakeShell::new();
+        dev.leftover = Some(b"\r\nch> ");
+        let (mut sh, _) = shell(dev);
+        sh.info = Some(ShellInfo {
+            model: "NanoVNA-F 4.3".into(),
+            ..Default::default()
+        });
+        assert_eq!(sh.screenshot().unwrap().data.len(), 800 * 480 * 2);
     }
 
     #[test]

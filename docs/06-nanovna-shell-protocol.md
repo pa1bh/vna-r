@@ -29,7 +29,16 @@ geprobeerd; een ander product op dat id wordt overgeslagen.
 
 Elke regel eindigt op `\r`; het apparaat echoot de regel, antwoordt, en sluit af met
 `\r\nch> `. Een lege regel geeft alleen een prompt, wat vna-r gebruikt om te
-synchroniseren. `help` op deze firmware:
+synchroniseren.
+
+Op Linux (NixOS, 11 november 2026) kwam na het openen van de poort een oude prompt
+(`\nch> `) pas binnen nadat de invoerbuffer was geleegd, en stond daardoor vóór de echo
+van het eerstvolgende commando. vna-r wacht daarom na het synchroniseren tot de lijn
+stil is, en leest elk antwoord vanaf de echo van het eigen commando; wat ervoor staat
+wordt weggegooid (`--trace` meldt het als `skipped … in front of the echo`). Waar die
+oude prompt vandaan komt is niet vastgesteld.
+
+`help` op deze firmware:
 
 ```
 scan scan_bin data frequencies freq sweep power offset bandwidth saveconfig

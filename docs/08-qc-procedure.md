@@ -189,6 +189,27 @@ Daarna uitgebracht als **0.3.0-rc.2**.
 (blok 4) en de slotronde; ronde C (NanoVNA-F, vooral punt 11 en 22); ronde D (Linux,
 punt 15 en 16 op de laptop); Windows.
 
+### 11 november 2026: NanoVNA-F op NixOS en macOS (0.3.0-rc.2)
+
+PA1BH testte de NanoVNA-F met de GUI op de NixOS-laptop (flake, tag `v0.3.0-rc.2`) en
+meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap gemeld.
+
+6. *Through op NixOS gaf "median raw |S21| is -65.8 dB"* (50 MHz–1,2 GHz, 801 punten),
+   ook met een tweede kabel. Dat is het niveau van de lek zonder verbinding tussen de
+   poorten. Dezelfde calibratie op de Mac gaf geen waarschuwing, en een ruwe sweep daar
+   (`vna-cli sweep --start 50M --stop 1200M --points 11`, kabel tussen de poorten) geeft
+   S21 van −1,35 dB bij 50 MHz tot −2,86 dB bij 855 MHz met een gelijkmatig draaiende
+   fase. De meetcode heeft geen platformafhankelijke delen. **Oorzaak niet vastgesteld**;
+   nog te herhalen op NixOS.
+7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
+   30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
+   stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet
+   tegen. Nagebootst in een test met de nagebootste poort (zelfde foutmelding) en
+   gerepareerd: na het openen wachten tot de lijn stil is, en elk antwoord lezen vanaf de
+   echo van het eigen commando (ook bij `scan_bin` en `capture`). Tests 86 + 4, clippy en
+   fmt schoon. **Niet met het apparaat gecontroleerd**, op geen van beide platforms; of dit
+   met bevinding 6 samenhangt is onbekend.
+
 ---
 
 # 0.2.6 — bugfixes

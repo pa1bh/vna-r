@@ -12,6 +12,15 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Fixed
+
+- NanoVNA-F (text shell): a sweep could fail with `protocol error: unexpected sweep reply
+  "\nch> sweep…"`, seen on Linux right after opening the port. A prompt that the device
+  had sent earlier arrived after the input buffer was cleared and ended up in front of
+  the echo of the next command. Opening the port now waits until the line is quiet, and
+  every reply is read from the echo of its own command onward, for text commands, scans
+  and screenshots alike.
+
 ## [0.3.0-rc.2] - 2026-11-10
 
 Second release candidate. 0.3.0-rc.1 was taken through the first part of its test
