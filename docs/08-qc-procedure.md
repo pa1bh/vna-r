@@ -209,7 +209,9 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    Gerepareerd: vna-r doet vóór de eerste scan van een sessie een scan van twee punten
    op 10 en 20 MHz. Gecontroleerd op de Mac: zonder die scan −64 dB na 25 s eigen sweep
    (4 van 4 keer), met de nieuwe build −1,35 dB (4 van 4 keer, ook vanuit de verloren
-   toestand). Nog te bevestigen op NixOS en met een through-calibratie in de GUI.
+   toestand). Bevestigd door PA1BH op NixOS met de CLI (revisie `c02976e`): na de scan op
+   10 en 20 MHz geeft 50 MHz–1,2 GHz S21 van −1,35 tot −2,86 dB, gelijk aan de Mac. Nog
+   te doen: een through-calibratie in de GUI.
 7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
    30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
    stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet
