@@ -221,6 +221,12 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    dialogen waren op NixOS nooit geprobeerd. Gerepareerd in `flake.nix` (pakket en
    ontwikkelshell). **Niet gecontroleerd**: hier is geen Nix; de CI bouwt de flake maar
    opent geen dialoog.
+9. *Open: S11 in de GUI een keer "all over the place"* (NixOS, NanoVNA-F, revisie
+   `b09c7c7`, 12 november). Geen schermafbeelding, bereik en calibratietoestand onbekend.
+   Ruwe sweeps met de CLI direct daarna waren goed, op 1–30 MHz en op 50 MHz–1,2 GHz:
+   open −3,4 dB ∠0° (bovenin zakkend naar −8 dB), load −42 tot −25 dB, short −0,9 dB
+   ∠180°. Daarna werkte de GUI weer, zonder dat duidelijk is wat er veranderde. Oorzaak
+   onbekend; bij herhaling eerst een schermafbeelding met het linkerpaneel maken.
 7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
    30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
    stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet
