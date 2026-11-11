@@ -107,6 +107,29 @@ Gemeten eigenschappen:
   gecalibreerde `1,001`. Bit 8 heeft op de kalibratie van `scan` zelf geen blijvend
   effect: een latere `scan` zonder bit 8 geeft weer 1,00.
 
+### S21 valt weg na de eigen sweep van het apparaat
+
+Gemeten op 11 november 2026 (firmware 1.0.4, kabel tussen de poorten, `threshold`
+280 MHz), herhaalbaar:
+
+- Laat het apparaat zo'n 25 s zelf sweepen (1–30 MHz, 301 punten, alleen een
+  S11-trace op het scherm; de toestand waarin vna-r het achterlaat). Een `scan` of
+  `scan_bin` van 50 MHz tot 1,2 GHz geeft daarna S21 rond −65 dB in plaats van −1,4 tot
+  −2,9 dB. S11 is goed. Na 4 s eigen sweep gebeurt het nog niet.
+- Elke volgende scan die boven de drempel komt (50 MHz–1,2 GHz, 300 MHz–1,2 GHz,
+  290–299 MHz) blijft zo, ook met `pause` ervoor, ook met een S21-trace op het scherm,
+  ook zonder bit 8.
+- Eén scan die geheel onder de drempel blijft (1–30 MHz, 10–20 MHz, 100–200 MHz,
+  50–280 MHz) herstelt het, voor alle bereiken, tot het apparaat weer zelf sweept.
+- Onbekende commando's (`AT`, zoals ModemManager op Linux stuurt) hebben er geen
+  invloed op.
+
+Het restsignaal van −65 dB heeft bij 50–280 MHz een vaste fase die met de kabel
+meedraait: het is de through zelf, sterk verzwakt, geen ruis. Het mechanisme in de
+firmware is niet uitgezocht. vna-r doet daarom vóór de eerste scan van een sessie, en
+opnieuw na `restore`, een scan van twee punten op 10 en 20 MHz en gooit die weg
+(`NanoVnaShell::prime`).
+
 ## 5. Snelheid
 
 Bij bandbreedte 0 (1 kHz):

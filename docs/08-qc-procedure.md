@@ -199,8 +199,17 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    poorten. Dezelfde calibratie op de Mac gaf geen waarschuwing, en een ruwe sweep daar
    (`vna-cli sweep --start 50M --stop 1200M --points 11`, kabel tussen de poorten) geeft
    S21 van −1,35 dB bij 50 MHz tot −2,86 dB bij 855 MHz met een gelijkmatig draaiende
-   fase. De meetcode heeft geen platformafhankelijke delen. **Oorzaak niet vastgesteld**;
-   nog te herhalen op NixOS.
+   fase. De meetcode heeft geen platformafhankelijke delen.
+   *Oorzaak gevonden met het apparaat aan de Mac*: het ligt aan de firmware, niet aan
+   het platform, de kabel of ModemManager (gestopt en opnieuw ingeplugd: geen verschil;
+   `AT` sturen: geen effect). Nadat het apparaat een tijd zelf heeft gesweept, verliest
+   een scan die boven 280 MHz komt de through, en elke volgende ook; één scan onder
+   280 MHz herstelt het. Dat het op de Mac eerst goed ging was toeval: daar was de
+   eerste sweep kennelijk een lage. Details in `docs/06-nanovna-shell-protocol.md`.
+   Gerepareerd: vna-r doet vóór de eerste scan van een sessie een scan van twee punten
+   op 10 en 20 MHz. Gecontroleerd op de Mac: zonder die scan −64 dB na 25 s eigen sweep
+   (4 van 4 keer), met de nieuwe build −1,35 dB (4 van 4 keer, ook vanuit de verloren
+   toestand). Nog te bevestigen op NixOS en met een through-calibratie in de GUI.
 7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
    30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
    stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet

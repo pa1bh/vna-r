@@ -14,6 +14,14 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Fixed
 
+- NanoVNA-F: S21 could come back at about -65 dB with a cable between the ports, so a
+  through calibration gave the warning "median raw |S21| is -65.8 dB" and every S21
+  measurement was wrong, while S11 was right. It is a property of the firmware (1.0.4):
+  after the device has swept on its own for some seconds, a scan that reaches above
+  280 MHz loses the through channel, and so does every such scan after it, until one scan
+  stays below 280 MHz. vna-r now makes that short scan (two points, 10 and 20 MHz) before
+  the first sweep of a session. Found on Linux, but it does not depend on the platform:
+  it showed whenever the first sweep after connecting went above 280 MHz.
 - NanoVNA-F (text shell): a sweep could fail with `protocol error: unexpected sweep reply
   "\nch> sweep…"`, seen on Linux right after opening the port. A prompt that the device
   had sent earlier arrived after the input buffer was cleared and ended up in front of

@@ -51,6 +51,10 @@ const COMMAND_TIMEOUT: Duration = Duration::from_millis(if cfg!(test) { 150 } el
 /// Longest time `sync` keeps dropping leftover output; it normally stops
 /// after one quiet port timeout (100 ms).
 const DRAIN_LIMIT: Duration = Duration::from_millis(1000);
+/// The scan that wakes the through channel, see [`NanoVnaShell::prime`]:
+/// start, stop, points. It has to lie below the firmware's `threshold`
+/// (280 MHz by default), where the device measures on the fundamental.
+const PRIME_SCAN: (u64, u64, u16) = (10_000_000, 20_000_000, 2);
 /// Per point: the device needs ~9 ms for S11 + S21 at the default bandwidth;
 /// narrower bandwidths are slower, so be generous.
 const PER_POINT_BUDGET: Duration = Duration::from_millis(60);
@@ -202,6 +206,9 @@ pub struct NanoVnaShell {
     /// Whether the device applied its own calibration on screen before our
     /// first raw scan (`cal` reports `cal'ed`); a raw scan can switch that off.
     saved_cal_apply: Option<bool>,
+    /// The through channel has been woken since the device last swept on its
+    /// own, see [`NanoVnaShell::prime`].
+    primed: bool,
     info: Option<ShellInfo>,
 }
 
@@ -224,6 +231,7 @@ impl NanoVnaShell {
             restore_on_drop: false,
             saved_sweep: None,
             saved_cal_apply: None,
+            primed: false,
             info: None,
         };
         dev.sync()?;
@@ -507,6 +515,25 @@ impl NanoVnaShell {
         parse_scan_points(got_mask, got_points, &data)
     }
 
+    /// Wake the through channel before the first scan of a session.
+    ///
+    /// Measured on a NanoVNA-F 4.3 with firmware 1.0.4: once the device has
+    /// swept on its own for some seconds (which it does whenever nobody is
+    /// connected), a scan that reaches above `threshold` returns S21 at the
+    /// level of the leak, about -65 dB with a cable between the ports, while
+    /// S11 is right. Every such scan after it does the same. One scan that
+    /// stays below `threshold` puts it right for all ranges, until the device
+    /// sweeps on its own again. So that scan comes first; its data is dropped.
+    fn prime(&mut self) -> Result<()> {
+        if self.primed {
+            return Ok(());
+        }
+        let (start, stop, points) = PRIME_SCAN;
+        self.scan_bin(&SweepConfig::linear(start, stop, points)?)?;
+        self.primed = true;
+        Ok(())
+    }
+
     /// Measure `cfg` (any number of points; chunked per [`MAX_SCAN_POINTS`]).
     /// Raw data unless `cfg.calibrated`, in which case the device applies its
     /// own calibration. The device's on-screen sweep is remembered on the
@@ -525,6 +552,7 @@ impl NanoVnaShell {
             // sweep back and re-asserting `cal on` on release costs nothing.
             self.saved_cal_apply = self.cal_status().ok().map(|s| s.contains("cal'ed"));
         }
+        self.prime()?;
         let started = Instant::now();
         let freqs = cfg.frequencies();
         let mut s11 = Vec::with_capacity(freqs.len());
@@ -601,6 +629,8 @@ impl NanoVnaShell {
         if self.saved_cal_apply.take() == Some(true) {
             self.set_cal_apply(true)?;
         }
+        // The device sweeps on its own again from here on.
+        self.primed = false;
         self.resume()
     }
 }
@@ -741,6 +771,9 @@ mod tests {
         }
     }
 
+    /// The scan that precedes the first one of a session.
+    const PRIME: &str = "scan_bin 10000000 20000000 2 15";
+
     fn shell(dev: FakeShell) -> (NanoVnaShell, FakePort) {
         let port = FakePort::new(dev);
         (NanoVnaShell::from_port(port.boxed()).unwrap(), port)
@@ -830,6 +863,7 @@ mod tests {
         assert_eq!(
             scans,
             [
+                PRIME,
                 "scan_bin 1000000 301000000 301 15",
                 "scan_bin 302000000 602000000 301 15",
                 "scan_bin 603000000 700000000 98 15",
@@ -886,6 +920,34 @@ mod tests {
         let err = sh.sweep(&linear(2_000_000, 6_000_000, 5)).unwrap_err();
         assert!(err.to_string().contains("unexpected echo"), "{err}");
         sh.restore_on_drop = false;
+    }
+
+    #[test]
+    fn the_first_scan_of_a_session_is_preceded_by_a_priming_scan() {
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let cfg = linear(300_000_000, 1_200_000_000, 4);
+        let mut calibrated = cfg;
+        calibrated.calibrated = true;
+        sh.sweep(&calibrated).unwrap();
+        sh.sweep(&cfg).unwrap();
+        // Once, raw whatever the sweep asks for, and before the first real scan.
+        assert_eq!(
+            *commands.lock().unwrap(),
+            [
+                "sweep",
+                "cal",
+                PRIME,
+                "scan_bin 300000000 1200000000 4 7",
+                "scan_bin 300000000 1200000000 4 15"
+            ]
+        );
+        // Handing the screen back lets the device sweep on its own: prime again.
+        sh.restore().unwrap();
+        commands.lock().unwrap().clear();
+        let r = sh.sweep(&cfg).unwrap();
+        assert_eq!(r.freqs_hz.len(), 4, "the priming points are not part of the result");
+        assert_eq!(commands.lock().unwrap()[2], PRIME);
     }
 
     /// Seen on Linux with a NanoVNA-F: a prompt from before the command arrived
