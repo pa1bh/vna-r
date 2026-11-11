@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/litevna", "crates/vna-cli", "crates/vna-gui"]
 
 [workspace.package]
-version = "0.3.0-rc.2"
+version = "0.3.0"
 edition = "2021"
 # The floor set by egui/eframe 0.37 and wgpu; nothing in this workspace needs more.
 rust-version = "1.95"

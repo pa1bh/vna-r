@@ -1,10 +1,10 @@
 # QC-procedure werklijst november 2026
 
-Stand: 10 november 2026: na het eerste deel van de QC op macOS met de LiteVNA 67 is
-**0.3.0-rc.2** uitgebracht (pre-release, met archieven voor Linux, beide Macs en Windows),
-met de twee reparaties uit het logboek hieronder en een bijgewerkte README en
-handleiding. 0.3.0-rc.1 was op jouw verzoek vóór de QC uitgebracht, om het testen op
-andere platforms makkelijker te maken. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+Stand: 12 november 2026: **0.3.0** is uitgebracht, na de release candidates 0.3.0-rc.1
+(vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
+het eerste deel van de QC op macOS met de LiteVNA 67), en na een ronde met de NanoVNA-F
+op NixOS en macOS. Wat getest is, wat gevonden is en wat nog openstaat, staat in het
+logboek hieronder. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
 
@@ -24,7 +24,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.2> (pre-release), uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
@@ -43,7 +43,7 @@ vna-gui
 ```
 
 Verwacht: de GUI start met je oude instellingen, de titelbalk toont de versie, Help ▸
-About toont versie en git-revisie (`v0.3.0-rc.2`, na latere commits gevolgd door het aantal commits sinds de tag en de hash).
+About toont versie en git-revisie (`v0.3.0`, na latere commits gevolgd door het aantal commits sinds de tag en de hash).
 
 ## Volgorde: vier rondes
 
@@ -214,6 +214,14 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    te doen: een through-calibratie in de GUI.
    PA1BH meldde daarna dat het werkt en dat metingen aan een filter, verzwakkers en
    antennes met de NanoVNA-F op NixOS er goed uitzien.
+7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
+   30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
+   stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet
+   tegen. Nagebootst in een test met de nagebootste poort (zelfde foutmelding) en
+   gerepareerd: na het openen wachten tot de lijn stil is, en elk antwoord lezen vanaf de
+   echo van het eigen commando (ook bij `scan_bin` en `capture`). Tests 86 + 4, clippy en
+   fmt schoon. **Niet met het apparaat gecontroleerd**, op geen van beide platforms; of dit
+   met bevinding 6 samenhangt is onbekend.
 8. *Bestandsdialogen doen niets op NixOS* (punt 15/16): **Save…** van een calibratie gaf
    geen dialoog; in het logboek "Can't connect to a portal: libdbus-1.so not found",
    daarna een mislukte terugval op zenity. rfd 0.17 laadt `libdbus-1.so.3` tijdens het
@@ -227,14 +235,12 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    open −3,4 dB ∠0° (bovenin zakkend naar −8 dB), load −42 tot −25 dB, short −0,9 dB
    ∠180°. Daarna werkte de GUI weer, zonder dat duidelijk is wat er veranderde. Oorzaak
    onbekend; bij herhaling eerst een schermafbeelding met het linkerpaneel maken.
-7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
-   30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
-   stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet
-   tegen. Nagebootst in een test met de nagebootste poort (zelfde foutmelding) en
-   gerepareerd: na het openen wachten tot de lijn stil is, en elk antwoord lezen vanaf de
-   echo van het eigen commando (ook bij `scan_bin` en `capture`). Tests 86 + 4, clippy en
-   fmt schoon. **Niet met het apparaat gecontroleerd**, op geen van beide platforms; of dit
-   met bevinding 6 samenhangt is onbekend.
+
+**Uitgebracht als 0.3.0** op 12 november 2026, op verzoek van PA1BH: verder testen komt
+in een nieuwe ronde. Bij de release niet bevestigd: de bestandsdialogen op NixOS na
+bevinding 8; onverklaard: bevinding 9; nog steeds niet met een apparaat geprobeerd:
+Windows; met de LiteVNA in de GUI niet stap voor stap doorlopen: referenties, TDR, gate
+en bestanden (blok 4) en de slotronde.
 
 ---
 
@@ -963,12 +969,10 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
    Besluit van 10 november: de Help-links blijven naar de tag van de eigen versie wijzen;
    een correctie in de handleiding gaat mee met de volgende release. Er is niets
    veranderd aan de code.
-2. **Versienummer en release: beantwoord.** Uitgebracht als 0.3.0-rc.1 en, na de eerste
-   QC-ronde, als 0.3.0-rc.2; beide zijn pre-releases. Vindt de rest van de QC fouten, dan
-   volgt rc.3. Is alles goed: voeg in `CHANGELOG.md` de secties `## [0.3.0-rc.2]` en
-   `## [0.3.0-rc.1]` samen tot één sectie `## [0.3.0] - <datum>` (de releasetekst komt uit
-   die ene sectie), zet `0.3.0` in `Cargo.toml`, pas de links onderaan de changelog aan,
-   commit, tag `v0.3.0`, push.
+2. **Versienummer en release: afgerond.** Uitgebracht als 0.3.0-rc.1, 0.3.0-rc.2 en op
+   12 november 2026 als 0.3.0; de secties van de candidates in `CHANGELOG.md` zijn
+   samengevoegd tot `## [0.3.0]`. Wat de volgende testronde vindt, komt in een volgende
+   versie.
 3. **Pushen: gedaan.** De CI heeft gedraaid; zie punt 16 en 29 voor wat je daarin
    naloopt.
 4. **Punt 42, kit-bestanden.** Welk formaat wil je kunnen lezen (NanoVNA-Saver, een

@@ -12,65 +12,25 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
-### Fixed
+## [0.3.0] - 2026-11-12
 
-- NixOS (flake): **Save…**, **Load…** and the other file dialogs of the GUI did nothing;
-  the log said "Can't connect to a portal: libdbus-1.so not found". The dialogs load
-  `libdbus` at run time, and the flake did not put it on the library path. It has been
-  that way since 0.2.0. The release archives for other distributions are not affected.
-- NanoVNA-F: S21 could come back at about -65 dB with a cable between the ports, so a
-  through calibration gave the warning "median raw |S21| is -65.8 dB" and every S21
-  measurement was wrong, while S11 was right. It is a property of the firmware (1.0.4):
-  after the device has swept on its own for some seconds, a scan that reaches above
-  280 MHz loses the through channel, and so does every such scan after it, until one scan
-  stays below 280 MHz. vna-r now makes that short scan (two points, 10 and 20 MHz) before
-  the first sweep of a session. Found on Linux, but it does not depend on the platform:
-  it showed whenever the first sweep after connecting went above 280 MHz.
-- NanoVNA-F (text shell): a sweep could fail with `protocol error: unexpected sweep reply
-  "\nch> sweep…"`, seen on Linux right after opening the port. A prompt that the device
-  had sent earlier arrived after the input buffer was cleared and ended up in front of
-  the echo of the next command. Opening the port now waits until the line is quiet, and
-  every reply is read from the echo of its own command onward, for text commands, scans
-  and screenshots alike.
+The result of a review of the whole project: bugs in the calibration and TDR, the
+calibration flow in the GUI, a stricter CLI, new functions and a round of restructuring.
+It went out as the release candidates 0.3.0-rc.1 and 0.3.0-rc.2 on 10 November; what they
+and the testing after them changed is merged into this section.
 
-## [0.3.0-rc.2] - 2026-11-10
+Tried with a LiteVNA 67 on macOS (the whole CLI; in the GUI connecting, sweeping,
+calibrating, interpolating a coarse calibration, the progress bar and losing the cable)
+and with a NanoVNA-F 4.3 on NixOS and macOS (CLI sweeps, and in the GUI a through
+calibration and measurements of a filter, attenuators and antennas). **Not tried with a
+device**: Windows. **Not confirmed**: the file dialogs on NixOS after the fix below. With
+the LiteVNA the references, TDR, gate and file functions of the GUI were not gone through
+step by step. One observation is unexplained: with the NanoVNA-F on NixOS the S11 trace in
+the GUI was scattered once while raw sweeps with the CLI were right, and it went away
+without a known cause.
 
-Second release candidate. 0.3.0-rc.1 was taken through the first part of its test
-procedure on macOS with a LiteVNA 67: the whole CLI, and in the GUI connecting, sweeping,
-calibrating, interpolating a coarse calibration, the progress bar and losing the cable.
-That found the two faults below; a review of the README and both manuals found the rest.
-**Not yet tried with this version**: the NanoVNA-F, Linux and Windows, and in the GUI the
-references, TDR, gate and file functions. Everything listed under 0.3.0-rc.1 is part of
-this version.
-
-### Fixed
-
-- CLI: the help of `tdr` gave the range as 1/step; it is 1/(2·step).
-- GUI: **Stop** is now also there while a calibration standard or a single sweep is being
-  measured with Run off; before, a long averaged standard could only be aborted by
-  starting Run. The space bar follows.
-- CLI: the comment line of a file written by `sweep --s2p` or `--s1p` now states a port
-  extension and a time gate, as the GUI already did; the `.s1p` comment also says whether
-  the data was calibrated.
-
-### Documentation
-
-- README and both manuals checked against the program and against each other. Corrected:
-  the TDR range of a 50 kHz–6.3 GHz sweep in 1001 points (8 m, not 17 m), an error message
-  that no longer exists, the label of a sweep outside the calibrated span (RAW), the two
-  thresholds for the load check, the dips in the antenna example and the arithmetic of
-  the 25 Ω example. Added: Return applies the sweep, Stop during a standard, what is
-  remembered, `--port-extension` with `tdr`, the short forms of the `cal` actions, and what
-  to do when the connection drops.
-- The screenshots in the manual date from 0.2.3 and 0.2.4; the manual now says so.
-
-## [0.3.0-rc.1] - 2026-11-10
-
-Release candidate: the result of a review of the whole project (bugs in the calibration
-and TDR, the calibration flow in the GUI, a stricter CLI, new functions, and a round of
-restructuring). Checked by the tests and on files; **not yet tried with a device** on any
-platform. Settings and calibration files of 0.2.x are read; 0.2.x does not read the
-settings this version writes, so keep a copy of `app.ron` if you want to go back.
+Settings and calibration files of 0.2.x are read; 0.2.x does not read the settings this
+version writes, so keep a copy of `app.ron` if you want to go back.
 
 ### Added
 - CLI: `vna-cli cal --help` lists the standards and actions with what each does, and a
@@ -99,6 +59,8 @@ settings this version writes, so keep a copy of `app.ron` if you want to go back
   finish; they take effect at the next block of data (255 points on a LiteVNA, 301 points
   or about three seconds on a NanoVNA-F, where a long sweep used to make Stop look dead
   for up to half a minute). A sweep that takes more than a moment shows a progress bar.
+  **Stop** is also there while a calibration standard or a single sweep is being measured
+  with Run off, and the space bar follows.
 - Library: `sweep_with` on `Vna`, `LiteVna` and `NanoVnaShell` reports progress per block
   and lets the caller cancel (`Error::Cancelled`).
 
@@ -152,6 +114,27 @@ settings this version writes, so keep a copy of `app.ron` if you want to go back
   that contradicted the measurements in docs/01 (FIFO checksum, points per second).
 
 ### Fixed
+- NixOS (flake): **Save…**, **Load…** and the other file dialogs of the GUI did nothing;
+  the log said "Can't connect to a portal: libdbus-1.so not found". The dialogs load
+  `libdbus` at run time, and the flake did not put it on the library path. It has been
+  that way since 0.2.0. The release archives for other distributions are not affected.
+- NanoVNA-F: S21 could come back at about -65 dB with a cable between the ports, so a
+  through calibration gave the warning "median raw |S21| is -65.8 dB" and every S21
+  measurement was wrong, while S11 was right. It is a property of the firmware (1.0.4):
+  after the device has swept on its own for some seconds, a scan that reaches above
+  280 MHz loses the through channel, and so does every such scan after it, until one scan
+  stays below 280 MHz. vna-r now makes that short scan (two points, 10 and 20 MHz) before
+  the first sweep of a session. Found on Linux, but it does not depend on the platform:
+  it showed whenever the first sweep after connecting went above 280 MHz.
+- NanoVNA-F (text shell): a sweep could fail with `protocol error: unexpected sweep reply
+  "\nch> sweep…"`, seen on Linux right after opening the port. A prompt that the device
+  had sent earlier arrived after the input buffer was cleared and ended up in front of
+  the echo of the next command. Opening the port now waits until the line is quiet, and
+  every reply is read from the echo of its own command onward, for text commands, scans
+  and screenshots alike.
+- CLI: the comment line of a file written by `sweep --s2p` did not say that S11 was
+  time-gated, while the GUI's did. It now states the gate and the port extension, and the
+  comment of an `.s1p` says whether the data was calibrated.
 - GUI: a sweep that TDR cannot work with (a file with unevenly spaced points, a span too
   narrow for its top frequency) put an error in the top bar that came back every frame
   and could not be dismissed, while the TDR view said "Connect and press Run". The TDR
@@ -230,6 +213,14 @@ settings this version writes, so keep a copy of `app.ron` if you want to go back
   a `resume` while cleaning up and waiting again); now once.
 
 ### Documentation
+- README and both manuals checked against the program and against each other. Corrected:
+  the TDR range of a 50 kHz–6.3 GHz sweep in 1001 points (8 m, not 17 m), an error message
+  that no longer exists, the label of a sweep outside the calibrated span (RAW), the two
+  thresholds for the load check, the dips in the antenna example and the arithmetic of
+  the 25 Ω example. Added: Return applies the sweep, Stop during a standard, what is
+  remembered, `--port-extension` with `tdr`, the short forms of the `cal` actions, and what
+  to do when the connection drops.
+- The screenshots in the manual date from 0.2.3 and 0.2.4; the manual now says so.
 - GTK was never a dependency: the file dialogs go through the xdg desktop portal. The
   README, the manuals, CI and the flake mentioned `libgtk-3-dev`/`gtk3` anyway; those
   are gone and the real requirement (a running portal) is stated. The README still said
@@ -355,9 +346,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0-rc.2...HEAD
-[0.3.0-rc.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.2
-[0.3.0-rc.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0-rc.1
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
 [0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
 [0.2.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.3
