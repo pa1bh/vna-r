@@ -74,7 +74,9 @@ manual's troubleshooting chapter has more.
 **File dialogs on Linux.** Open and Save go through the desktop portal (`xdg-desktop-portal`
 with the backend of your desktop: GTK, KDE, GNOME, wlr). Without a running portal, as on a bare
 window manager, the dialogs do not appear and nothing is opened or saved; install and start a
-portal backend in that case.
+portal backend in that case. The GUI reaches the portal through `libdbus-1.so.3`, which it loads
+when the first dialog opens; every desktop distribution has it, and the flake puts it on the
+library path.
 
 **Serial port access on Linux.** Copy [linux/70-litevna.rules](linux/70-litevna.rules) to
 `/etc/udev/rules.d/` and reload udev (instructions in the file), or add yourself to the `dialout`

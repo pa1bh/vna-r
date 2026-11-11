@@ -40,7 +40,9 @@ sudo apt-get install -y pkg-config libudev-dev
 
 The file dialogs of the GUI use the desktop portal (`xdg-desktop-portal` with the
 backend of your desktop environment). On a bare window manager without a portal they
-do not appear; install a backend such as `xdg-desktop-portal-gtk` then.
+do not appear; install a backend such as `xdg-desktop-portal-gtk` then. The GUI reaches
+the portal through `libdbus-1.so.3`, loaded when the first dialog opens; every desktop
+distribution has it.
 
 The port is called `/dev/ttyACM0` or higher. To be allowed to open it without root, install
 the udev rule from the repository:

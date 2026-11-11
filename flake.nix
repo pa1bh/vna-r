@@ -13,9 +13,10 @@
         let
           inherit (pkgs) lib stdenv;
           # What the GUI dlopens at run time on Linux: winit (X11 / Wayland) and
-          # wgpu (Vulkan, with GL as fallback). The file dialogs talk to the
-          # xdg desktop portal over D-Bus and need no library.
+          # wgpu (Vulkan, with GL as fallback), and rfd (libdbus, to reach the
+          # xdg desktop portal for the file dialogs).
           runtimeLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
+            dbus
             libxkbcommon
             wayland
             libGL
@@ -76,7 +77,7 @@
         let
           inherit (pkgs) lib stdenv;
           runtimeLibs = lib.optionals stdenv.hostPlatform.isLinux (with pkgs; [
-            libxkbcommon wayland libGL vulkan-loader
+            dbus libxkbcommon wayland libGL vulkan-loader
             libx11 libxcursor libxi libxrandr
           ]);
         in

@@ -212,6 +212,15 @@ meldde dat bijna alles werkt; welke stappen precies zijn gedaan is niet per stap
    toestand). Bevestigd door PA1BH op NixOS met de CLI (revisie `c02976e`): na de scan op
    10 en 20 MHz geeft 50 MHz–1,2 GHz S21 van −1,35 tot −2,86 dB, gelijk aan de Mac. Nog
    te doen: een through-calibratie in de GUI.
+   PA1BH meldde daarna dat het werkt en dat metingen aan een filter, verzwakkers en
+   antennes met de NanoVNA-F op NixOS er goed uitzien.
+8. *Bestandsdialogen doen niets op NixOS* (punt 15/16): **Save…** van een calibratie gaf
+   geen dialoog; in het logboek "Can't connect to a portal: libdbus-1.so not found",
+   daarna een mislukte terugval op zenity. rfd 0.17 laadt `libdbus-1.so.3` tijdens het
+   draaien en de flake zette die niet op het zoekpad; dat is zo sinds 0.2.0, de
+   dialogen waren op NixOS nooit geprobeerd. Gerepareerd in `flake.nix` (pakket en
+   ontwikkelshell). **Niet gecontroleerd**: hier is geen Nix; de CI bouwt de flake maar
+   opent geen dialoog.
 7. *`vna-cli sweep` op NixOS: `protocol error: unexpected sweep reply "\nch> sweep\r\n1000000
    30000000 301"`* (poort `/dev/ttyACM1`, direct na het openen). Een prompt van eerder
    stond vóór de echo van het eerste commando; het lezen van tekstantwoorden kon daar niet

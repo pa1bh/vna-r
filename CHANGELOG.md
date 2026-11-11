@@ -14,6 +14,10 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Fixed
 
+- NixOS (flake): **Save…**, **Load…** and the other file dialogs of the GUI did nothing;
+  the log said "Can't connect to a portal: libdbus-1.so not found". The dialogs load
+  `libdbus` at run time, and the flake did not put it on the library path. It has been
+  that way since 0.2.0. The release archives for other distributions are not affected.
 - NanoVNA-F: S21 could come back at about -65 dB with a cable between the ports, so a
   through calibration gave the warning "median raw |S21| is -65.8 dB" and every S21
   measurement was wrong, while S11 was right. It is a property of the firmware (1.0.4):

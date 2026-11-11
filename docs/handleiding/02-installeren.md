@@ -40,7 +40,9 @@ sudo apt-get install -y pkg-config libudev-dev
 
 De bestandsdialogen van de GUI lopen via de desktop-portal (`xdg-desktop-portal` met de
 backend van je bureaubladomgeving). Op een kale windowmanager zonder portal verschijnen
-ze niet; installeer dan een backend zoals `xdg-desktop-portal-gtk`.
+ze niet; installeer dan een backend zoals `xdg-desktop-portal-gtk`. De GUI bereikt de
+portal via `libdbus-1.so.3`, geladen bij de eerste dialoog; elke desktopdistributie heeft
+die.
 
 De poort heet `/dev/ttyACM0` of hoger. Om hem zonder root te mogen openen, installeer je
 de udev-regel uit de repository:
