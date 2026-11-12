@@ -279,9 +279,12 @@ de USB-C-stekker bij het wisselen van loads, of een reset van het apparaat). Wel
 gerepareerd is hoe de GUI erop reageert: de werker merkt de uitval op (ook in rust),
 wacht tot 30 s op de poort, verbindt opnieuw en gaat verder met Run of de enkele sweep.
 Gecontroleerd: de tests, en `hardware_session` (genegeerde test in `worker.rs`) met het
-apparaat onaangeroerd: 18 sweeps, stop, rust, enkele sweep, geen valse uitval. **Niet
-gecontroleerd: het opnieuw verbinden zelf**; dat vraagt iemand die de kabel lostrekt
-(`VNA_R_EXPECT_DROP=1`, zie de test).
+apparaat onaangeroerd: 18 sweeps, stop, rust, enkele sweep, geen valse uitval. Daarna
+met `VNA_R_EXPECT_DROP=1` terwijl PA1BH de kabel lostrok en terugstak: de systeemlog
+toont het apparaat 1,6 s en daarna 8,2 s van de bus; de werker meldde beide keren
+`sweep: I/O error: Broken pipe` (dezelfde fout als in de GUI), was 0,4 en 0,5 s na
+terugkomst van de poort opnieuw verbonden en deed daarna nog 24 sweeps. Niet gezien: de
+oranje balk en de melding in de GUI zelf.
 
 ---
 
