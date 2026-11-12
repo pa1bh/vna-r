@@ -312,6 +312,15 @@ bij een USB-C-contact dat beweegt als het apparaat beweegt, maar sluit iets elek
 (aanraken van de massa van de poort) niet uit. Proef: het apparaat vasthouden zodat de
 stekker niet kan bewegen en dan de connector aanraken.
 
+**Oorzaak gevonden: de USB-kabel.** Kort daarna meldde het apparaat zich helemaal niet
+meer (macOS zag het niet op de bus, `vna-cli list` toonde het terecht niet). Met een
+andere kabel is de uitval weg, ook bij het draaien aan de N-connector. PA1BH probeerde
+daarna in de GUI met de nieuwe wachtregel: kabel eruit en erin, de verbinding kwam netjes
+terug; en de oranje waarschuwing voor de sprong in de calibratie staat er zoals bedoeld.
+Daarmee zijn de oranje balk bij uitval en de waarschuwing in het venster zelf gezien, op
+macOS. Niet geprobeerd: een reeks van snel komen en gaan met de nieuwe wachtregel (die
+deed zich met de goede kabel niet meer voor), en Linux en Windows.
+
 ---
 
 # 0.2.6 — bugfixes
