@@ -12,6 +12,18 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-12
+
+Two things that came out of an evening of measuring with a LiteVNA 67 on macOS: a
+sawtooth at 100 MHz and an occasional `I/O error: Broken pipe`.
+
+Tried: the jump detection on six calibration files (two of them have the 100 MHz jump),
+and the reconnecting with the device, by pulling the cable while the GUI's worker was
+sweeping: twice lost, twice reconnected within half a second of the port coming back,
+sweeping resumed. **Not seen**: the warning and the orange "connection dropped" bar in
+the GUI window itself; the reconnecting on Linux and Windows. What was and was not tried
+for 0.3.0 still holds.
+
 ### Added
 
 - A warning when a calibration is interpolated across a jump: a sweep with points between
@@ -34,7 +46,8 @@ things that are not backwards compatible, such as the format of the calibration 
   being measured (the port is looked at twice a second, and a battery reading that fails
   counts). A calibration standard that was being measured is not repeated. Seen with a
   LiteVNA 67 on macOS, where the system log showed the device leaving the bus for about
-  two seconds, three times in twenty seconds; what made it do so is not established.
+  two seconds, three times in twenty seconds. The cause there was the USB-C plug: taking
+  hold of it was enough for such a drop.
 
 ### Documentation
 
@@ -389,7 +402,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.2
 [0.3.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.1
 [0.3.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5

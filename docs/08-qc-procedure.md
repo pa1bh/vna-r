@@ -1,7 +1,8 @@
 # QC-procedure werklijst november 2026
 
-Stand: 12 november 2026: **0.3.1** is uitgebracht (0.3.0 plus View ▸ Zoom, zie het
-logboek). **0.3.0** kwam na de release candidates 0.3.0-rc.1
+Stand: 12 november 2026: **0.3.2** is uitgebracht (waarschuwing bij een sprong in de
+calibratie, en opnieuw verbinden na uitval), na **0.3.1** (0.3.0 plus View ▸ Zoom); zie
+het logboek. **0.3.0** kwam na de release candidates 0.3.0-rc.1
 (vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
 het eerste deel van de QC op macOS met de LiteVNA 67), en na een ronde met de NanoVNA-F
 op NixOS en macOS. Wat getest is, wat gevonden is en wat nog openstaat, staat in het
@@ -25,7 +26,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.1>, uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.2>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
@@ -291,6 +292,10 @@ vastpakken van de stekker, vóór het lostrekken, en is even kort als de drie ui
 21:18. Dat maakt een mechanische oorzaak aannemelijk: het contact van de USB-C-stekker,
 in de kabel of in de bus van het apparaat, verdraagt geen aanraking. Welke van de twee
 is niet onderzocht; een andere kabel is de eerste proef.
+
+**Uitgebracht als 0.3.2** op 12 november 2026, met de twee bevindingen hierboven. Bij de
+release niet gezien: de waarschuwing voor de sprong en de oranje balk bij uitval in het
+venster van de GUI zelf; het opnieuw verbinden op Linux en Windows.
 
 ---
 
