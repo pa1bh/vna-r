@@ -8,10 +8,13 @@ mod app;
 mod smith;
 mod worker;
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use eframe::egui_wgpu::{wgpu, WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     // `RUST_LOG=info` shows eframe's and wgpu's choices (adapter, backend) on stderr.
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn,vna_gui=info")).init();
@@ -32,6 +35,44 @@ fn main() -> eframe::Result {
     eframe::run_native("vna-r", options, Box::new(|cc| Ok(Box::new(app::App::new(cc)))))
 }
 
+/// The browser build: the same [`app::App`] in a canvas, without a device
+/// (the serial port and the worker thread do not exist there). A spike, see
+/// `docs/09-wasm-proef.md`.
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    use eframe::wasm_bindgen::JsCast as _;
+    use eframe::web_sys;
+
+    eframe::WebLogger::init(log::LevelFilter::Info).ok();
+    wasm_bindgen_futures::spawn_local(async {
+        let document = web_sys::window().and_then(|w| w.document()).expect("no document");
+        let canvas = document
+            .get_element_by_id("vna-r-canvas")
+            .expect("no element with id vna-r-canvas")
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .expect("vna-r-canvas is not a canvas");
+        let started = eframe::WebRunner::new()
+            .start(
+                canvas,
+                eframe::WebOptions::default(),
+                Box::new(|cc| Ok(Box::new(app::App::new(cc)))),
+            )
+            .await;
+        // The page shows a "loading" line until this point; the error replaces it if there is one.
+        let loading = document.get_element_by_id("loading");
+        match (started, loading) {
+            (Ok(()), Some(loading)) => loading.remove(),
+            (Ok(()), None) => {}
+            (Err(e), loading) => {
+                if let Some(loading) = loading {
+                    loading.set_inner_html("vna-r could not start in this browser; the console has the details.");
+                }
+                log::error!("starting eframe: {e:?}");
+            }
+        }
+    });
+}
+
 /// Choose the graphics adapter. wgpu's own choice is "Vulkan first", which on
 /// an old NVIDIA card under the open-source nouveau driver lands on the
 /// experimental NVK Vulkan driver: frames arrive late and menus miss clicks,
@@ -39,6 +80,7 @@ fn main() -> eframe::Result {
 /// shaky or software-only when a hardware alternative exists, then prefer a
 /// modern backend and a real GPU. `WGPU_BACKEND=vulkan|gl|…` still limits the
 /// candidates beforehand, so it remains a way to force a backend.
+#[cfg(not(target_arch = "wasm32"))]
 fn pick_adapter(adapters: &[wgpu::Adapter], surface: Option<&wgpu::Surface<'_>>) -> Result<wgpu::Adapter, String> {
     let usable: Vec<&wgpu::Adapter> = adapters
         .iter()
@@ -66,6 +108,7 @@ fn pick_adapter(adapters: &[wgpu::Adapter], surface: Option<&wgpu::Surface<'_>>)
 
 /// Higher is better. Order of importance: not a shaky driver, not software,
 /// a modern backend, a real GPU.
+#[cfg(not(target_arch = "wasm32"))]
 fn adapter_rank(info: &wgpu::AdapterInfo) -> (bool, bool, u8, u8) {
     let backend = match info.backend {
         wgpu::Backend::Metal | wgpu::Backend::Vulkan | wgpu::Backend::Dx12 => 2,
@@ -82,11 +125,13 @@ fn adapter_rank(info: &wgpu::AdapterInfo) -> (bool, bool, u8, u8) {
 }
 
 /// Mesa's NVK (nouveau Vulkan) on the pre-Turing cards it supports only experimentally.
+#[cfg(not(target_arch = "wasm32"))]
 fn is_shaky(info: &wgpu::AdapterInfo) -> bool {
     info.backend == wgpu::Backend::Vulkan && (info.driver.contains("NVK") || info.name.contains("NVK"))
 }
 
 /// Software rasterisers: fine as a last resort, slow for a plot that redraws on every mouse move.
+#[cfg(not(target_arch = "wasm32"))]
 fn is_software(info: &wgpu::AdapterInfo) -> bool {
     let n = format!("{} {}", info.name, info.driver).to_lowercase();
     info.device_type == wgpu::DeviceType::Cpu
@@ -96,6 +141,7 @@ fn is_software(info: &wgpu::AdapterInfo) -> bool {
         || n.contains("softpipe")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn describe(info: &wgpu::AdapterInfo) -> String {
     format!(
         "{:?} {} ({:?}; {} {})",

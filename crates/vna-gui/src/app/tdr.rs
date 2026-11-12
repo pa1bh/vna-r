@@ -172,7 +172,7 @@ impl App {
                     Color32::from_rgb(230, 150, 80),
                     format!("No TDR for this sweep: {why}.\nTDR needs evenly spaced points from a low start frequency to a high stop."),
                 ),
-                _ => ui.label("Connect and press Run; TDR is computed from S11"),
+                _ => ui.label(format!("{EMPTY_HINT}; TDR is computed from S11")),
             });
             return;
         };

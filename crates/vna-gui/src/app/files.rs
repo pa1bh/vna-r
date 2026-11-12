@@ -15,13 +15,47 @@ pub(super) fn compact_hz(hz: u64) -> String {
     format!("{number}{unit}")
 }
 
+/// Ask for a calibration file for one sweep segment. Those are kept by path,
+/// which a browser does not give (and without a device there are no segments to sweep).
+pub(super) fn pick_cal_path() -> Option<PathBuf> {
+    #[cfg(not(target_arch = "wasm32"))]
+    return rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file();
+    #[cfg(target_arch = "wasm32")]
+    None
+}
+
 impl App {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn open_touchstone(&mut self, as_reference: bool) {
         let Some(path) = rfd::FileDialog::new().add_filter("Touchstone", &["s1p", "s2p"]).pick_file() else {
             return;
         };
         let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        match read_touchstone_file_full(&path) {
+        self.show_touchstone(name, &path.display().to_string(), read_touchstone_file_full(&path), as_reference);
+    }
+
+    /// The browser asks for the file and answers later: see [`App::handle_picked`].
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn open_touchstone(&mut self, as_reference: bool) {
+        let purpose = if as_reference {
+            web::PickFor::Reference
+        } else {
+            web::PickFor::Trace
+        };
+        self.web.pick(purpose, "Touchstone", &["s1p", "s2p"]);
+    }
+
+    /// Show a Touchstone file that was read (or say why it could not be) as
+    /// the trace or as a reference. `shown_as` is how the messages name it:
+    /// the path, or in a browser just the file name.
+    pub(super) fn show_touchstone(
+        &mut self,
+        name: String,
+        shown_as: &str,
+        file: litevna::Result<litevna::touchstone::TouchstoneFile>,
+        as_reference: bool,
+    ) {
+        match file {
             Ok(file) => {
                 let note = if file.renormalised() {
                     format!("; {} Ω file: S11 renormalised to 50 Ω, S21 as in the file", file.z0_ohm)
@@ -30,8 +64,7 @@ impl App {
                 };
                 let sweep = file.sweep;
                 self.file_message = Some(format!(
-                    "opened {} as {}{note}",
-                    path.display(),
+                    "opened {shown_as} as {}{note}",
                     if as_reference { "reference" } else { "trace" }
                 ));
                 if as_reference {
@@ -56,23 +89,17 @@ impl App {
                     self.set_shown(sweep);
                 }
             }
-            Err(e) => self.error = Some(format!("opening {}: {e}", path.display())),
+            Err(e) => self.error = Some(format!("opening {shown_as}: {e}")),
         }
     }
 
     pub(super) fn save_s2p(&mut self) {
         let Some(sweep) = self.freq_sweep() else { return };
-        let Some(path) = rfd::FileDialog::new()
-            .add_filter("Touchstone", &["s2p", "s1p"])
-            .set_file_name(format!(
-                "sweep-{}-{}.s2p",
-                compact_hz(sweep.freqs_hz[0]),
-                compact_hz(*sweep.freqs_hz.last().unwrap())
-            ))
-            .save_file()
-        else {
-            return;
-        };
+        let file_name = format!(
+            "sweep-{}-{}.s2p",
+            compact_hz(sweep.freqs_hz[0]),
+            compact_hz(*sweep.freqs_hz.last().unwrap())
+        );
         let gated = if self.gate_on && self.gated_cache.is_some() {
             format!(
                 ", S11 time-gated {:.2}..{:.2} m {}",
@@ -99,14 +126,39 @@ impl App {
             },
             gated
         );
+        // A browser saves by downloading under the proposed name: always the two-port file.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let mut bytes = Vec::new();
+            match write_s2p(&mut bytes, &sweep, Some(&comment)) {
+                Ok(()) => {
+                    self.file_message = Some(format!("offered {file_name} as a download"));
+                    self.web.save(file_name, bytes);
+                }
+                Err(e) => self.error = Some(format!("saving s2p: {e}")),
+            }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.write_touchstone(&sweep, &comment, file_name);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn write_touchstone(&mut self, sweep: &SweepResult, comment: &str, file_name: String) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Touchstone", &["s2p", "s1p"])
+            .set_file_name(file_name)
+            .save_file()
+        else {
+            return;
+        };
         // The extension decides: .s1p is S11 only, anything else the two-port file.
         let one_port = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("s1p"));
         let written = std::fs::File::create(&path).and_then(|f| {
             let f = std::io::BufWriter::new(f);
             if one_port {
-                write_s1p(f, &sweep, Some(&comment))
+                write_s1p(f, sweep, Some(comment))
             } else {
-                write_s2p(f, &sweep, Some(&comment))
+                write_s2p(f, sweep, Some(comment))
             }
         });
         match written {
@@ -144,6 +196,11 @@ impl App {
         }
     }
 
+    /// A screenshot comes from a device, which the browser build does not have.
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn save_screenshot(&mut self) {}
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn save_screenshot(&mut self) {
         let Some((_, shot)) = &self.screenshot else { return };
         let Some(path) = rfd::FileDialog::new()
