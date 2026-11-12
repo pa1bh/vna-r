@@ -286,6 +286,12 @@ toont het apparaat 1,6 s en daarna 8,2 s van de bus; de werker meldde beide kere
 terugkomst van de poort opnieuw verbonden en deed daarna nog 24 sweeps. Niet gezien: de
 oranje balk en de melding in de GUI zelf.
 
+PA1BH trok de kabel daarbij één keer los. De eerste uitval (1,6 s) viel dus bij het
+vastpakken van de stekker, vóór het lostrekken, en is even kort als de drie uitvallen van
+21:18. Dat maakt een mechanische oorzaak aannemelijk: het contact van de USB-C-stekker,
+in de kabel of in de bus van het apparaat, verdraagt geen aanraking. Welke van de twee
+is niet onderzocht; een andere kabel is de eerste proef.
+
 ---
 
 # 0.2.6 — bugfixes
