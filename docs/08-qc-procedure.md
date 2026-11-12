@@ -248,7 +248,11 @@ liteVNA op groups.io; de eerste reactie, van een gebruiker op Windows 11, was da
 te klein is. Zoomen zat al in de GUI (Ctrl of ⌘ met +, − en 0) maar stond nergens; 0.3.1
 zet **View ▸ Zoom** in het menu en in beide handleidingen. PA1BH bekeek het menu op
 macOS; dat de gekozen grootte wordt weggeschreven is gezien in `app.ron`, dat ze bij een
-nieuwe start terugkomt is niet gemeld. Niet geprobeerd op Linux en Windows.
+nieuwe start terugkomt is niet gemeld. Niet geprobeerd op Linux.
+
+Dezelfde dag probeerde PA1BH de GUI op Windows, zonder apparaat: starten, de menu's en
+het zoomen werken. Het is de eerste keer dat de Windows-build is gestart; verbinden,
+sweepen en calibreren zijn daar nog steeds niet geprobeerd.
 
 ---
 
