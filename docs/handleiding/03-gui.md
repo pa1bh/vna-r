@@ -39,7 +39,9 @@ grafieken; maak het venster groter of scrol in het linkerpaneel.
 1. Kies de poort in de keuzelijst; een VNA heeft een ster en wordt vanzelf gekozen. De
    lijst wordt elke twee seconden ververst zolang je niet verbonden bent, dus een
    apparaat dat je later aansluit verschijnt vanzelf; **rescan** zoekt direct.
-2. **Connect**. De bovenbalk toont model, firmware en batterijspanning.
+2. **Connect**. De bovenbalk toont model, firmware en batterijspanning. Valt de
+   verbinding weg, dan wacht het programma op het apparaat en verbindt het zelf opnieuw
+   (hoofdstuk 9).
 3. **Run** start continu sweepen, **Single** doet er één. Zolang er iets gemeten wordt
    (de continue sweep, een enkele sweep of een calibratiestandaard) staat op de plaats
    van Run de knop **Stop**.

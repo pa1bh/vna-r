@@ -63,6 +63,10 @@ impl App {
                 out.push_str(&format!("\n{}\n", info.detail));
             }
             Connection::Connecting(p) => out.push_str(&format!("device: connecting to {p}\n")),
+            Connection::Reconnecting { port, since } => out.push_str(&format!(
+                "device: connection dropped {:.0} s ago, waiting for {port}\n",
+                since.elapsed().as_secs_f32()
+            )),
             Connection::Disconnected => out.push_str("device: not connected\n"),
         }
         out.push_str(&format!(

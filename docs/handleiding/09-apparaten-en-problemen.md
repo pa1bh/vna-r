@@ -90,9 +90,20 @@ een HF-calibratie of segmenten (hoofdstuk 4).
 **Oranje waarschuwing bij een standaard**. De gemeten standaard lijkt niet op wat hij
 hoort te zijn: losse connector, verkeerde standaard, of stuk. Controleer en meet opnieuw.
 
-**"I/O error"** in de bovenbalk tijdens een sweep, en de knop staat weer op **Connect**.
-De verbinding is weggevallen: de kabel is bewogen of losgetrokken, of het apparaat is
-uitgezet. Steek hem terug, wacht tot de poort in de lijst verschijnt en klik **Connect**.
+**"connection dropped, waiting for …"** in de bovenbalk, in oranje. Het apparaat is van
+de USB-bus verdwenen: de kabel of de stekker is bewogen (dat gebeurt makkelijk terwijl je
+een standaard op de poort draait), de kabel is losgetrokken, of het apparaat is herstart
+of uitgezet. De melding eronder noemt wat er misging, bijvoorbeeld
+`sweep: I/O error: Broken pipe`. Je hoeft niets te doen: het programma zoekt de poort
+twee keer per seconde, verbindt opnieuw zodra hij terug is en gaat verder met Run of met
+de enkele sweep die liep; een melding zegt na hoeveel seconden. Een calibratiestandaard
+die gemeten werd, wordt niet herhaald; meet hem opnieuw. Na 30 seconden zonder apparaat,
+of als de verbinding telkens binnen een paar seconden na terugkomst weer wegvalt (vier
+keer achter elkaar), staat de knop weer op **Connect**; met **Cancel** ben je daar
+meteen. Het programma merkt het ook op
+als er niets gemeten wordt.
+Gebeurt het vaak, probeer dan een andere kabel of poort en houd de kabel vrij van de
+connector waaraan je draait.
 
 **De LiteVNA blijft in USB MODE**, of de NanoVNA-F blijft op het raster van de laatste
 meting staan. `vna-cli release`, of uit en aan.

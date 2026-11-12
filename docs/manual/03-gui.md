@@ -39,7 +39,8 @@ or scroll in the left panel.
 1. Choose the port in the drop-down list; a VNA has a star and is selected automatically.
    The list is refreshed every two seconds as long as you are not connected, so a device
    you plug in later appears by itself; **rescan** searches straight away.
-2. **Connect**. The top bar shows the model, firmware and battery voltage.
+2. **Connect**. The top bar shows the model, firmware and battery voltage. If the
+   connection drops, the program waits for the device and reconnects by itself (chapter 9).
 3. **Run** starts continuous sweeping, **Single** does one sweep. While anything is
    being measured (the continuous sweep, a single sweep or a calibration standard) the
    Run button reads **Stop**.

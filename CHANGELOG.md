@@ -23,6 +23,19 @@ things that are not backwards compatible, such as the format of the calibration 
   `vna-cli cal show` lists the jumps in a file (also in `--json`, as `jumps`). The cure
   is to calibrate on the grid you measure on; the interpolation itself is unchanged.
 
+### Changed
+
+- GUI: a connection that drops is no longer the end of the session. When the device
+  leaves the USB bus (a cable or connector that moves, a device that restarts) the top
+  bar says so, the program waits up to 30 seconds for the port to come back, reconnects
+  and carries on with Run or the single sweep that was under way. Before, the first sign
+  was `I/O error: Broken pipe` at the next sweep and you had to connect again yourself,
+  sometimes after restarting the program. The loss is now also noticed while nothing is
+  being measured (the port is looked at twice a second, and a battery reading that fails
+  counts). A calibration standard that was being measured is not repeated. Seen with a
+  LiteVNA 67 on macOS, where the system log showed the device leaving the bus for about
+  two seconds, three times in twenty seconds; what made it do so is not established.
+
 ### Documentation
 
 - README and manual chapter 2: what to do when cargo refuses to build because it picks up

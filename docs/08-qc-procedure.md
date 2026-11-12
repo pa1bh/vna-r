@@ -266,6 +266,23 @@ Gecontroleerd met de tests en met `cal show` op de zes bestanden in `cal/` (`n-1
 `n-6g3` melden de sprong, de andere vier niets). Niet gezien: de waarschuwing in de GUI
 en bij een sweep met het apparaat.
 
+**Na 0.3.1, 12 november 2026: "I/O error: Broken pipe" in de GUI.** PA1BH kreeg met de
+LiteVNA 67 op de Mac af en toe deze fout; soms hielp de GUI herstarten, soms alleen de
+USB-C-kabel opnieuw insteken. De systeemlog van macOS (`/usr/bin/log show` met
+`eventMessage CONTAINS "LiteVNA6"`) toont dat het apparaat om 21:18:02, 21:18:16 en
+21:18:21 telkens 1,4 tot 2,4 s van de USB-bus verdween; de fout van 21:18:20 is dus een
+echte verbindingsuitval. Niet op te roepen zonder het apparaat aan te raken: 120 losse
+CLI-sweeps, 150 s aaneengesloten sweepen, het lezen 8 en 20 s stilleggen midden in een
+sweep, de poort 4 minuten open, en 200 s vrijgegeven met elke 10 s een batterij-uitlezing
+gaven nul fouten en nul uitval. Oorzaak van de uitval zelf niet vastgesteld (vermoeden:
+de USB-C-stekker bij het wisselen van loads, of een reset van het apparaat). Wel
+gerepareerd is hoe de GUI erop reageert: de werker merkt de uitval op (ook in rust),
+wacht tot 30 s op de poort, verbindt opnieuw en gaat verder met Run of de enkele sweep.
+Gecontroleerd: de tests, en `hardware_session` (genegeerde test in `worker.rs`) met het
+apparaat onaangeroerd: 18 sweeps, stop, rust, enkele sweep, geen valse uitval. **Niet
+gecontroleerd: het opnieuw verbinden zelf**; dat vraagt iemand die de kabel lostrekt
+(`VNA_R_EXPECT_DROP=1`, zie de test).
+
 ---
 
 # 0.2.6 — bugfixes

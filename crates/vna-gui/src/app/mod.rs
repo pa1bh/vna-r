@@ -128,6 +128,11 @@ enum Connection {
         info: VnaInfo,
         battery_mv: Option<u16>,
     },
+    /// The link dropped; the worker waits for the port to come back.
+    Reconnecting {
+        port: String,
+        since: Instant,
+    },
 }
 
 pub struct App {
@@ -442,6 +447,11 @@ impl App {
         while let Ok(evt) = self.worker.rx.try_recv() {
             match evt {
                 Event::Connected { port, info, battery_mv } => {
+                    if let Connection::Reconnecting { since, .. } = &self.connection {
+                        let text = format!("reconnected after {:.0} s", since.elapsed().as_secs_f32().max(1.0));
+                        self.log(text.clone());
+                        self.notify(text);
+                    }
                     self.log(format!("connected: {} on {port}", info.summary()));
                     self.connection = Connection::Connected { port, info, battery_mv };
                     self.last_battery_poll = ctx.input(|i| i.time);
@@ -462,6 +472,26 @@ impl App {
                     if let Purpose::Standard(std) = purpose {
                         self.cal.pending = None;
                         self.cal.message = Some(format!("measuring {} was stopped", std.name()));
+                    }
+                }
+                Event::LinkLost { port, msg } => {
+                    // The worker waits for the port and reconnects; `running`
+                    // stays as it is, a continuous sweep resumes by itself.
+                    self.log(format!("connection dropped ({msg}); waiting for {port}"));
+                    self.error = Some(format!(
+                        "the connection to the device dropped ({msg}): the cable or connector moved, or the device \
+                         restarted. Waiting for it to come back."
+                    ));
+                    self.connection = Connection::Reconnecting {
+                        port,
+                        since: Instant::now(),
+                    };
+                    self.progress = None;
+                    if let Some(std) = self.cal.pending.take() {
+                        self.cal.message = Some(format!(
+                            "measuring {} was interrupted: the connection dropped. Measure it again.",
+                            std.name()
+                        ));
                     }
                 }
                 Event::Disconnected => {
@@ -606,6 +636,25 @@ impl App {
                     ui.spinner();
                     ui.label(format!("connecting {p}…"));
                 }
+                Connection::Reconnecting { port, since } => {
+                    let cancel = ui
+                        .button("Cancel")
+                        .on_hover_text("stop waiting for the device and disconnect")
+                        .clicked();
+                    ui.spinner();
+                    ui.label(
+                        RichText::new(format!(
+                            "connection dropped, waiting for {port}… {:.0} s",
+                            since.elapsed().as_secs_f32()
+                        ))
+                        .color(Color32::from_rgb(255, 150, 80)),
+                    );
+                    ui.ctx().request_repaint_after(Duration::from_millis(500));
+                    if cancel {
+                        self.running = false;
+                        self.send(Cmd::Disconnect);
+                    }
+                }
                 Connection::Connected { port, info, battery_mv } => {
                     if ui.button("Disconnect").clicked() {
                         self.running = false;
@@ -724,7 +773,7 @@ impl App {
                     }
                 } else if ui
                     .add_enabled(
-                        self.selected_port.is_some() && !matches!(self.connection, Connection::Connecting(_)),
+                        self.selected_port.is_some() && matches!(self.connection, Connection::Disconnected),
                         egui::Button::new("Connect"),
                     )
                     .clicked()
