@@ -66,6 +66,11 @@ cargo build --release
 
 The binaries land in `target/release/`. `cargo run --release -p vna-gui` starts the GUI directly.
 
+If cargo stops with `rustc 1.xx is not supported by the following packages`, it is using
+an older Rust than the one you think you have: a toolchain that rustup installed earlier
+takes precedence over the one from your distribution. `rustup update stable` brings it up
+to date.
+
 **Graphics on Linux.** The GUI draws with wgpu and prefers Vulkan, except on drivers known to
 stutter (NVK on older NVIDIA cards under nouveau) or software rasterisers, where it picks OpenGL. If
 menus feel sluggish, check the renderer line under **Help ▸ About** and try `WGPU_BACKEND=gl`; the

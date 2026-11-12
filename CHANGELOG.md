@@ -12,6 +12,12 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Documentation
+
+- README and manual chapter 2: what to do when cargo refuses to build because it picks up
+  an older Rust that rustup installed earlier (`rustup update stable`). Reported by a user
+  on Fedora.
+
 ## [0.3.1] - 2026-11-12
 
 A small release after the first reaction from a user outside the circle of testers.

@@ -13,6 +13,10 @@ git clone https://github.com/pa1bh/vna-r.git
 cd vna-r && cargo build --release
 ```
 
+Stopt cargo met `rustc 1.xx is not supported by the following packages`, dan gebruikt het
+een oudere Rust dan je denkt te hebben: een toolchain die rustup eerder installeerde gaat
+voor die van je distributie. `rustup update stable` werkt hem bij.
+
 De programma's staan daarna in `target/release/`: `vna-cli` en `vna-gui`. Starten kan ook
 rechtstreeks via cargo:
 
