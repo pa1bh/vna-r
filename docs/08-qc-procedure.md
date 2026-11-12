@@ -324,6 +324,12 @@ deed zich met de goede kabel niet meer voor), en Linux en Windows.
 
 **Uitgebracht als 0.3.3** op 12 november 2026, met de nieuwe wachtregel.
 
+Na de release-commit probeerde PA1BH met dezelfde code nog de lange uitval: kabel eruit
+terwijl er niet gemeten werd. De GUI merkte het zonder sweep op ("connection: the device
+left the USB bus", de controle in rust) en meldde na 30 s "the device on … did not come
+back within 30 s", met de knop terug op Connect. Daarmee zijn in het venster gezien: kort
+lostrekken met herverbinden (7,6 s), uitval in rust, en opgeven na 30 s.
+
 ---
 
 # 0.2.6 — bugfixes
