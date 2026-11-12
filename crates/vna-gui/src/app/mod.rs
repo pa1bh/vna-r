@@ -54,6 +54,35 @@ fn manual_url(dir: &str) -> String {
 
 const ISSUES_URL: &str = "https://github.com/pa1bh/vna-r/issues";
 
+/// The sizes offered under View ▸ Zoom, in percent.
+const ZOOM_STEPS: [u32; 7] = [75, 100, 125, 150, 175, 200, 250];
+
+/// View ▸ Zoom: the size of everything in the window, text included. egui
+/// already zooms on Ctrl/Cmd with plus, minus and zero and eframe keeps the
+/// factor with its own state; this entry is there so that it can be found.
+fn zoom_menu(ui: &mut egui::Ui) {
+    use egui::gui_zoom::kb_shortcuts::{ZOOM_IN, ZOOM_OUT, ZOOM_RESET};
+    let ctx = ui.ctx().clone();
+    let current = (ctx.zoom_factor() * 100.0).round() as u32;
+    ui.menu_button(format!("Zoom ({current}%)"), |ui| {
+        for percent in ZOOM_STEPS {
+            if ui.radio(current == percent, format!("{percent}%")).clicked() {
+                ui.close();
+                ctx.set_zoom_factor(percent as f32 / 100.0);
+            }
+        }
+        ui.separator();
+        ui.weak(format!(
+            "{} and {} step by 10%, {} goes back to 100%",
+            ctx.format_shortcut(&ZOOM_IN),
+            ctx.format_shortcut(&ZOOM_OUT),
+            ctx.format_shortcut(&ZOOM_RESET)
+        ));
+    })
+    .response
+    .on_hover_text("the size of everything in the window, text included");
+}
+
 /// Lines kept in the developer log.
 const LOG_LINES: usize = 400;
 
@@ -739,6 +768,8 @@ impl App {
                 ui.separator();
                 ui.checkbox(&mut self.show_s11, "S11");
                 ui.checkbox(&mut self.show_s21, "S21");
+                ui.separator();
+                zoom_menu(ui);
                 ui.separator();
                 ui.checkbox(&mut self.auto_connect, "Connect at start")
                     .on_hover_text("connect by itself when the program starts and a VNA is plugged in");

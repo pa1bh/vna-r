@@ -10,9 +10,10 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
   calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
 - **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
   en een schermafbeelding van het apparaat.
-- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Connect at
-  start** (vanzelf verbinden als het programma start en er een VNA aangesloten is;
-  standaard uit) en de schakelaar **Developer tools**.
+- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Zoom** (de
+  grootte van de tekst en al het andere, zie hieronder), **Connect at start** (vanzelf
+  verbinden als het programma start en er een VNA aangesloten is; standaard uit) en de
+  schakelaar **Developer tools**.
 - **Help**: de handleiding op GitHub in het Engels en het Nederlands, zoals die bij jouw
   versie hoort, de probleemmelder, en **About vna-r** met versie, build-revisie, auteur en
   de link naar het project.
@@ -22,6 +23,14 @@ logvenster (verbindingen, fouten, bestandsbewerkingen en, zolang het venster ope
 elke sweep met puntenaantal en duur) en **Copy diagnostics**: dat zet versie, apparaat,
 sweep-instellingen, calibratie, de laatste fout en het log als tekst op het klembord. Plak
 dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
+
+### Grotere of kleinere tekst
+
+**View ▸ Zoom** stelt de grootte in van alles in het venster, tekst en grafieken, van 75%
+tot 250%; het menu toont de grootte die in gebruik is. Met het toetsenbord gaan Ctrl met +
+en Ctrl met − (op een Mac ⌘ in plaats van Ctrl) in stappen van 10%, en Ctrl met 0 gaat
+terug naar 100%. De grootte wordt bewaard. Een grote instelling laat minder ruimte voor de
+grafieken; maak het venster groter of scrol in het linkerpaneel.
 
 ![Weergaven, markers en een gecalibreerde meting van een kabel met load](../images/gui-load-rx.webp)
 
@@ -123,7 +132,8 @@ apparaat zelf liet zien.
 
 Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg, segmenten,
 het calibratiebestand en of het toegepast wordt, de poortverlenging, de weergavekeuzes,
-TDR- en gate-instellingen, markerfrequenties, **Connect at start** en de venstergrootte. Bij de volgende start komt dat
+TDR- en gate-instellingen, markerfrequenties, **Connect at start**, de zoom en de
+venstergrootte. Bij de volgende start komt dat
 terug; het calibratiebestand wordt automatisch geladen en de markers worden bij de eerste
 sweep op de dichtstbijzijnde frequentie gezet. Ook de referenties blijven bewaard, als
 bestanden naast de instellingen. Niet bewaard worden de meetdata van de live trace.

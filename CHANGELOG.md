@@ -12,6 +12,13 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Added
+
+- GUI: **View ▸ Zoom** sets the size of the text and everything else in the window, from
+  75% to 250%, and shows the size in use. Zooming itself was already there, on Ctrl (⌘ on
+  a Mac) with +, − and 0, and the size was already remembered, but nothing in the program
+  or the manual said so. Asked for by a user on Windows 11 who found the text too small.
+
 ## [0.3.0] - 2026-11-12
 
 The result of a review of the whole project: bugs in the calibration and TDR, the

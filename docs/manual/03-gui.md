@@ -10,9 +10,10 @@ with four charts. The title bar shows the version number.
   save a calibration, quit. The same buttons are also in the left panel.
 - **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
   screenshot of the device.
-- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Connect at
-  start** (connect by itself when the program starts and a VNA is plugged in; off by
-  default) and the **Developer tools** toggle.
+- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Zoom** (the
+  size of the text and everything else, see below), **Connect at start** (connect by
+  itself when the program starts and a VNA is plugged in; off by default) and the
+  **Developer tools** toggle.
 - **Help**: the manual on GitHub in English and in Dutch, as published for your version,
   the issue tracker, and **About vna-r** with the version, build revision, author and the
   link to the project.
@@ -22,6 +23,14 @@ window (connections, errors, file operations and, as long as the window is open,
 sweep with its number of points and duration) and **Copy diagnostics**: that puts the
 version, device, sweep settings, calibration, the last error and the log on the clipboard
 as text. Paste that into an issue report (chapter 9). The choice is remembered.
+
+### Larger or smaller text
+
+**View ▸ Zoom** sets the size of everything in the window, text and charts alike, from
+75% to 250%; the menu shows the size in use. From the keyboard, Ctrl with + and Ctrl
+with − (on a Mac ⌘ instead of Ctrl) step by 10%, and Ctrl with 0 goes back to 100%. The
+size is remembered. A large size leaves less room for the charts; make the window larger
+or scroll in the left panel.
 
 ![Views, markers and a calibrated measurement of a cable with a load](../images/gui-load-rx.webp)
 
@@ -122,8 +131,8 @@ button to save it as PNG. Handy for documenting what the device itself was showi
 
 On quitting, the following are saved: port, start, stop, points, average, sweep avg,
 segments, the calibration file and whether it is applied, the port extension, the view
-choices, TDR and gate settings, marker frequencies, **Connect at start** and the window
-size. At the next start that all comes back;
+choices, TDR and gate settings, marker frequencies, **Connect at start**, the zoom and
+the window size. At the next start that all comes back;
 the calibration file is loaded automatically and the markers are placed at the nearest
 frequency on the first sweep. The references are kept too, as files next to the settings.
 Not saved are the measurement data of the live trace.
