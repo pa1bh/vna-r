@@ -781,7 +781,7 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
                         format_hz(cfg.stop_hz())
                     )
                 })?;
-                if let Some(w) = set.coarse_low_end_warning(&freqs) {
+                for w in set.interpolation_warnings(&freqs) {
                     eprintln!("WARNING: {}: {w}", p.display());
                 }
                 Some(cal)
@@ -852,7 +852,7 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
                     String::new()
                 }
             );
-            if let Some(w) = set.coarse_low_end_warning(&freqs) {
+            for w in set.interpolation_warnings(&freqs) {
                 eprintln!("WARNING: {w}");
             }
             (cfg, Some(cal))
@@ -1388,6 +1388,12 @@ fn show_cal(set: &CalibrationSet, json: bool) -> Result<()> {
             "note": set.note,
             "measured": have,
             "missing": set.missing_standards().iter().map(|s| s.name()).collect::<Vec<_>>(),
+            "jumps": set.jumps().iter().map(|j| serde_json::json!({
+                "standard": j.standard.name(),
+                "f_lo_hz": j.f_lo_hz,
+                "f_hi_hz": j.f_hi_hz,
+                "ratio": j.ratio,
+            })).collect::<Vec<_>>(),
             "kit": {
                 "name": set.kit.name,
                 "open_c0_farad": set.kit.open_c0(),
@@ -1438,6 +1444,15 @@ fn show_cal(set: &CalibrationSet, json: bool) -> Result<()> {
             have.join(", ")
         }
     );
+    for j in set.jumps() {
+        println!(
+            "jump     : {} → {} (raw {}, {:.0}× the steps around it); a sweep on another grid is unreliable between these points",
+            format_hz(j.f_lo_hz),
+            format_hz(j.f_hi_hz),
+            j.standard.name(),
+            j.ratio
+        );
+    }
     match set.solve() {
         Ok(cal) => {
             println!(

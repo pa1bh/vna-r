@@ -448,6 +448,27 @@ impl CalibrationSet {
 pub const MAX_INTERPOLATION_PHASE_STEP: f64 = 3.0 * PI / 4.0;
 /// See [`CalibrationSet::coarse_low_end_warning`].
 pub const COARSE_LOW_END_RATIO: f64 = 2.0;
+/// A step between two calibration points counts as a jump when it is this many
+/// times larger than every step around it. See [`CalibrationSet::jumps`].
+pub const JUMP_RATIO: f64 = 4.0;
+/// Smallest step (as a difference of raw reflection or transmission
+/// coefficients) that counts as a jump; below this it is noise.
+pub const JUMP_MIN_STEP: f64 = 0.02;
+/// Steps on either side that a jump is compared with.
+const JUMP_NEIGHBOURS: usize = 4;
+
+/// A discontinuity in a raw standard measurement between two neighbouring
+/// calibration points. See [`CalibrationSet::jumps`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct GridJump {
+    /// The standard that shows it most clearly.
+    pub standard: Standard,
+    /// The calibration points on either side.
+    pub f_lo_hz: u64,
+    pub f_hi_hz: u64,
+    /// How many times larger the step is than the largest step around it.
+    pub ratio: f64,
+}
 
 impl CalibrationSet {
     /// Resample every stored standard onto `freqs_hz` by linear interpolation
@@ -532,6 +553,116 @@ impl CalibrationSet {
             crate::freq::format_hz(f1),
             crate::freq::format_hz(f1)
         ))
+    }
+
+    /// Places where a raw standard measurement jumps between two neighbouring
+    /// calibration points: the change per hertz is at least [`JUMP_RATIO`]
+    /// times the largest of the [`JUMP_NEIGHBOURS`] steps on either side, and
+    /// the step itself is at least [`JUMP_MIN_STEP`].
+    ///
+    /// A VNA that switches its signal source or its mixing scheme at some
+    /// frequency has a discontinuity there in everything it measures raw. A
+    /// LiteVNA 67 does so near 100 MHz: its raw short moves by 0.09 from one
+    /// side to the other, against 0.012 between other points 5 MHz apart. On
+    /// the calibration grid that is harmless, because every point is
+    /// corrected with terms measured at that point. Interpolating between
+    /// the two points around the edge, however, blends the terms of the two
+    /// sides: the error grows up to the edge and drops back behind it.
+    ///
+    /// The first and last two steps are never reported (there is nothing on
+    /// one side to compare with; the low end has its own check,
+    /// [`Self::coarse_low_end_warning`]), and a grid much coarser than the
+    /// jump hides it. One entry per step, for the standard that shows it
+    /// most; sorted by frequency.
+    pub fn jumps(&self) -> Vec<GridJump> {
+        let f = &self.freqs_hz;
+        let mut found: Vec<GridJump> = Vec::new();
+        let checked = [
+            (Standard::Open, self.open.as_ref().map(|m| &m.s11)),
+            (Standard::Short, self.short.as_ref().map(|m| &m.s11)),
+            (Standard::Load, self.load.as_ref().map(|m| &m.s11)),
+            (Standard::Through, self.through.as_ref().map(|m| &m.s21)),
+            (Standard::LineOpen, self.line_open.as_ref().map(|m| &m.s11)),
+            (Standard::LineShort, self.line_short.as_ref().map(|m| &m.s11)),
+        ];
+        for (standard, values) in checked {
+            let Some(values) = values else { continue };
+            let n = values.len().min(f.len());
+            if n < 2 * JUMP_NEIGHBOURS {
+                continue;
+            }
+            let step: Vec<f64> = (0..n - 1).map(|i| (values[i + 1] - values[i]).norm()).collect();
+            let rate: Vec<f64> = (0..n - 1).map(|i| step[i] / f[i + 1].saturating_sub(f[i]).max(1) as f64).collect();
+            for i in 2..rate.len() - 2 {
+                if step[i] < JUMP_MIN_STEP {
+                    continue;
+                }
+                let left = &rate[i.saturating_sub(JUMP_NEIGHBOURS)..i];
+                let right = &rate[i + 1..(i + 1 + JUMP_NEIGHBOURS).min(rate.len())];
+                let around = left.iter().chain(right).copied().fold(0.0, f64::max);
+                if !(around > 0.0) || rate[i] < JUMP_RATIO * around {
+                    continue;
+                }
+                let jump = GridJump {
+                    standard,
+                    f_lo_hz: f[i],
+                    f_hi_hz: f[i + 1],
+                    ratio: rate[i] / around,
+                };
+                match found.iter_mut().find(|j| j.f_lo_hz == jump.f_lo_hz) {
+                    Some(known) if known.ratio < jump.ratio => *known = jump,
+                    Some(_) => {}
+                    None => found.push(jump),
+                }
+            }
+        }
+        found.sort_by_key(|j| j.f_lo_hz);
+        found
+    }
+
+    /// Warn when `freqs_hz` has points strictly between two calibration
+    /// points that have a jump between them (see [`Self::jumps`]): those
+    /// points are corrected with terms interpolated across the jump. Returns
+    /// `None` when the grids are equal or no sweep point lies in such a step.
+    pub fn jump_warning(&self, freqs_hz: &[u64]) -> Option<String> {
+        if freqs_hz == self.freqs_hz.as_slice() {
+            return None;
+        }
+        let hit: Vec<(GridJump, usize)> = self
+            .jumps()
+            .into_iter()
+            .map(|j| {
+                let inside = freqs_hz.iter().filter(|&&f| f > j.f_lo_hz && f < j.f_hi_hz).count();
+                (j, inside)
+            })
+            .filter(|(_, inside)| *inside > 0)
+            .collect();
+        let (first, inside) = hit.first()?;
+        let more = match hit.len() - 1 {
+            0 => String::new(),
+            1 => " One more such step lies in this sweep.".to_string(),
+            n => format!(" {n} more such steps lie in this sweep."),
+        };
+        Some(format!(
+            "{} sweep points lie between the calibration points {} and {}, where the raw {} measurement jumps              (the step is {:.0} times larger than those around it): the VNA probably switches its signal source              there. The error terms are interpolated across that jump and results between those two frequencies              are unreliable. Calibrate on this grid instead.{}",
+            inside,
+            crate::freq::format_hz(first.f_lo_hz),
+            crate::freq::format_hz(first.f_hi_hz),
+            first.standard.name(),
+            first.ratio,
+            more
+        ))
+    }
+
+    /// Everything worth telling the user about correcting a sweep on
+    /// `freqs_hz` with this set when that takes interpolation:
+    /// [`Self::coarse_low_end_warning`] and [`Self::jump_warning`]. Empty
+    /// when the grids are equal or nothing is wrong.
+    pub fn interpolation_warnings(&self, freqs_hz: &[u64]) -> Vec<String> {
+        [self.coarse_low_end_warning(freqs_hz), self.jump_warning(freqs_hz)]
+            .into_iter()
+            .flatten()
+            .collect()
     }
 
     /// `solve()`, interpolating first when `freqs_hz` differs from this set's grid.
@@ -1169,6 +1300,70 @@ mod tests {
         assert!(CalibrationSet::new(dense, CalKit::ideal())
             .coarse_low_end_warning(&hf[1..500])
             .is_none());
+    }
+
+    /// A set on 1 MHz..1 GHz in 201 points whose raw short (and, less, open)
+    /// steps by `jump` between the points around 100 MHz, like a LiteVNA 67.
+    fn set_with_jump(jump: f64) -> CalibrationSet {
+        let freqs: Vec<u64> = (0..201).map(|i| 1_000_000 + i * 4_995_000).collect();
+        let raw = |sign: f64, scale: f64| -> Vec<C64> {
+            freqs
+                .iter()
+                .map(|&f| {
+                    // a smooth turn of 0.8° per point plus the step above 100 MHz
+                    let turn = C64::from_polar(1.0, -(f as f64) * 2.8e-9);
+                    let offset = if f > 100_000_000 { scale * jump } else { 0.0 };
+                    sign * turn * (0.95 - offset)
+                })
+                .collect()
+        };
+        let zeros = vec![C64::new(0.0, 0.0); freqs.len()];
+        let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
+        set.set(Standard::Open, &sweep_from(&freqs, raw(1.0, 0.3), zeros.clone())).unwrap();
+        set.set(Standard::Short, &sweep_from(&freqs, raw(-1.0, 1.0), zeros.clone()))
+            .unwrap();
+        set.set(Standard::Load, &sweep_from(&freqs, zeros.clone(), zeros)).unwrap();
+        set
+    }
+
+    #[test]
+    fn a_jump_between_calibration_points_is_found() {
+        let set = set_with_jump(0.09);
+        let jumps = set.jumps();
+        assert_eq!(jumps.len(), 1, "{jumps:?}");
+        let j = &jumps[0];
+        assert_eq!((j.f_lo_hz, j.f_hi_hz), (95_905_000, 100_900_000));
+        assert_eq!(j.standard, Standard::Short);
+        assert!(j.ratio > 5.0, "ratio {}", j.ratio);
+
+        // a sweep with points inside that step is warned about, naming the two points
+        let inside: Vec<u64> = (0..801).map(|i| 50_000_000 + i * 125_000).collect();
+        let w = set.jump_warning(&inside).expect("warning");
+        assert!(w.contains("95.905 MHz") && w.contains("100.900 MHz") && w.contains("short"), "{w}");
+        assert_eq!(set.interpolation_warnings(&inside), vec![w]);
+        // away from the step, on the step's own two points, or on the calibration grid: silence
+        let above: Vec<u64> = (0..101).map(|i| 200_000_000 + i * 1_000_000).collect();
+        assert!(set.jump_warning(&above).is_none());
+        assert!(set.jump_warning(&[95_905_000, 100_900_000, 105_895_000]).is_none());
+        assert!(set.jump_warning(&set.freqs_hz.clone()).is_none());
+    }
+
+    #[test]
+    fn a_smooth_calibration_has_no_jumps() {
+        // without the step, and with one too small to matter
+        assert!(set_with_jump(0.0).jumps().is_empty());
+        assert!(set_with_jump(0.01).jumps().is_empty());
+        // the fast change at the low end of a wide grid is the business of the
+        // low-end warning, not a jump: the first two steps are never reported
+        let freqs: Vec<u64> = (0..201).map(|i| 1_000_000 + i * 4_995_000).collect();
+        let low: Vec<C64> = freqs
+            .iter()
+            .map(|&f| C64::from_polar(1.0 - 0.5 * (-(f as f64) / 3e6).exp(), -(f as f64) * 2.8e-9))
+            .collect();
+        let zeros = vec![C64::new(0.0, 0.0); freqs.len()];
+        let mut set = CalibrationSet::new(freqs.clone(), CalKit::ideal());
+        set.set(Standard::Open, &sweep_from(&freqs, low, zeros)).unwrap();
+        assert!(set.jumps().is_empty(), "{:?}", set.jumps());
     }
     use std::time::Duration;
 

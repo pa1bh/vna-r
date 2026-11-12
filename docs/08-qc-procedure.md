@@ -254,6 +254,18 @@ Dezelfde dag probeerde PA1BH de GUI op Windows, zonder apparaat: starten, de men
 het zoomen werken. Het is de eerste keer dat de Windows-build is gestart; verbinden,
 sweepen en calibreren zijn daar nog steeds niet geprobeerd.
 
+**Na 0.3.1, 12 november 2026: een zaagtand bij 100 MHz.** PA1BH mat met de LiteVNA 67 een
+open N-naar-BNC-verloopstuk over 50–150 MHz met de calibratie `n-1g` (1 MHz–1 GHz, 201
+punten) en zag R + jX en |Z| vanaf 96 MHz weglopen en op precies 100 MHz terugvallen.
+Oorzaak: de calibratie wordt geïnterpoleerd over de frequentie waarop het apparaat van
+signaalbron wisselt (zie "Valkuil: de bandgrens bij 100 MHz" in
+[docs/03-calibratie.md](03-calibratie.md)). Gerepareerd met een waarschuwing, niet met
+een andere interpolatie: CLI en GUI melden het als een sweep punten heeft tussen twee
+calibratiepunten met een sprong ertussen, en `vna-cli cal show` toont de sprongen.
+Gecontroleerd met de tests en met `cal show` op de zes bestanden in `cal/` (`n-1g` en
+`n-6g3` melden de sprong, de andere vier niets). Niet gezien: de waarschuwing in de GUI
+en bij een sweep met het apparaat.
+
 ---
 
 # 0.2.6 — bugfixes

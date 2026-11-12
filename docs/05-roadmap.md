@@ -316,6 +316,7 @@ en de meetpunten 45 tot 47; de reden staat in de statuskolom.
 | 49 | Kleine UX-punten: Return past de sweep toe, hover bij Apply en Clear, CLI weigert tegenstrijdige vlaggen | U7, U9, U13 | S | gedaan 2026-11-10 |
 | 50 | Schermafbeeldingen in de handleiding opnieuw maken: ze zijn van 0.2.3/0.2.4 (geen menubalk, oud TDR-bereik, oude paneelteksten) | — | M | open: vraagt het apparaat met de antenne, de kabels en het filter; de handleiding vermeldt nu dat ze ouder zijn |
 | 51 | Onderkant van een brede calibratie: sweeppunten onder het tweede calibratiepunt niet tekenen, of een calibratieraster dat onderin dichter is | — | M | open: gezien in de QC (short tot +8 dB te hoog onder 6,35 MHz met `n-6g3`); nu alleen een waarschuwing |
+| 52 | Waarschuwen als een calibratie over een sprong in de ruwe standaardmetingen heen geïnterpoleerd wordt (bandgrens van het apparaat; LiteVNA 67 bij 100 MHz) | — | S | gedaan 2026-11-12; niet over de sprong heen interpoleren blijft open, dat vraagt de exacte grens per apparaat |
 
 ## Meten
 

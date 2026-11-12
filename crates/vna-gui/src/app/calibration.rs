@@ -48,7 +48,7 @@ impl CalState {
                 Ok(cal) => {
                     self.solved = Some((freqs.to_vec(), cal));
                     self.solve_error = None;
-                    self.grid_warning = set.coarse_low_end_warning(freqs);
+                    self.grid_warning = join_warnings(set.interpolation_warnings(freqs));
                 }
                 Err(e) => {
                     self.solved = None;
@@ -60,6 +60,11 @@ impl CalState {
         }
         self.solved.as_ref().map(|(_, c)| c)
     }
+}
+
+/// The warnings of [`CalibrationSet::interpolation_warnings`] as one text, or `None`.
+fn join_warnings(warnings: Vec<String>) -> Option<String> {
+    (!warnings.is_empty()).then(|| warnings.join("\n"))
 }
 
 /// A calibration file bound to an extra segment.
@@ -98,9 +103,7 @@ impl App {
             match set.solve_for(&part.freqs_hz) {
                 Ok(cal) => {
                     entry.solved = Some((part.freqs_hz.clone(), cal));
-                    entry.error = set
-                        .coarse_low_end_warning(&part.freqs_hz)
-                        .map(|w| format!("{}: {w}", path.display()));
+                    entry.error = join_warnings(set.interpolation_warnings(&part.freqs_hz)).map(|w| format!("{}: {w}", path.display()));
                 }
                 Err(e) => {
                     entry.solved = None;

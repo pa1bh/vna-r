@@ -92,6 +92,14 @@ case:
   strongly that a straight line between the two produces a false impedance dip of tens of
   ohms. Solution: a separate HF calibration, and with segments (chapter 3) both in one
   trace.
+- **A jump between two calibration points**: a warning when the sweep has points between
+  two calibration points where a raw standard measurement steps at least four times more
+  than between the points around them. A VNA that switches its signal source at some
+  frequency has such a step in everything it measures raw; a LiteVNA 67 has one near
+  100 MHz. On the calibration grid itself that does no harm, but in between the
+  correction blends the two sides: the trace runs off towards the switching frequency
+  and drops back right behind it, a sawtooth a few megahertz wide. Solution: calibrate
+  on the grid you measure on. `vna-cli cal show` lists the jumps in a file.
 
 ![The false dip below 6 MHz with a wide calibration, and the flat load with an HF calibration](../images/gui-hf-cal-load.webp)
 

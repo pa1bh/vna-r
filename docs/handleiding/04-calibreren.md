@@ -92,6 +92,15 @@ calibratiepunten glad verlopen, en het programma weigert als dat niet zo is:
   zo sterk dat een rechte lijn ertussen een valse impedantiedip van tientallen ohm
   oplevert. Oplossing: een aparte HF-calibratie, en met segmenten (hoofdstuk 3) beide in
   één trace.
+- **Een sprong tussen twee calibratiepunten**: een waarschuwing wanneer de sweep punten
+  heeft tussen twee calibratiepunten waar een ruwe standaardmeting minstens viermaal
+  zoveel verspringt als tussen de punten eromheen. Een VNA die op een bepaalde frequentie
+  van signaalbron wisselt, heeft zo'n sprong in alles wat hij ruw meet; een LiteVNA 67
+  heeft er een bij 100 MHz. Op het calibratieraster zelf kan dat geen kwaad, maar
+  ertussen mengt de correctie de twee kanten: de trace loopt weg naar de
+  omschakelfrequentie toe en valt er direct achter terug, een zaagtand van een paar
+  megahertz breed. Oplossing: calibreer op het raster waarop je meet. `vna-cli cal show`
+  toont de sprongen in een bestand.
 
 ![De valse dip onder 6 MHz met een brede calibratie, en de vlakke load met een HF-calibratie](../images/gui-hf-cal-load.webp)
 

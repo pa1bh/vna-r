@@ -12,6 +12,17 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Added
+
+- A warning when a calibration is interpolated across a jump: a sweep with points between
+  two calibration points where a raw standard measurement steps at least four times more
+  than between the points around them. A LiteVNA 67 switches its signal source near
+  100 MHz and everything it measures raw steps there; a 1 MHz–1 GHz calibration in 201
+  points used on a 50–150 MHz sweep then draws a sawtooth from 96 to 100 MHz. The GUI
+  shows the warning under Calibration, the CLI prints it with `sweep --cal`, and
+  `vna-cli cal show` lists the jumps in a file (also in `--json`, as `jumps`). The cure
+  is to calibrate on the grid you measure on; the interpolation itself is unchanged.
+
 ### Documentation
 
 - README and manual chapter 2: what to do when cargo refuses to build because it picks up

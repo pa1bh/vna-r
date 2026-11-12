@@ -227,6 +227,35 @@ calibratiebestand (GUI: **Segments**; CLI: `--segment START:STOP:POINTS@cal.json
 op zijn eigen dichte calibratie naast het brede segment op de 6,3 GHz-calibratie geeft één trace
 zonder de kunstmatige dip hierboven.
 
+### Valkuil: de bandgrens bij 100 MHz (12 november 2026)
+
+Gemeten: een open N-naar-BNC-verloopstuk, sweep 50–150 MHz in 801 punten, gecorrigeerd met
+`cal/n-1g.cal.json` (201 punten, 1 MHz–1 GHz, stap 4,995 MHz). Resultaat: R + jX en |Z|
+lopen vanaf 96 MHz lineair weg (|Z| van 870 naar 930 Ω, R van 0 naar 50 Ω) en vallen op
+precies 100 MHz terug op de verwachte lijn. De rest klopt: −1183 Ω op 71 MHz en −600 Ω op
+139,75 MHz zijn allebei 1,9 pF.
+
+Oorzaak: de LiteVNA 67 wisselt bij 100 MHz van signaalbron, en alles wat hij ruw meet
+verspringt daar. In het calibratiebestand is dat te zien aan de ruwe short: 0,094 tussen
+95,905 en 100,900 MHz, tegen 0,011 tot 0,014 tussen de punten eromheen (open 0,026 tegen
+0,014; load niet zichtbaar). `cal/n-6g3.cal.json` toont hetzelfde tussen 94,549 en
+100,849 MHz. Op het calibratieraster is elk punt gecorrigeerd met termen die op dat punt
+gemeten zijn, dus daar is niets aan de hand. Ertussen schuift de interpolatie de termen
+geleidelijk van de ene bron naar de andere, terwijl het apparaat tot 100 MHz nog met de
+lage bron meet: de fout groeit lineair tot de grens en valt erachter terug. De exacte
+omschakelfrequentie is afgeleid uit deze sweep, niet uit de firmware.
+
+Sinds 12 november 2026 zoekt `CalibrationSet::jumps` zulke sprongen: een stap tussen twee
+calibratiepunten die per hertz minstens viermaal zo groot is als de grootste van de vier
+stappen aan weerszijden, en minstens 0,02 groot. `jump_warning` waarschuwt als een sweep
+punten in zo'n stap heeft; de CLI en de GUI tonen dat naast de waarschuwing voor de
+onderkant, en `vna-cli cal show` noemt de sprongen in een bestand. De drempel is gekozen
+op de zes calibratiebestanden in `cal/`: de echte sprong geeft een verhouding van 5,7 en
+6,9, de grootste ruis (open rond 5,8 GHz in `n-6g3`) 3,1. Beperkingen: de eerste en
+laatste twee stappen worden niet beoordeeld, en een raster dat veel grover is dan de
+sprong verbergt hem (`qc-grof`, stap 63 MHz, meldt niets). Er wordt alleen gewaarschuwd;
+niet over de sprong heen interpoleren vraagt de exacte grens per apparaat.
+
 ## 8. Calibratie tot 6,3 GHz en de kit-fit
 
 ### Waarom de ideale kit boven ~1 GHz niet meer volstaat
