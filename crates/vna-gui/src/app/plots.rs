@@ -10,11 +10,19 @@ pub(super) struct Reference {
 }
 
 /// Subdirectory of the settings directory that holds the references.
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) const REFERENCE_DIR: &str = "references";
 
 /// Where the references are kept between sessions: next to eframe's settings file.
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn references_dir() -> Option<PathBuf> {
     eframe::storage_dir("vna-r").map(|d| d.join(REFERENCE_DIR))
+}
+
+/// A browser has no directory to keep them in: the references last as long as the page.
+#[cfg(target_arch = "wasm32")]
+pub(super) fn references_dir() -> Option<PathBuf> {
+    None
 }
 
 fn reference_file(dir: &Path, position: usize) -> PathBuf {
@@ -197,7 +205,7 @@ impl App {
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
         let Some(sweep) = sweep else {
-            ui.centered_and_justified(|ui| ui.label("Connect and press Run"));
+            ui.centered_and_justified(|ui| ui.label(EMPTY_HINT));
             return;
         };
         // Grey lines where a gated trace stops being trustworthy.

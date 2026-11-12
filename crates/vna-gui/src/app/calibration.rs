@@ -491,6 +491,7 @@ impl App {
         self.reshow();
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn load_cal(&mut self) {
         let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() else {
             return;
@@ -498,11 +499,20 @@ impl App {
         self.load_cal_from(&path);
     }
 
+    /// The browser asks for the file and answers later: see [`App::handle_picked`].
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn load_cal(&mut self) {
+        self.web.pick(web::PickFor::Calibration, "calibration", &["json"]);
+    }
+
     pub(super) fn load_cal_from(&mut self, path: &Path) {
-        match std::fs::read_to_string(path)
-            .map_err(|e| e.to_string())
-            .and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string()))
-        {
+        self.load_cal_text(std::fs::read_to_string(path).map_err(|e| e.to_string()), path);
+    }
+
+    /// Take over a calibration from the text of its file (or the reason it
+    /// could not be read). `path` is where it came from; in a browser only the name.
+    pub(super) fn load_cal_text(&mut self, text: Result<String, String>, path: &Path) {
+        match text.and_then(|t| CalibrationSet::from_json(&t).map_err(|e| e.to_string())) {
             Ok(set) => {
                 self.cal.set = Some(set);
                 self.cal.file = Some(path.to_path_buf());
@@ -519,13 +529,30 @@ impl App {
 
     pub(super) fn save_cal(&mut self) {
         let Some(set) = &self.cal.set else { return };
+        let file_name = format!(
+            "{}-{}.cal.json",
+            compact_hz(set.freqs_hz[0]),
+            compact_hz(*set.freqs_hz.last().unwrap())
+        );
+        // A browser saves by downloading under the proposed name.
+        #[cfg(target_arch = "wasm32")]
+        match set.to_json() {
+            Ok(json) => {
+                self.cal.message = Some(format!("offered {file_name} as a download"));
+                self.web.save(file_name, json.into_bytes());
+            }
+            Err(e) => self.error = Some(format!("saving calibration: {e}")),
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        self.write_cal(file_name);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn write_cal(&mut self, file_name: String) {
+        let Some(set) = &self.cal.set else { return };
         let Some(path) = rfd::FileDialog::new()
             .add_filter("calibration", &["json"])
-            .set_file_name(format!(
-                "{}-{}.cal.json",
-                compact_hz(set.freqs_hz[0]),
-                compact_hz(*set.freqs_hz.last().unwrap())
-            ))
+            .set_file_name(file_name)
             .save_file()
         else {
             return;

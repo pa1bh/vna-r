@@ -15,6 +15,11 @@
 //! battery reading, and while idle by looking whether the port still exists;
 //! it then waits for the port to come back, reconnects and carries on with
 //! what it was doing. See [`Lost`].
+//!
+//! The browser build has no threads and no serial port: there [`spawn`] only
+//! hands out the channels and nothing answers.
+
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
 
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
@@ -104,6 +109,7 @@ pub struct WorkerHandle {
     pub rx: Receiver<Event>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn spawn(ctx: egui::Context) -> WorkerHandle {
     let (cmd_tx, cmd_rx) = channel::<Cmd>();
     let (evt_tx, evt_rx) = channel::<Event>();
@@ -111,6 +117,15 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
         .name("litevna-worker".into())
         .spawn(move || run(cmd_rx, evt_tx, ctx))
         .expect("spawn worker thread");
+    WorkerHandle { tx: cmd_tx, rx: evt_rx }
+}
+
+/// The browser build: a handle nobody listens to. Commands are dropped and no
+/// event ever arrives, so the program stays "not connected".
+#[cfg(target_arch = "wasm32")]
+pub fn spawn(_ctx: egui::Context) -> WorkerHandle {
+    let (cmd_tx, _) = channel::<Cmd>();
+    let (_, evt_rx) = channel::<Event>();
     WorkerHandle { tx: cmd_tx, rx: evt_rx }
 }
 

@@ -3950,6 +3950,8 @@ dependencies = [
  "rfd",
  "ron",
  "serde",
+ "wasm-bindgen-futures",
+ "web-time",
 ]
 
 [[package]]

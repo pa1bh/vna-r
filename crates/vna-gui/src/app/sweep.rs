@@ -139,7 +139,7 @@ impl App {
                         None => "cal: panel (interpolated)".to_string(),
                     };
                     if ui.small_button(label).on_hover_text("calibration file for this segment; without one the calibration panel's set is interpolated").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file() {
+                        if let Some(path) = pick_cal_path() {
                             self.seg_cals.remove(&path);
                             self.extra_segments[k].cal_file = Some(path);
                         }

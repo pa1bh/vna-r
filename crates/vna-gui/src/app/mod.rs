@@ -3,7 +3,8 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+// `Instant` from std panics in a browser; web-time is std itself on native.
+use web_time::{Duration, Instant};
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
@@ -12,7 +13,9 @@ use litevna::device::plan_segments;
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, nearest_index, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
-use litevna::touchstone::{read_touchstone_file_full, write_s1p, write_s2p};
+use litevna::touchstone::write_s2p;
+#[cfg(not(target_arch = "wasm32"))]
+use litevna::touchstone::{read_touchstone_file_full, write_s1p};
 use litevna::traces::{self, db, impedance, swr, Param, TraceKind};
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
@@ -28,6 +31,8 @@ mod plots;
 mod settings;
 mod sweep;
 mod tdr;
+#[cfg(target_arch = "wasm32")]
+mod web;
 
 // Types and helpers the submodules define; each submodule sees this module through `use super::*`.
 use self::calibration::*;
@@ -82,6 +87,13 @@ fn zoom_menu(ui: &mut egui::Ui) {
     .response
     .on_hover_text("the size of everything in the window, text included");
 }
+
+/// What an empty chart says: how to get a trace on it.
+#[cfg(not(target_arch = "wasm32"))]
+const EMPTY_HINT: &str = "Connect and press Run";
+/// The browser build has no device: a trace can only come from a file.
+#[cfg(target_arch = "wasm32")]
+const EMPTY_HINT: &str = "No device support in the browser build: open a Touchstone file (File ▸ Open as trace…)";
 
 /// Lines kept in the developer log.
 const LOG_LINES: usize = 400;
@@ -237,6 +249,9 @@ pub struct App {
     /// Developer log: connection events, errors, file operations, sweeps while the window is open.
     log: VecDeque<String>,
     started: Instant,
+    /// File dialogs of the browser build, which answer in a later frame.
+    #[cfg(target_arch = "wasm32")]
+    web: web::WebFiles,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -319,6 +334,8 @@ impl App {
             show_log: false,
             log: VecDeque::new(),
             started: Instant::now(),
+            #[cfg(target_arch = "wasm32")]
+            web: web::WebFiles::new(cc.egui_ctx.clone()),
         };
         app.log(format!(
             "vna-r {VERSION} ({GIT_REV}) on {} {}",
@@ -1098,6 +1115,8 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_events(&ctx);
+        #[cfg(target_arch = "wasm32")]
+        self.handle_picked();
         self.housekeeping(&ctx);
         self.shortcuts(&ctx);
         if self.running {
