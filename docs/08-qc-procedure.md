@@ -1,6 +1,7 @@
 # QC-procedure werklijst november 2026
 
-Stand: 12 november 2026: **0.3.0** is uitgebracht, na de release candidates 0.3.0-rc.1
+Stand: 12 november 2026: **0.3.1** is uitgebracht (0.3.0 plus View ▸ Zoom, zie het
+logboek). **0.3.0** kwam na de release candidates 0.3.0-rc.1
 (vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
 het eerste deel van de QC op macOS met de LiteVNA 67), en na een ronde met de NanoVNA-F
 op NixOS en macOS. Wat getest is, wat gevonden is en wat nog openstaat, staat in het
@@ -24,7 +25,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.0>, uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.1>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
@@ -241,6 +242,13 @@ in een nieuwe ronde. Bij de release niet bevestigd: de bestandsdialogen op NixOS
 bevinding 8; onverklaard: bevinding 9; nog steeds niet met een apparaat geprobeerd:
 Windows; met de LiteVNA in de GUI niet stap voor stap doorlopen: referenties, TDR, gate
 en bestanden (blok 4) en de slotronde.
+
+**Uitgebracht als 0.3.1** op 12 november 2026. PA1BH kondigde 0.3.0 aan in de groep
+liteVNA op groups.io; de eerste reactie, van een gebruiker op Windows 11, was dat de tekst
+te klein is. Zoomen zat al in de GUI (Ctrl of ⌘ met +, − en 0) maar stond nergens; 0.3.1
+zet **View ▸ Zoom** in het menu en in beide handleidingen. PA1BH bekeek het menu op
+macOS; dat de gekozen grootte wordt weggeschreven is gezien in `app.ron`, dat ze bij een
+nieuwe start terugkomt is niet gemeld. Niet geprobeerd op Linux en Windows.
 
 ---
 

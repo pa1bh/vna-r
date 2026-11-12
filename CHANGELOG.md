@@ -12,6 +12,12 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-12
+
+A small release after the first reaction from a user outside the circle of testers.
+Nothing else changed since 0.3.0, so what was and was not tried there still holds; the
+Zoom menu was tried on macOS only.
+
 ### Added
 
 - GUI: **View ▸ Zoom** sets the size of the text and everything else in the window, from
@@ -353,7 +359,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.1
 [0.3.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0
 [0.2.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.5
 [0.2.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.2.4
