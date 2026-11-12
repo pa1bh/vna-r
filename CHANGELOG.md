@@ -12,6 +12,16 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-11-12
+
+One correction to the reconnecting that 0.3.2 introduced.
+
+Tried with a LiteVNA 67 on macOS, in the GUI: the cable pulled and put back, after which
+the connection came back; and the warning for a jump in the calibration, new in 0.3.2,
+shows as intended. **Not tried**: a port that comes and goes in quick succession with the
+new rule (with a good cable that no longer happened; the rule is covered by tests only),
+and the reconnecting on Linux and Windows.
+
 ### Fixed
 
 - GUI: reconnecting no longer gives up after four drops in a row ("the connection keeps
@@ -414,7 +424,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.3
 [0.3.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.2
 [0.3.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.1
 [0.3.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.0
