@@ -93,12 +93,13 @@ should be: loose connector, wrong standard, or broken. Check and measure again.
 USB bus: the cable or its connector moved (easily done while screwing a standard onto the
 port), the cable was unplugged, or the device restarted or was switched off. The message
 under it names what failed, for example `sweep: I/O error: Broken pipe`. You do not have
-to do anything: the program looks for the port twice a second, reconnects as soon as it
-is back and carries on with Run or with the single sweep that was under way; a note says
-after how many seconds. A calibration standard that was being measured is not repeated;
-measure it again. After 30 seconds without the device, or when the connection keeps
-dropping within seconds of coming back (four times in a row), the button is back on
-**Connect**; **Cancel** gets you there at once. The program also notices it when nothing is being measured.
+to do anything: the program looks for the port twice a second, reconnects once it has
+stayed for a second and carries on with Run or with the single sweep that was under way;
+a note says after how many seconds. A contact that is being moved makes the device come
+and go for as long as your hand is on the connector; the program then waits longer before
+it reconnects (up to eight seconds), and goes on waiting for as long as it takes. A calibration standard that was being measured is not repeated;
+measure it again. After 30 seconds without the device the button is back on **Connect**;
+**Cancel** gets you there at once. The program also notices it when nothing is being measured.
 If it happens often, try another cable or port and keep the cable free of the connector
 you are turning.
 

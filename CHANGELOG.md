@@ -12,6 +12,17 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Fixed
+
+- GUI: reconnecting no longer gives up after four drops in a row ("the connection keeps
+  dropping; not reconnecting again", new in 0.3.2). A contact that is being moved does
+  not drop once: a LiteVNA 67 left the USB bus fourteen times in half a minute while a
+  connector was being turned on its port, each time back after 1.4 s and gone again
+  within a second. The program now waits until the port has stayed for a second before it
+  opens it again, longer after every drop in a row (2, 4, at most 8 seconds), and keeps
+  waiting for as long as the port keeps coming back. It still stops after 30 seconds
+  without the device.
+
 ## [0.3.2] - 2026-11-12
 
 Two things that came out of an evening of measuring with a LiteVNA 67 on macOS: a

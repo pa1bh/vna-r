@@ -95,12 +95,13 @@ de USB-bus verdwenen: de kabel of de stekker is bewogen (dat gebeurt makkelijk t
 een standaard op de poort draait), de kabel is losgetrokken, of het apparaat is herstart
 of uitgezet. De melding eronder noemt wat er misging, bijvoorbeeld
 `sweep: I/O error: Broken pipe`. Je hoeft niets te doen: het programma zoekt de poort
-twee keer per seconde, verbindt opnieuw zodra hij terug is en gaat verder met Run of met
-de enkele sweep die liep; een melding zegt na hoeveel seconden. Een calibratiestandaard
-die gemeten werd, wordt niet herhaald; meet hem opnieuw. Na 30 seconden zonder apparaat,
-of als de verbinding telkens binnen een paar seconden na terugkomst weer wegvalt (vier
-keer achter elkaar), staat de knop weer op **Connect**; met **Cancel** ben je daar
-meteen. Het programma merkt het ook op
+twee keer per seconde, verbindt opnieuw zodra hij een seconde gebleven is en gaat verder
+met Run of met de enkele sweep die liep; een melding zegt na hoeveel seconden. Een
+contact dat bewogen wordt laat het apparaat komen en gaan zolang je hand aan de connector
+zit; het programma wacht dan langer voor het opnieuw verbindt (tot acht seconden), en
+blijft wachten zolang het duurt. Een calibratiestandaard
+die gemeten werd, wordt niet herhaald; meet hem opnieuw. Na 30 seconden zonder apparaat
+staat de knop weer op **Connect**; met **Cancel** ben je daar meteen. Het programma merkt het ook op
 als er niets gemeten wordt.
 Gebeurt het vaak, probeer dan een andere kabel of poort en houd de kabel vrij van de
 connector waaraan je draait.

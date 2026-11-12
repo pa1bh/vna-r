@@ -120,12 +120,28 @@ const IDLE_CHECK: Duration = Duration::from_millis(500);
 const RECONNECT_POLL: Duration = Duration::from_millis(500);
 /// How long a worker waits for a lost device to come back.
 pub const RECONNECT_FOR: Duration = Duration::from_secs(30);
-/// Links lost in a row after which the worker stops reconnecting: a device
-/// that opens but fails every sweep would otherwise go round for ever. A loss
-/// is "in a row" when the link had held for less than [`RELINK_WINDOW`] and no
-/// sweep was completed on it.
-const MAX_RELINKS: u8 = 3;
+/// A loss counts as one of a row when the link had held for less than this
+/// and no sweep was completed on it; see [`settle_for`].
 const RELINK_WINDOW: Duration = Duration::from_secs(10);
+/// How long the port must have stayed before it is opened again, after the
+/// first loss; see [`settle_for`].
+const SETTLE: Duration = Duration::from_secs(1);
+const SETTLE_MAX: Duration = Duration::from_secs(8);
+
+/// How long the port must be there without a break before the worker opens
+/// it again, after `relinks` losses in a row: 1, 2, 4, 8, 8, … seconds.
+///
+/// A contact that is being moved does not drop once: the device comes and
+/// goes for as long as the hand is on the connector (a LiteVNA 67 was seen
+/// leaving the bus fourteen times in half a minute, each time back after
+/// 1.4 s and gone again within a second). Opening the port in every gap is
+/// pointless, so the worker waits until the port has stayed. The wait grows
+/// with every loss in a row, which also slows down a device that opens but
+/// fails every sweep, without ever giving up on it.
+fn settle_for(relinks: u8) -> Duration {
+    let doubled = SETTLE.saturating_mul(1u32 << relinks.saturating_sub(1).min(8));
+    doubled.min(SETTLE_MAX)
+}
 
 /// What to pick up again once a lost link is back.
 #[derive(Debug, Clone, PartialEq)]
@@ -159,26 +175,31 @@ impl Resume {
 /// A link that dropped and is being waited for.
 struct Lost {
     since: Instant,
+    /// When the port was last seen (the moment of the loss, to begin with).
+    last_seen: Instant,
+    /// Since when the port has been there without a break, if it is there.
+    present_since: Option<Instant>,
     resume: Resume,
 }
 
 /// What to do about a lost link right now.
 #[derive(Debug, PartialEq, Eq)]
 enum Retry {
-    /// The port is not there (yet).
+    /// The port is not there, or has not stayed long enough yet.
     Wait,
-    /// The port exists: try to open it.
+    /// The port has stayed for the settle time: try to open it.
     Open,
     GiveUp,
 }
 
-fn retry_step(waited: Duration, port_present: bool) -> Retry {
-    if waited > RECONNECT_FOR {
-        Retry::GiveUp
-    } else if port_present {
-        Retry::Open
-    } else {
-        Retry::Wait
+/// `absent` is how long ago the port was last seen, `present` for how long
+/// it has been there without a break (`None` when it is not there).
+fn retry_step(absent: Duration, present: Option<Duration>, settle: Duration) -> Retry {
+    match present {
+        Some(p) if p >= settle => Retry::Open,
+        Some(_) => Retry::Wait,
+        None if absent > RECONNECT_FOR => Retry::GiveUp,
+        None => Retry::Wait,
     }
 }
 
@@ -197,7 +218,7 @@ struct Worker {
     port: Option<String>,
     /// Set while the link is lost and the worker waits for the port.
     lost: Option<Lost>,
-    /// Links lost in a row, see [`MAX_RELINKS`].
+    /// Links lost in a row, see [`settle_for`].
     relinks: u8,
     /// When the device was last opened.
     linked_at: Option<Instant>,
@@ -304,41 +325,48 @@ impl Worker {
     }
 
     /// The link dropped: forget the handle, tell the UI and start waiting
-    /// for the port. After [`MAX_RELINKS`] in a row it is a disconnect.
+    /// for the port.
     fn lose(&mut self, context: &str, err: impl std::fmt::Display, resume: Resume) {
         let msg = format!("{context}: {err}");
         self.dev = None;
         self.continuous = None;
+        let Some(port) = self.port.clone() else {
+            self.emit(Event::Disconnected);
+            self.fail(context, err);
+            return;
+        };
         if self.linked_at.is_some_and(|t| t.elapsed() > RELINK_WINDOW) {
             self.relinks = 0;
         }
-        self.relinks += 1;
-        let Some(port) = self.port.clone().filter(|_| self.relinks <= MAX_RELINKS) else {
-            self.lost = None;
-            self.port = None;
-            self.emit(Event::Disconnected);
-            self.emit(Event::Error {
-                msg: format!("{msg} (the connection keeps dropping; not reconnecting again)"),
-                stops_sweep: true,
-            });
-            return;
-        };
-        log::warn!("{msg}; waiting for {port} to come back");
+        self.relinks = self.relinks.saturating_add(1);
+        log::warn!("{msg}; waiting for {port} to come back (loss {} in a row)", self.relinks);
+        let now = Instant::now();
         self.lost = Some(Lost {
-            since: Instant::now(),
+            since: now,
+            last_seen: now,
+            present_since: None,
             resume,
         });
         self.emit(Event::LinkLost { port, msg });
     }
 
-    /// One look at a lost link: reconnect when the port is back, give up
-    /// after [`RECONNECT_FOR`].
+    /// One look at a lost link: reconnect when the port has stayed for
+    /// [`settle_for`], give up when it has been away for [`RECONNECT_FOR`].
     fn try_reconnect(&mut self) {
-        let (Some(lost), Some(port)) = (&self.lost, self.port.clone()) else {
+        let present = !self.port_vanished();
+        let settle = settle_for(self.relinks);
+        let (Some(lost), Some(port)) = (&mut self.lost, self.port.clone()) else {
             return;
         };
+        let now = Instant::now();
+        if present {
+            lost.present_since.get_or_insert(now);
+            lost.last_seen = now;
+        } else {
+            lost.present_since = None;
+        }
         let waited = lost.since.elapsed();
-        match retry_step(waited, !self.port_vanished()) {
+        match retry_step(now - lost.last_seen, lost.present_since.map(|t| now - t), settle) {
             Retry::Wait => {}
             Retry::GiveUp => {
                 self.lost = None;
@@ -349,8 +377,6 @@ impl Worker {
                     stops_sweep: true,
                 });
             }
-            // A device that has only just appeared may not answer yet; the
-            // next look tries again.
             Retry::Open => match open_device(&port) {
                 Ok((d, info, battery_mv)) => {
                     log::info!("reconnected {port} after {:.1} s", waited.as_secs_f32());
@@ -364,7 +390,11 @@ impl Worker {
                         Resume::Once(cfgs, repeat) => self.sweep_once(cfgs, Purpose::Display, repeat),
                     }
                 }
-                Err(e) => log::debug!("reconnecting {port}: {e}"),
+                // Not answering (yet): let it settle once more before the next try.
+                Err(e) => {
+                    log::debug!("reconnecting {port}: {e}");
+                    lost.present_since = None;
+                }
             },
         }
     }
@@ -570,12 +600,25 @@ mod tests {
 
     #[test]
     fn a_lost_link_is_waited_for_then_opened_then_given_up() {
-        assert_eq!(retry_step(Duration::from_secs(1), false), Retry::Wait);
-        assert_eq!(retry_step(Duration::from_secs(1), true), Retry::Open);
-        assert_eq!(retry_step(RECONNECT_FOR, true), Retry::Open);
-        // past the limit it is over, also when the port happens to be there
-        assert_eq!(retry_step(RECONNECT_FOR + Duration::from_millis(1), false), Retry::GiveUp);
-        assert_eq!(retry_step(RECONNECT_FOR + Duration::from_millis(1), true), Retry::GiveUp);
+        let (s, ms) = (Duration::from_secs, Duration::from_millis);
+        let settle = s(1);
+        // not there: wait, until it has been away too long
+        assert_eq!(retry_step(s(1), None, settle), Retry::Wait);
+        assert_eq!(retry_step(RECONNECT_FOR, None, settle), Retry::Wait);
+        assert_eq!(retry_step(RECONNECT_FOR + ms(1), None, settle), Retry::GiveUp);
+        // there, but only just: a contact that bounces is not opened in every gap
+        assert_eq!(retry_step(ms(0), Some(ms(300)), settle), Retry::Wait);
+        assert_eq!(retry_step(ms(0), Some(s(1)), settle), Retry::Open);
+        // a port that is there is never given up on, however long it took
+        assert_eq!(retry_step(ms(0), Some(ms(100)), s(8)), Retry::Wait);
+    }
+
+    #[test]
+    fn the_settle_time_grows_with_losses_in_a_row() {
+        let secs: Vec<u64> = (1..=6).map(|n| settle_for(n).as_secs()).collect();
+        assert_eq!(secs, [1, 2, 4, 8, 8, 8]);
+        assert_eq!(settle_for(0), SETTLE);
+        assert_eq!(settle_for(u8::MAX), SETTLE_MAX);
     }
 
     /// With a device: `VNA_R_TEST_PORT=/dev/… cargo test -p vna-gui -- --ignored --nocapture hardware_session`.

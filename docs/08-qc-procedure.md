@@ -297,6 +297,21 @@ is niet onderzocht; een andere kabel is de eerste proef.
 release niet gezien: de waarschuwing voor de sprong en de oranje balk bij uitval in het
 venster van de GUI zelf; het opnieuw verbinden op Linux en Windows.
 
+**Na 0.3.2, 12 november 2026: opgeven na vier keer.** PA1BH probeerde 0.3.2 in de GUI en
+raakte alleen de N-connector aan, niet de USB-C-kabel: de GUI verbond opnieuw, en na een
+paar keer meldde hij "the connection keeps dropping; not reconnecting again". De
+systeemlog toont wat er gebeurt terwijl een hand aan de connector zit: het apparaat komt
+en gaat in reeksen, tot veertien keer in 27 s (23:05:09–23:05:36), telkens 1,4 tot 1,6 s
+weg en 0,1 tot 1,2 s terug. De regel uit 0.3.2 (opgeven na vier keer uitval op rij) is
+daar te streng voor. Vervangen door: de poort moet eerst een seconde gebleven zijn voor
+hij weer geopend wordt, bij elke uitval op rij langer (2, 4, hooguit 8 s), en er wordt
+niet meer opgegeven zolang de poort terugkomt; wel na 30 s zonder poort. Gecontroleerd
+met de tests; **niet met het apparaat**, want de GUI van PA1BH had de poort. Over de
+oorzaak: uitval bij het aanraken van de N-connector zonder de kabel aan te raken past
+bij een USB-C-contact dat beweegt als het apparaat beweegt, maar sluit iets elektrisch
+(aanraken van de massa van de poort) niet uit. Proef: het apparaat vasthouden zodat de
+stekker niet kan bewegen en dan de connector aanraken.
+
 ---
 
 # 0.2.6 — bugfixes
