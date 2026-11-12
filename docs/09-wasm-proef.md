@@ -76,8 +76,22 @@ bedienen vanuit een geautomatiseerde browser; die stap is onderschept en het bes
 rechtstreeks aan het invoerveld gegeven. Alles daarna (lezen, parsen, tonen) is de echte
 route. En de downloadlink is gecontroleerd op naam en inhoud, maar niet aangeklikt.
 
-**Niet getest:** een gewone Chrome, Edge, Firefox of Safari; de terugval naar WebGL (zit
-erin via `egui-wgpu`, maar is niet gezien); Windows en Linux; een telefoon.
+Daarna door Bas in een gewone Chrome op macOS, vanaf `http://localhost:8080`, dus zonder
+die omweg:
+
+- **Open as trace** via de bestandskiezer van het systeem, met
+  `hf-ocf-3-20-NanoVNA-F.s2p`: Smith-chart, log mag, SWR en fase zoals in de native versie;
+- **Load calibration** via dezelfde kiezer, met `n-hf.cal.json`: geladen, 1001 punten,
+  100 kHz tot 50 MHz, klaar voor S11 + S21;
+- een marker plaatsen: de uitlezing (frequentie, S11, impedantie, SWR, S21) klopt met de
+  grafieken.
+
+Daarmee is de eerste kanttekening hierboven voor Chrome weggenomen: de echte
+bestandskiezer werkt.
+
+**Niet getest:** Edge, Firefox en Safari; opslaan in een gewone browser (de download
+zelf); de terugval naar WebGL (zit erin via `egui-wgpu`, maar is niet gezien); Windows en
+Linux; een telefoon.
 
 ## Wat nog niet goed is
 
