@@ -131,6 +131,35 @@ pub fn plan_segments<T>(mut segments: Vec<(SweepConfig, T)>) -> Result<Vec<(Swee
     Ok(segments)
 }
 
+/// Segment edges that divide `start_hz..=stop_hz` into `segments` ranges of
+/// equal ratio (each spans the same factor), touching end to start: with the
+/// same number of points per segment the grid is then dense at the low end
+/// and coarse at the top, which is what 50 kHz to 6 GHz in one picture needs.
+/// Edges are rounded to whole hertz; a kilohertz start over a gigahertz stop
+/// in four segments gives about 1:18 per segment.
+pub fn log_segment_edges(start_hz: u64, stop_hz: u64, segments: usize) -> Result<Vec<(u64, u64)>> {
+    if start_hz == 0 || stop_hz <= start_hz || segments == 0 {
+        return Err(Error::InvalidArgument(
+            "logarithmic spacing needs a start above 0 Hz, a stop above the start and at least one segment".into(),
+        ));
+    }
+    let ratio = (stop_hz as f64 / start_hz as f64).powf(1.0 / segments as f64);
+    let edge = |k: usize| -> u64 {
+        if k == segments {
+            stop_hz
+        } else {
+            (start_hz as f64 * ratio.powi(k as i32)).round() as u64
+        }
+    };
+    let edges: Vec<(u64, u64)> = (0..segments).map(|k| (edge(k), edge(k + 1))).collect();
+    if edges.iter().any(|(a, b)| b <= a) {
+        return Err(Error::InvalidArgument(
+            "too many segments for this span: segments would be empty".into(),
+        ));
+    }
+    Ok(edges)
+}
+
 /// What a sweep calls while it runs: after every block of data, with the
 /// number of points measured so far and the total. Returning
 /// `ControlFlow::Break(())` stops the sweep, which then fails with
@@ -1244,6 +1273,27 @@ mod tests {
         let alone = SweepResult::average_trimmed(&sweeps[2..3], 2).unwrap();
         assert_eq!(alone.s11[0].re, 1.0);
         assert!(SweepResult::average_trimmed(&sweeps[..0], 1).is_none());
+    }
+
+    #[test]
+    fn log_segment_edges_share_one_ratio_and_touch() {
+        let edges = log_segment_edges(50_000, 6_300_000_000, 4).unwrap();
+        assert_eq!(edges.len(), 4);
+        assert_eq!(edges[0].0, 50_000);
+        assert_eq!(edges[3].1, 6_300_000_000);
+        for w in edges.windows(2) {
+            assert_eq!(w[0].1, w[1].0, "segments must touch");
+        }
+        let ratios: Vec<f64> = edges.iter().map(|(a, b)| *b as f64 / *a as f64).collect();
+        for r in &ratios {
+            assert!((r - ratios[0]).abs() / ratios[0] < 1e-6, "{ratios:?}");
+        }
+        assert!((ratios[0] - (6_300_000_000.0_f64 / 50_000.0).powf(0.25)).abs() < 1e-3);
+        assert_eq!(log_segment_edges(1_000_000, 30_000_000, 1).unwrap(), vec![(1_000_000, 30_000_000)]);
+        assert!(log_segment_edges(0, 1_000, 2).is_err());
+        assert!(log_segment_edges(2_000, 1_000, 2).is_err());
+        assert!(log_segment_edges(1_000, 1_000, 1).is_err());
+        assert!(log_segment_edges(1_000, 1_001, 5).is_err());
     }
 
     #[test]

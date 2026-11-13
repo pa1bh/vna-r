@@ -156,11 +156,57 @@ impl App {
             if let Some(k) = remove {
                 self.extra_segments.remove(k);
             }
-            if ui.small_button("+ segment").clicked() {
-                let start = self.extra_segments.last().map(|s| s.stop.clone()).unwrap_or_else(|| self.stop.clone());
-                let stop = format_hz(self.device_max_hz()).replace(' ', "");
-                self.extra_segments.push(SegmentSettings { start, stop, points: 1001, cal_file: None });
-            }
+            ui.horizontal(|ui| {
+                if ui.small_button("+ segment").clicked() {
+                    let start = self.extra_segments.last().map(|s| s.stop.clone()).unwrap_or_else(|| self.stop.clone());
+                    let stop = format_hz(self.device_max_hz()).replace(' ', "");
+                    self.extra_segments.push(SegmentSettings { start, stop, points: 1001, cal_file: None });
+                }
+                if !self.extra_segments.is_empty()
+                    && ui
+                        .small_button("log spacing")
+                        .on_hover_text("move the segment edges so that every segment spans the same ratio, from the lowest start to the highest stop; points and calibration files stay with their segment")
+                        .clicked()
+                {
+                    self.space_segments_logarithmically();
+                }
+            });
         });
+    }
+
+    /// Redistribute the primary segment and the extras over the span they
+    /// cover together, every segment the same ratio wide (see
+    /// `log_segment_edges`). The texts are rewritten; nothing is applied yet.
+    pub(super) fn space_segments_logarithmically(&mut self) {
+        let all: Vec<(&str, &str)> = std::iter::once((self.start.as_str(), self.stop.as_str()))
+            .chain(self.extra_segments.iter().map(|s| (s.start.as_str(), s.stop.as_str())))
+            .collect();
+        let mut lo = u64::MAX;
+        let mut hi = 0u64;
+        for (a, b) in &all {
+            match (parse_hz(a), parse_hz(b)) {
+                (Ok(a), Ok(b)) => {
+                    lo = lo.min(a);
+                    hi = hi.max(b);
+                }
+                (Err(e), _) | (_, Err(e)) => {
+                    self.sweep_error = Some(e.to_string());
+                    return;
+                }
+            }
+        }
+        match log_segment_edges(lo, hi, all.len()) {
+            Ok(edges) => {
+                let text = |hz: u64| format_hz(hz).replace(' ', "");
+                self.start = text(edges[0].0);
+                self.stop = text(edges[0].1);
+                for (seg, (a, b)) in self.extra_segments.iter_mut().zip(&edges[1..]) {
+                    seg.start = text(*a);
+                    seg.stop = text(*b);
+                }
+                self.sweep_error = None;
+            }
+            Err(e) => self.sweep_error = Some(e.to_string()),
+        }
     }
 }

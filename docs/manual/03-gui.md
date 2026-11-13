@@ -77,7 +77,11 @@ shown in a single trace. Each segment can have its own calibration file; without
 the calibration of the panel is interpolated. The application par excellence is a fine HF
 segment with an HF calibration next to a wide segment up to 6.3 GHz, because a wide
 calibration is too coarse at the bottom end (chapter 4). Segments may touch each other but
-not overlap. TDR and gate work on the widest segment.
+not overlap. TDR and gate work on the widest segment. **log spacing** moves the edges
+so that every segment spans the same ratio between the lowest start and the highest stop:
+with the same number of points per segment the grid is then dense on HF and coarse on
+UHF, which is what 50 kHz to 6 GHz in one picture needs. Points and calibration files
+stay with their segment; **Apply sweep** afterwards.
 
 ![Two segments: 1–50 MHz with an HF calibration and 50 MHz–6.3 GHz with the wide one](../images/gui-segmenten.webp)
 

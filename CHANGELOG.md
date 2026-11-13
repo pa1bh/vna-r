@@ -26,6 +26,10 @@ things that are not backwards compatible, such as the format of the calibration 
   sets how many sweeps per point, farthest from the mean first, are left out of the
   average. One glitch (a USB hiccup, a hand near the antenna) then does not pull the
   trace. Default 0, the plain mean as before; remembered. (Work list 55.)
+- Segments: a **log spacing** button moves the segment edges so that every segment spans
+  the same ratio, from the lowest start to the highest stop. With the same points per
+  segment the grid is then dense on HF and coarse on UHF: 50 kHz to 6 GHz in one picture
+  without a hundred points wasted above 3 GHz. (Work list 56.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

@@ -79,7 +79,11 @@ Onder **Segments** voeg je extra frequentiebereiken toe die na het eerste geveeg
 bestand wordt de calibratie van het paneel geïnterpoleerd. De toepassing bij uitstek is
 een fijn HF-segment met een HF-calibratie naast een breed segment tot 6,3 GHz, omdat een
 brede calibratie aan de onderkant te grof is (hoofdstuk 4). Segmenten mogen elkaar raken
-maar niet overlappen. TDR en gate werken op het breedste segment.
+maar niet overlappen. TDR en gate werken op het breedste segment. **log spacing**
+verschuift de grenzen zo dat elk segment dezelfde verhouding omspant, van de laagste start
+tot de hoogste stop: met hetzelfde aantal punten per segment is het raster dan dicht op
+HF en grof op UHF, wat 50 kHz tot 6 GHz in één beeld nodig heeft. Punten en
+calibratiebestanden blijven bij hun segment; daarna **Apply sweep**.
 
 ![Twee segmenten: 1–50 MHz met HF-calibratie en 50 MHz–6,3 GHz met de brede](../images/gui-segmenten.webp)
 

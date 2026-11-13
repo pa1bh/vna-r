@@ -10,7 +10,7 @@ use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
 use litevna::bands::{bands_within, REGION_1};
 use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
-use litevna::device::plan_segments;
+use litevna::device::{log_segment_edges, plan_segments};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, nearest_index, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
