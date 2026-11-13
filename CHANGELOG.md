@@ -30,6 +30,10 @@ things that are not backwards compatible, such as the format of the calibration 
   the same ratio, from the lowest start to the highest stop. With the same points per
   segment the grid is then dense on HF and coarse on UHF: 50 kHz to 6 GHz in one picture
   without a hundred points wasted above 3 GHz. (Work list 56.)
+- TDR: a **cable** list next to the velocity factor with the catalogue values of common
+  cables (RG-58, RG-213, PTFE types, RG-8X, H155, Aircell, H2000, LMR, Aircom Plus,
+  Ecoflex, window line). A starting point only: within one type the spread is a few
+  percent, so a known length still decides. (Work list 57.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

@@ -71,7 +71,10 @@ reflecties. Wissel van window: echte reflecties blijven staan, zijlobben verande
 2. Kabel op poort 1, open of short aan het eind. Sweep 50 kHz tot 6,3 GHz, 1001 punten.
 3. TDR: de grote piek is het kabeleind. Klik erop: de uitlezing geeft afstand en tijd.
    Klopt de afstand niet met de meetlat, pas dan de verkortingsfactor aan tot het klopt;
-   zo bepaal je de VF van een onbekende kabel.
+   zo bepaal je de VF van een onbekende kabel. De lijst **cable** naast de
+   verkortingsfactor heeft de cataloguswaarden van gangbare kabels (RG-58 en RG-213 0,66,
+   PTFE 0,695, Aircell 7 0,83, Ecoflex 10 0,86) als beginpunt; binnen één type schelen
+   ze een paar procent.
 4. Kleinere pieken onderweg zijn connectoren, knikken, waterschade of een slechte
    soldering. De impedantiegrafiek zegt of het een hoog- of laagohmige fout is.
 5. De hoogte van de eindpiek onder 0 dB is tweemaal het kabelverlies op die frequentie

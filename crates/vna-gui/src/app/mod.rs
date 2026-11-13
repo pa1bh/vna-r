@@ -13,7 +13,7 @@ use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Ca
 use litevna::device::{log_segment_edges, plan_segments};
 use litevna::discovery::{self, PortCandidate};
 use litevna::freq::{format_hz, nearest_index, parse_hz};
-use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0};
+use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0, CABLES};
 use litevna::touchstone::write_s2p;
 #[cfg(not(target_arch = "wasm32"))]
 use litevna::touchstone::{read_touchstone_file_full, write_s1p};
@@ -1086,7 +1086,23 @@ impl App {
             });
             egui::Grid::new("tdr-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
                 ui.label("Velocity factor");
-                ui.add(egui::DragValue::new(&mut self.tdr_vf).range(0.3..=1.0).speed(0.005).fixed_decimals(3));
+                ui.horizontal(|ui| {
+                    ui.add(egui::DragValue::new(&mut self.tdr_vf).range(0.3..=1.0).speed(0.005).fixed_decimals(3));
+                    // Catalogue values as a starting point; the number stays
+                    // editable, because one length measured beats any table.
+                    egui::ComboBox::from_id_salt("tdr-cable")
+                        .selected_text("cable")
+                        .width(60.0)
+                        .show_ui(ui, |ui| {
+                            for (name, vf) in CABLES {
+                                if ui.selectable_label((self.tdr_vf - vf).abs() < 0.0005, format!("{vf:.3}  {name}")).clicked() {
+                                    self.tdr_vf = *vf;
+                                }
+                            }
+                        })
+                        .response
+                        .on_hover_text("nominal values for common cables; the spread within one type is a few percent, so check a known length");
+                });
                 ui.end_row();
                 ui.label("Window");
                 egui::ComboBox::from_id_salt("tdr-window").selected_text(self.tdr_window.name()).show_ui(ui, |ui| {

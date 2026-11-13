@@ -71,7 +71,10 @@ reflections. Switch windows: real reflections stay put, side lobes change.
 2. Cable on port 1, open or short at the end. Sweep 50 kHz to 6.3 GHz, 1001 points.
 3. TDR: the big peak is the cable end. Click on it: the readout gives distance and time.
    If the distance does not match the tape measure, adjust the velocity factor until it
-   does; that is how you determine the VF of an unknown cable.
+   does; that is how you determine the VF of an unknown cable. The **cable** list next
+   to the velocity factor has the catalogue values of common cables (RG-58 and RG-213
+   0.66, PTFE 0.695, Aircell 7 0.83, Ecoflex 10 0.86) as a starting point; within one
+   type they vary a few percent.
 4. Smaller peaks along the way are connectors, kinks, water damage or a bad solder
    joint. The impedance graph tells you whether it is a high- or low-impedance fault.
 5. The height of the end peak below 0 dB is twice the cable loss at that frequency

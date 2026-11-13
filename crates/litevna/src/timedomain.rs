@@ -72,6 +72,25 @@ impl Window {
     }
 }
 
+/// Nominal velocity factors of common lines, `(name, VF)`, for picking a
+/// starting value. Catalogue numbers: within one type the spread is a few
+/// percent (foam density, batch), so for a length that matters measure a
+/// known piece first and adjust (manual, chapter 5).
+pub const CABLES: &[(&str, f64)] = &[
+    ("RG-58, RG-213, RG-8, RG-174 (solid PE)", 0.66),
+    ("RG-316, RG-142, RG-402 (PTFE)", 0.695),
+    ("RG-8X (foam PE)", 0.82),
+    ("H155", 0.81),
+    ("Aircell 5", 0.82),
+    ("Aircell 7", 0.83),
+    ("H2000 Flex", 0.83),
+    ("LMR-240", 0.84),
+    ("LMR-400", 0.85),
+    ("Aircom Plus", 0.85),
+    ("Ecoflex 10, Ecoflex 15", 0.86),
+    ("450 Ω window line", 0.91),
+];
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TdrConfig {
     pub window: Window,
@@ -485,6 +504,14 @@ pub fn gate(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig, g: &Gate) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cable_table_is_within_the_physical_range() {
+        for (name, vf) in CABLES {
+            assert!((0.5..1.0).contains(vf), "{name}: {vf}");
+            assert!(!name.is_empty());
+        }
+    }
 
     #[test]
     fn distances_convert_to_round_trip_time() {
