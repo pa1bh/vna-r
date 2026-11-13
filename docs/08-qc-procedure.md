@@ -348,6 +348,7 @@ met de bestaande instellingen van 0.3.3.
 | 2 | 56: Apply sweep en Single met short, ruw en met `n-6g3` | goed: één doorlopende trace over de drie segmenten, marker op 106 en 360 MHz zonder sprong; **bevinding 11** |
 | 2 | slotronde: segmenten weg, TDR met hann, kaiser 6 en 13, afsluiten en starten | goed; in `app.ron` segmenten leeg, avg 1, drop 0, banden aan |
 | 3, later die avond | 69: gedeelde as, **reset view**, ook in de TDR-weergave met gate; 70: **sweep from calibration** met `n-1g` en `n-hf` aan de LiteVNA | goed: "alles in orde" |
+| 4, na 0.3.4 | 71: **Band** ▸ 40 m in regio 1 en 2, lijst en achtergrond van regio 2, Band ▸ 20 m met Run aan, regio bewaard na herstart | goed: "alles in orde" |
 
 **Bevindingen.**
 
@@ -1102,7 +1103,8 @@ middeling met drop en de log spacing zijn alleen op de library getest), de kabel
 de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows. Uitgevoerd op
 13 november 2026 op macOS met de LiteVNA 67; uitkomst en bevindingen 10 en 11 staan in het
 logboek bovenaan. Daarna kwamen op verzoek van PA1BH de punten 69 en 70 erbij; die staan
-onderaan deze ronde en zijn dezelfde avond door hem nagelopen: in orde.
+onderaan deze ronde en zijn dezelfde avond door hem nagelopen: in orde. Punt 71 (Band en
+regio 2, na de release van 0.3.4) eveneens.
 
 Alles hieronder kan **zonder apparaat** met `cal/sweep.s2p` of het voorbeeld in de
 browserbouw, tenzij anders gezegd. Begin met:
