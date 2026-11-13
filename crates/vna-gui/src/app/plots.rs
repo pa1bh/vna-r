@@ -78,6 +78,28 @@ pub(super) fn resample_complex(src_f: &[u64], s11: &[Complex64], s21: &[Complex6
     (interpolate_complex(src_f, s11, dst_f), interpolate_complex(src_f, s21, dst_f))
 }
 
+/// Paint the amateur bands that fall inside the plot's x range as a grey
+/// backdrop with their name, in screen space after the plot has drawn (a
+/// data-space polygon would feed back into the auto-bounds; see `draw_gate`).
+pub(super) fn draw_bands(ui: &egui::Ui, transform: &egui_plot::PlotTransform, rect: egui::Rect) {
+    let bounds = transform.bounds();
+    let (lo_hz, hi_hz) = (bounds.min()[0].max(0.0) * 1e6, bounds.max()[0].max(0.0) * 1e6);
+    let x_of = |hz: u64| transform.position_from_point(&egui_plot::PlotPoint::new(hz as f64 / 1e6, 0.0)).x;
+    let painter = ui.painter().with_clip_rect(rect);
+    for b in bands_within(REGION_1, lo_hz as u64, hi_hz as u64) {
+        let (xa, xb) = (x_of(b.start_hz).max(rect.left()), x_of(b.stop_hz).min(rect.right()));
+        let band = egui::Rect::from_min_max(egui::pos2(xa, rect.top()), egui::pos2(xb, rect.bottom()));
+        painter.rect_filled(band, 0.0, Color32::from_rgba_unmultiplied(160, 160, 160, 28));
+        painter.text(
+            egui::pos2((xa + xb) / 2.0, rect.top() + 4.0),
+            egui::Align2::CENTER_TOP,
+            b.name,
+            egui::FontId::proportional(10.0),
+            Color32::from_gray(150),
+        );
+    }
+}
+
 pub(super) fn series(x: &[f64], y: impl Iterator<Item = f64>) -> PlotPoints<'static> {
     x.iter().zip(y).map(|(x, y)| [*x, y]).collect()
 }
@@ -438,6 +460,9 @@ impl App {
                 }
                 (pui.response().clicked(), pui.pointer_coordinate())
             });
+        if self.show_bands {
+            draw_bands(ui, &r.transform, r.response.rect);
+        }
         match r.inner {
             (true, Some(p)) => Some(p.x),
             _ => None,

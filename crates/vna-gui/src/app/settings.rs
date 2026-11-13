@@ -53,6 +53,8 @@ pub(super) struct Settings {
     pub(super) cal_apply: bool,
     pub(super) show_s11: bool,
     pub(super) show_s21: bool,
+    /// The amateur bands drawn behind the frequency plots.
+    pub(super) show_bands: bool,
     pub(super) view_tdr: bool,
     pub(super) tdr_vf: f64,
     pub(super) tdr_window: String,
@@ -122,6 +124,7 @@ impl Default for Settings {
             cal_apply: true,
             show_s11: true,
             show_s21: true,
+            show_bands: false,
             view_tdr: false,
             tdr_vf: 0.70,
             tdr_window: "hann".into(),
@@ -172,6 +175,7 @@ impl App {
         self.cal.apply = s.cal_apply;
         self.show_s11 = s.show_s11;
         self.show_s21 = s.show_s21;
+        self.show_bands = s.show_bands;
         self.view = if s.view_tdr { View::Tdr } else { View::Frequency };
         // A hand-edited or future settings file may hold 0, NaN or nonsense;
         // the DragValues only clamp on interaction.
@@ -235,6 +239,7 @@ impl App {
             cal_apply: self.cal.apply,
             show_s11: self.show_s11,
             show_s21: self.show_s21,
+            show_bands: self.show_bands,
             view_tdr: self.view == View::Tdr,
             tdr_vf: self.tdr_vf,
             tdr_window: self.tdr_window.name().into(),

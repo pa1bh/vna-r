@@ -10,7 +10,9 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
   calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
 - **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
   en een schermafbeelding van het apparaat.
-- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Zoom** (de
+- **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Amateur
+  bands** (de amateurbanden van IARU-regio 1 als grijze achtergrond met hun naam in de
+  drie frequentiegrafieken, zodat je direct ziet of een dip in de band ligt), **Zoom** (de
   grootte van de tekst en al het andere, zie hieronder), **Connect at start** (vanzelf
   verbinden als het programma start en er een VNA aangesloten is; standaard uit) en de
   schakelaar **Developer tools**.

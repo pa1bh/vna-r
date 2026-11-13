@@ -8,6 +8,7 @@ use web_time::{Duration, Instant};
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
+use litevna::bands::{bands_within, REGION_1};
 use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::device::plan_segments;
 use litevna::discovery::{self, PortCandidate};
@@ -202,6 +203,8 @@ pub struct App {
     pending_marker_freqs: Option<[Option<u64>; MARKERS]>,
     show_s11: bool,
     show_s21: bool,
+    /// The amateur bands as a backdrop in the frequency plots (View ▸ Amateur bands).
+    show_bands: bool,
     plot_kinds: [TraceKind; 3],
     /// Half-width (points) of the group-delay difference.
     gd_aperture: usize,
@@ -308,6 +311,7 @@ impl App {
             pending_marker_freqs: None,
             show_s11: true,
             show_s21: true,
+            show_bands: false,
             plot_kinds: [TraceKind::LogMag, TraceKind::Swr, TraceKind::Phase],
             gd_aperture: 2,
             error: None,
@@ -887,6 +891,8 @@ impl App {
                 ui.separator();
                 ui.checkbox(&mut self.show_s11, "S11");
                 ui.checkbox(&mut self.show_s21, "S21");
+                ui.checkbox(&mut self.show_bands, "Amateur bands")
+                    .on_hover_text("the IARU Region 1 amateur bands as a grey backdrop in the frequency plots");
                 ui.separator();
                 zoom_menu(ui);
                 ui.separator();

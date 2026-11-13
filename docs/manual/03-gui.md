@@ -10,7 +10,9 @@ with four charts. The title bar shows the version number.
   save a calibration, quit. The same buttons are also in the left panel.
 - **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
   screenshot of the device.
-- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Zoom** (the
+- **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Amateur
+  bands** (the IARU Region 1 bands as a grey backdrop with their name in the three
+  frequency charts, so you see at once whether a dip lies in the band), **Zoom** (the
   size of the text and everything else, see below), **Connect at start** (connect by
   itself when the program starts and a VNA is plugged in; off by default) and the
   **Developer tools** toggle.

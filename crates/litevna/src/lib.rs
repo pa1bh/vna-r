@@ -18,11 +18,13 @@
 //! * [`touchstone`] — read Touchstone `.s1p`/`.s2p` files, write `.s2p` and CSV.
 //! * [`traces`] — derived quantities for display: dB, phase, SWR, impedance, group delay.
 //! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
+//! * [`bands`] — the amateur bands, a backdrop for frequency plots.
 
 /// Reference impedance of the measurement system, ohm. Everything in this
 /// crate (calibration kit models, impedance, SWR, TDR) is relative to it.
 pub const Z0: f64 = 50.0;
 
+pub mod bands;
 pub mod calibration;
 pub mod device;
 pub mod discovery;
