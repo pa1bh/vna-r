@@ -121,7 +121,7 @@ reflecties op met afstand, |Γ| en de impedantie erachter.
 |---|---|
 | `--cal <bestand>` | sterk aanbevolen |
 | `--vf <0.1..1>` | verkortingsfactor, standaard 0,70 |
-| `--window rectangular\|hann\|blackman` | standaard hann |
+| `--window rectangular\|hann\|blackman\|kaiser6\|kaiser13` | standaard hann |
 | `--peaks <n>` | aantal reflecties, standaard 5 |
 | `--max-distance <m>` | niet verder kijken dan dit |
 | `--csv <bestand>` | afstand/tijd/impuls/stap/impedantie |

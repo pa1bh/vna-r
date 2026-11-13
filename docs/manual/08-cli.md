@@ -120,7 +120,7 @@ reflections with distance, |Γ| and the impedance behind them.
 |---|---|
 | `--cal <file>` | strongly recommended |
 | `--vf <0.1..1>` | velocity factor, default 0.70 |
-| `--window rectangular\|hann\|blackman` | default hann |
+| `--window rectangular\|hann\|blackman\|kaiser6\|kaiser13` | default hann |
 | `--peaks <n>` | number of reflections, default 5 |
 | `--max-distance <m>` | do not look further than this |
 | `--csv <file>` | distance/time/impulse/step/impedance |

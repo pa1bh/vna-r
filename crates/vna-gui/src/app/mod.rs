@@ -1133,7 +1133,7 @@ impl App {
                 ui.end_row();
                 ui.label("Window");
                 egui::ComboBox::from_id_salt("tdr-window").selected_text(self.tdr_window.name()).show_ui(ui, |ui| {
-                    for w in [Window::Rectangular, Window::Hann, Window::Blackman] {
+                    for w in Window::ALL {
                         ui.selectable_value(&mut self.tdr_window, w, w.name());
                     }
                 });

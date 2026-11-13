@@ -41,9 +41,24 @@ pub enum Window {
     Rectangular,
     Hann,
     Blackman,
+    /// Kaiser with β = 6: side lobes at about −44 dB for nearly the width of
+    /// hann (−31.5 dB).
+    Kaiser6,
+    /// Kaiser with β = 13: side lobes below −95 dB, the peak 2.3 times as wide
+    /// as rectangular; for a very weak reflection next to a short or open.
+    Kaiser13,
 }
 
 impl Window {
+    /// Every window, in the order the GUI lists them.
+    pub const ALL: [Window; 5] = [
+        Window::Rectangular,
+        Window::Hann,
+        Window::Blackman,
+        Window::Kaiser6,
+        Window::Kaiser13,
+    ];
+
     /// Symmetric window value at `x ∈ [-1, 1]` (0 = centre).
     fn at(&self, x: f64) -> f64 {
         let x = x.clamp(-1.0, 1.0);
@@ -51,14 +66,23 @@ impl Window {
             Window::Rectangular => 1.0,
             Window::Hann => 0.5 * (1.0 + (PI * x).cos()),
             Window::Blackman => 0.42 + 0.5 * (PI * x).cos() + 0.08 * (2.0 * PI * x).cos(),
+            Window::Kaiser6 => kaiser(6.0, x),
+            Window::Kaiser13 => kaiser(13.0, x),
         }
     }
 
     pub fn parse(text: &str) -> Option<Self> {
-        Some(match text.to_ascii_lowercase().as_str() {
+        let t: String = text
+            .to_ascii_lowercase()
+            .chars()
+            .filter(|c| !matches!(c, ' ' | '-' | '_'))
+            .collect();
+        Some(match t.as_str() {
             "rect" | "rectangular" | "none" => Window::Rectangular,
             "hann" | "hanning" => Window::Hann,
             "blackman" => Window::Blackman,
+            "kaiser6" => Window::Kaiser6,
+            "kaiser13" => Window::Kaiser13,
             _ => return None,
         })
     }
@@ -68,8 +92,31 @@ impl Window {
             Window::Rectangular => "rectangular",
             Window::Hann => "hann",
             Window::Blackman => "blackman",
+            Window::Kaiser6 => "kaiser 6",
+            Window::Kaiser13 => "kaiser 13",
         }
     }
+}
+
+/// Kaiser window `I0(β·√(1−x²)) / I0(β)` at `x ∈ [-1, 1]`; β trades side-lobe
+/// level for peak width in one number (β = 0 is rectangular).
+fn kaiser(beta: f64, x: f64) -> f64 {
+    bessel_i0(beta * (1.0 - x * x).max(0.0).sqrt()) / bessel_i0(beta)
+}
+
+/// Modified Bessel function of the first kind, order 0, by its power series
+/// `Σ ((x/2)^k / k!)²`, which converges for every x; for β ≤ 13 about 30 terms.
+fn bessel_i0(x: f64) -> f64 {
+    let half = x / 2.0;
+    let mut sum = 1.0;
+    let mut term = 1.0;
+    let mut k = 1.0;
+    while term > 1e-17 * sum {
+        term *= (half / k) * (half / k);
+        sum += term;
+        k += 1.0;
+    }
+    sum
 }
 
 /// Nominal velocity factors of common lines, `(name, VF)`, for picking a
@@ -506,6 +553,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn kaiser_windows_are_one_at_the_centre_and_fall_to_the_edges() {
+        // I0(0) = 1, I0(1) = 1.2660658777520084, I0(6) = 67.23440697647798.
+        assert_eq!(bessel_i0(0.0), 1.0);
+        assert!((bessel_i0(1.0) - 1.2660658777520084).abs() < 1e-14);
+        assert!((bessel_i0(6.0) - 67.23440697647798).abs() < 1e-11);
+        for w in [Window::Kaiser6, Window::Kaiser13] {
+            assert_eq!(w.at(0.0), 1.0);
+            let edge = w.at(1.0);
+            assert!(edge > 0.0 && edge < 0.02, "{}: edge {edge}", w.name());
+            assert_eq!(w.at(1.0), w.at(-1.0));
+            let mut prev = 1.0;
+            for i in 1..=20 {
+                let v = w.at(i as f64 / 20.0);
+                assert!(v < prev, "{} not falling at {i}", w.name());
+                prev = v;
+            }
+        }
+        // β = 13 is the narrower spectrum's price: a narrower window than β = 6.
+        assert!(Window::Kaiser13.at(0.5) < Window::Kaiser6.at(0.5));
+    }
+
+    #[test]
     fn cable_table_is_within_the_physical_range() {
         for (name, vf) in CABLES {
             assert!((0.5..1.0).contains(vf), "{name}: {vf}");
@@ -760,6 +829,11 @@ mod tests {
         uneven[5] += 1;
         assert!(tdr(&uneven, &vec![Complex64::new(0.0, 0.0); uneven.len()], &TdrConfig::default()).is_err());
         assert!(Window::parse("hann") == Some(Window::Hann));
+        for w in Window::ALL {
+            assert_eq!(Window::parse(w.name()), Some(w), "{}", w.name());
+        }
+        assert_eq!(Window::parse("Kaiser-13"), Some(Window::Kaiser13));
+        assert_eq!(Window::parse("kaiser"), None);
     }
 
     #[test]

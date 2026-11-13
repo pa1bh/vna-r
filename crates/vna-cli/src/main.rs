@@ -147,7 +147,7 @@ enum Cmd {
         /// Velocity factor of the cable (0.66 RG-58, 0.70 RG-316, 0.83 foam).
         #[arg(long, default_value_t = 0.70)]
         vf: f64,
-        /// Window: rectangular, hann, blackman.
+        /// Window: rectangular, hann, blackman, kaiser6, kaiser13.
         #[arg(long, default_value = "hann")]
         window: String,
         /// Number of reflections to list.

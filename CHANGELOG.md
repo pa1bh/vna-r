@@ -38,6 +38,10 @@ things that are not backwards compatible, such as the format of the calibration 
   test and port 2 (to protect the port from an amplifier). The value is added back, so
   S21 shows the device alone in the charts, the markers and saved files, whose comment
   line names the offset. 0 is off; remembered. (Work list 58.)
+- TDR and gate: two Kaiser windows next to rectangular, hann and blackman. **kaiser 6**
+  has side lobes at about −44 dB for nearly the width of hann; **kaiser 13** puts them
+  below −95 dB at 2.3 times the rectangular width, for a very weak reflection next to a
+  short or open. Also `vna-cli tdr --window kaiser6|kaiser13`. (Work list 59.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

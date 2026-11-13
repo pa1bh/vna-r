@@ -61,6 +61,8 @@ zijlobben in voor piekbreedte:
 | rectangular | −13 dB | 1× | twee dicht bijeen liggende fouten scheiden |
 | hann | −31,5 dB | 1,6× | de normale keuze |
 | blackman | −58 dB | 2,4× | een zwakke reflectie naast een sterke zoeken |
+| kaiser 6 | −44 dB | 1,6× | lagere zijlobben dan hann bij bijna dezelfde breedte |
+| kaiser 13 | −98 dB | 2,3× | een heel zwakke reflectie naast een short of open |
 
 De golving tussen de pieken in de impulsgrafiek zijn meestal deze zijlobben, niet echte
 reflecties. Wissel van window: echte reflecties blijven staan, zijlobben veranderen.

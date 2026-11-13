@@ -61,6 +61,8 @@ width:
 | rectangular | −13 dB | 1× | separating two faults that lie close together |
 | hann | −31.5 dB | 1.6× | the normal choice |
 | blackman | −58 dB | 2.4× | finding a weak reflection next to a strong one |
+| kaiser 6 | −44 dB | 1.6× | lower side lobes than hann at almost the same width |
+| kaiser 13 | −98 dB | 2.3× | a very weak reflection next to a short or open |
 
 The ripple between the peaks in the impulse graph is usually these side lobes, not real
 reflections. Switch windows: real reflections stay put, side lobes change.
