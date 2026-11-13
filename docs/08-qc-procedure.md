@@ -346,6 +346,7 @@ met de bestaande instellingen van 0.3.3.
 | 2 | 56: 50 k–6,3 G, twee segmenten, **log spacing** | goed: 50 k → 2,507 M → 125,66 M → 6,3 G, 1001 punten per segment blijven; **bevinding 10** |
 | 2 | 56: Apply sweep en Single met short, ruw en met `n-6g3` | goed: één doorlopende trace over de drie segmenten, marker op 106 en 360 MHz zonder sprong; **bevinding 11** |
 | 2 | slotronde: segmenten weg, TDR met hann, kaiser 6 en 13, afsluiten en starten | goed; in `app.ron` segmenten leeg, avg 1, drop 0, banden aan |
+| 3, later die avond | 69: gedeelde as, **reset view**, ook in de TDR-weergave met gate; 70: **sweep from calibration** met `n-1g` en `n-hf` aan de LiteVNA | goed: "alles in orde" |
 
 **Bevindingen.**
 
@@ -1100,7 +1101,7 @@ middeling met drop en de log spacing zijn alleen op de library getest), de kabel
 de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows. Uitgevoerd op
 13 november 2026 op macOS met de LiteVNA 67; uitkomst en bevindingen 10 en 11 staan in het
 logboek bovenaan. Daarna kwamen op verzoek van PA1BH de punten 69 en 70 erbij; die staan
-onderaan deze ronde en zijn nog niet door hem bekeken.
+onderaan deze ronde en zijn dezelfde avond door hem nagelopen: in orde.
 
 Alles hieronder kan **zonder apparaat** met `cal/sweep.s2p` of het voorbeeld in de
 browserbouw, tenzij anders gezegd. Begin met:
@@ -1244,8 +1245,8 @@ hetzelfde voor alle drie. TDR-weergave: sleep in de bovenste grafiek, de onderst
 ## Punt 70 — Sweep uit de calibratie
 
 **Veranderd.** `sweep_from_calibration` in `calibration.rs`; knop **sweep from
-calibration** achter de regel "N pts, start → stop" in het calibratiepaneel. Niet op het
-scherm gezien: het paneel staat niet in de browserbouw.
+calibration** achter de regel "N pts, start → stop" in het calibratiepaneel. Niet in de
+browserbouw te zien (het paneel staat er niet in); door PA1BH met de LiteVNA bekeken.
 
 **Met apparaat**: Sweep 1M–30M, 201 punten, Apply. Laad `cal/n-1g.cal.json` (201 punten,
 1 MHz–1 GHz). Klik **sweep from calibration**. Verwacht: Start `1MHz`, Stop `1GHz`, Points
