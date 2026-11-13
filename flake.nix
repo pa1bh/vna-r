@@ -1,9 +1,15 @@
 {
   description = "vna-r: LiteVNA / NanoVNA-F tooling (library, CLI, egui GUI)";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Splits the build in two derivations: the ~400 dependency crates and the
+    # workspace itself. The first only changes with Cargo.lock, so a cached
+    # store (CI, or a laptop) does not recompile wgpu and egui for every commit.
+    crane.url = "github:ipetkov/crane";
+  };
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, crane }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAll = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
@@ -12,6 +18,7 @@
       packages = forAll (pkgs:
         let
           inherit (pkgs) lib stdenv;
+          craneLib = crane.mkLib pkgs;
           # What the GUI dlopens at run time on Linux: winit (X11 / Wayland) and
           # wgpu (Vulkan, with GL as fallback), and rfd (libdbus, to reach the
           # xdg desktop portal for the file dialogs).
@@ -28,18 +35,31 @@
           ]);
           # One version number for the whole workspace, read from Cargo.toml.
           version = (builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version;
-          vna-r = pkgs.rustPlatform.buildRustPackage {
+
+          # Shared by the dependency build and the package build: the same
+          # toolchain inputs, so the cached artifacts are reusable.
+          commonArgs = {
             pname = "vna-r";
             inherit version;
-            # build.rs shows this in About and --version; the store copy has no .git.
-            VNA_R_GIT_REV = self.shortRev or self.dirtyShortRev or "unknown";
-            # Only the git-tracked files, so a local target/ or cal/ never ends up in the store.
+            # Only the git-tracked files, so a local target/ or cal/ never ends up
+            # in the store. Not filtered down to the Rust sources: postInstall
+            # needs linux/70-litevna.rules too.
             src = self;
-            cargoLock.lockFile = ./Cargo.lock;
 
             nativeBuildInputs = [ pkgs.pkg-config ]
               ++ lib.optionals stdenv.hostPlatform.isLinux [ pkgs.makeWrapper ];
             buildInputs = lib.optionals stdenv.hostPlatform.isLinux [ pkgs.udev ];
+          };
+
+          # The dependencies alone, compiled against a dummy copy of the workspace
+          # that crane derives from Cargo.toml and Cargo.lock. Also builds the
+          # test targets, so the package's `cargo test` below finds them ready.
+          cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+          vna-r = craneLib.buildPackage (commonArgs // {
+            inherit cargoArtifacts;
+            # build.rs shows this in About and --version; the store copy has no .git.
+            VNA_R_GIT_REV = self.shortRev or self.dirtyShortRev or "unknown";
 
             # The tests need no hardware.
             doCheck = true;
@@ -58,7 +78,7 @@
               platforms = platforms.unix;
               mainProgram = "vna-gui";
             };
-          };
+          });
         in
         {
           default = vna-r;
