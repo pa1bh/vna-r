@@ -14,6 +14,10 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Added
 
+- Marker table: a column **L / C** with the reactance at the marker as the one coil or
+  capacitor it is at that frequency (1 µH, 47 pF). Hovering over it gives Q (|X|/R) and
+  the parallel form of the impedance, R ∥ L or C. For an unknown component on port 1 this
+  saves the arithmetic from R + jX. (Work list 53, after NanoVNA-Saver.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

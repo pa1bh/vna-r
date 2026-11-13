@@ -16,7 +16,9 @@ use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Windo
 use litevna::touchstone::write_s2p;
 #[cfg(not(target_arch = "wasm32"))]
 use litevna::touchstone::{read_touchstone_file_full, write_s1p};
-use litevna::traces::{self, db, impedance, swr, Param, TraceKind};
+use litevna::traces::{
+    self, db, format_eng, impedance, parallel_equivalent, q_factor, series_equivalent, swr, Param, Reactance, TraceKind,
+};
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};

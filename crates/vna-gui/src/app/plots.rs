@@ -514,7 +514,7 @@ impl App {
             return;
         }
         egui::Grid::new("marker-table").striped(true).spacing([14.0, 2.0]).show(ui, |ui| {
-            for h in ["", "frequency", "S11 dB", "S11 °", "Z", "SWR", "S21 dB", "S21 °"] {
+            for h in ["", "frequency", "S11 dB", "S11 °", "Z", "L / C", "SWR", "S21 dB", "S21 °"] {
                 ui.label(RichText::new(h).weak());
             }
             ui.end_row();
@@ -522,11 +522,31 @@ impl App {
                 let s11 = sweep.s11[*i];
                 let s21 = sweep.s21[*i];
                 let z = impedance(s11);
+                let f_hz = sweep.freqs_hz[*i];
                 ui.label(RichText::new(format!("M{}", k + 1)).color(MARKER_COLORS[*k]).strong());
-                ui.label(format_hz(sweep.freqs_hz[*i]));
+                ui.label(format_hz(f_hz));
                 ui.label(RichText::new(format!("{:.2}", db(s11.norm()))).color(S11_COLOR));
                 ui.label(format!("{:.1}", s11.arg().to_degrees()));
                 ui.label(format!("{:.1} {} j{:.1} Ω", z.re, if z.im < 0.0 { "−" } else { "+" }, z.im.abs()));
+                // The reactance as the one coil or capacitor it is at this
+                // frequency; Q and the parallel form on hover, so the table
+                // stays one line per marker.
+                let lc = match series_equivalent(z, f_hz as f64) {
+                    Some(Reactance::Inductance(l)) => format_eng(l, "H"),
+                    Some(Reactance::Capacitance(c)) => format_eng(c, "F"),
+                    None => "–".to_string(),
+                };
+                let q = q_factor(z).map_or("–".to_string(), |q| format!("{q:.1}"));
+                let p = parallel_equivalent(z);
+                let p_x = match series_equivalent(Complex64::new(0.0, p.im), f_hz as f64) {
+                    Some(Reactance::Inductance(l)) => format_eng(l, "H"),
+                    Some(Reactance::Capacitance(c)) => format_eng(c, "F"),
+                    None => "–".to_string(),
+                };
+                ui.label(lc).on_hover_text(format!(
+                    "series equivalent of X at this frequency\nQ = |X|/R = {q}\nparallel equivalent: {} ∥ {p_x}",
+                    format_eng(p.re, "Ω")
+                ));
                 ui.label(format!("{:.2}", swr(s11.norm())));
                 ui.label(RichText::new(format!("{:.2}", db(s21.norm()))).color(S21_COLOR));
                 ui.label(format!("{:.1}", s21.arg().to_degrees()));
@@ -541,6 +561,7 @@ impl App {
                 ui.label(format!("{}{}", if df < 0 { "−" } else { "" }, format_hz(df.unsigned_abs())));
                 ui.label(format!("{:+.2}", db(sweep.s11[b].norm()) - db(sweep.s11[a].norm())));
                 ui.label(format!("{:+.1}", sweep.s11[b].arg().to_degrees() - sweep.s11[a].arg().to_degrees()));
+                ui.label("");
                 ui.label("");
                 ui.label("");
                 ui.label(format!("{:+.2}", db(sweep.s21[b].norm()) - db(sweep.s21[a].norm())));

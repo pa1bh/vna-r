@@ -102,9 +102,11 @@ dragging and scrolling zoom.
 
 At the top are M1 to M4. The selected one is active: click in a chart or on the Smith
 chart to put it there, and move it with the arrow keys (with shift, ten points at a time).
-The table below shows for each marker the frequency, S11 in dB and degrees, Z, SWR and
-S21; if there are two, also the difference, handy for the bandwidth of a filter or the
-spacing between two resonances. The buttons **min SWR**, **max S21** and **min S21** jump
+The table below shows for each marker the frequency, S11 in dB and degrees, Z, the
+reactance as the coil or capacitor it is at that frequency (**L / C**: 1 µH, 47 pF), SWR
+and S21; if there are two, also the difference, handy for the bandwidth of a filter or
+the spacing between two resonances. Hovering over the L / C value gives Q (|X|/R) and the
+parallel form of the impedance, R ∥ L or C, for a parallel circuit or a trap. The buttons **min SWR**, **max S21** and **min S21** jump
 the active marker to that point.
 
 Top right is a label that says what you are looking at: **CAL** (calibrated), **RAW**

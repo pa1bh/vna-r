@@ -103,9 +103,12 @@ automatisch; slepen en scrollen zoomt.
 
 Bovenin staan M1 tot M4. De geselecteerde is actief: klik in een grafiek of op de
 Smith-chart om hem daar te zetten, en verschuif hem met de pijltjestoetsen (met shift tien
-punten tegelijk). De tabel eronder toont per marker frequentie, S11 in dB en graden, Z,
-SWR en S21; staan er twee, dan ook het verschil, handig voor de bandbreedte van een filter
-of de afstand tussen twee resonanties. De knoppen **min SWR**, **max S21** en **min S21**
+punten tegelijk). De tabel eronder toont per marker frequentie, S11 in dB en graden, Z, de
+reactantie als de spoel of condensator die hij op die frequentie is (**L / C**: 1 µH,
+47 pF), SWR en S21; staan er twee, dan ook het verschil, handig voor de bandbreedte van
+een filter of de afstand tussen twee resonanties. Wijs je de L / C-waarde aan, dan zie je
+Q (|X|/R) en de parallelvorm van de impedantie, R ∥ L of C, voor een parallelkring of een
+trap. De knoppen **min SWR**, **max S21** en **min S21**
 springen met de actieve marker naar dat punt.
 
 Rechtsboven staat een label dat zegt wat je ziet: **CAL** (gecalibreerd), **RAW**

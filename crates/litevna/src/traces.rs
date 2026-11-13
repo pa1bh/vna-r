@@ -140,6 +140,83 @@ pub fn impedance(gamma: C64) -> C64 {
     }
 }
 
+/// The one reactive element that has the reactance `X` of `z` at `f_hz`:
+/// an inductance `L = X/(2πf)` for X > 0, a capacitance `C = −1/(2πfX)` for
+/// X < 0. What a coil or a capacitor on port 1 "is" at a marker; for a
+/// series RLC it is the net element at that frequency, not the component.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Reactance {
+    /// Henry.
+    Inductance(f64),
+    /// Farad.
+    Capacitance(f64),
+}
+
+/// Series equivalent of the reactance of `z` at `f_hz`; `None` for X = 0, a
+/// non-positive frequency or a non-finite impedance (an open).
+pub fn series_equivalent(z: C64, f_hz: f64) -> Option<Reactance> {
+    if !(f_hz > 0.0) || !z.im.is_finite() || z.im == 0.0 {
+        return None;
+    }
+    let w = 2.0 * PI * f_hz;
+    Some(if z.im > 0.0 {
+        Reactance::Inductance(z.im / w)
+    } else {
+        Reactance::Capacitance(-1.0 / (w * z.im))
+    })
+}
+
+/// The parallel circuit `Rp ∥ jXp` with the same impedance as the series
+/// `R + jX`: `Rp = |Z|²/R`, `Xp = |Z|²/X`. Infinite where R or X is 0 (that
+/// branch is absent).
+pub fn parallel_equivalent(z: C64) -> C64 {
+    let sq = z.norm_sqr();
+    C64::new(sq / z.re, sq / z.im)
+}
+
+/// Quality factor of the port impedance, `|X|/R`; `None` where R ≤ 0 (no
+/// loss to divide by: a raw open, or a badly calibrated reactance).
+pub fn q_factor(z: C64) -> Option<f64> {
+    (z.re > 0.0 && z.im.is_finite()).then(|| z.im.abs() / z.re)
+}
+
+/// A value with an SI prefix and three significant digits, e.g. `format_eng(1.2e-11, "F")` = "12.0 pF".
+/// Beyond the prefixes (10⁻¹⁵ … 10¹²) the number is written as is.
+pub fn format_eng(value: f64, unit: &str) -> String {
+    if !value.is_finite() {
+        return format!("{value} {unit}");
+    }
+    if value == 0.0 {
+        return format!("0 {unit}");
+    }
+    const PREFIXES: [(f64, &str); 10] = [
+        (1e-15, "f"),
+        (1e-12, "p"),
+        (1e-9, "n"),
+        (1e-6, "µ"),
+        (1e-3, "m"),
+        (1.0, ""),
+        (1e3, "k"),
+        (1e6, "M"),
+        (1e9, "G"),
+        (1e12, "T"),
+    ];
+    let mag = value.abs();
+    let Some((scale, prefix)) = PREFIXES.iter().rev().find(|(s, _)| mag >= *s * 0.9995) else {
+        return format!("{value:.3e} {unit}");
+    };
+    let scaled = value / scale;
+    // Three significant digits: 1.23, 12.3, 123.
+    let decimals = if scaled.abs() >= 99.95 {
+        0
+    } else if scaled.abs() >= 9.995 {
+        1
+    } else {
+        2
+    };
+    format!("{scaled:.decimals$} {prefix}{unit}")
+}
+
 /// Lowest value [`db`] returns: the magnitude 0 has no logarithm.
 pub const DB_FLOOR: f64 = -200.0;
 /// What [`swr`] returns for total reflection (|Γ| ≥ 1), where SWR is infinite.
@@ -324,6 +401,48 @@ mod tests {
         assert!(impedance(C64::new(1.0, 0.0)).re.is_infinite());
         assert!((swr_clamped(1.0 / 3.0, 20.0) - 2.0).abs() < 1e-12);
         assert_eq!(swr_clamped(1.2, 20.0), 20.0);
+    }
+
+    #[test]
+    fn equivalents_of_a_coil_and_a_capacitor() {
+        // 1 µH at 10 MHz: X = 62.83 Ω. 100 pF at 10 MHz: X = −159.15 Ω.
+        let f = 10e6;
+        let coil = C64::new(2.0, 2.0 * PI * f * 1e-6);
+        match series_equivalent(coil, f) {
+            Some(Reactance::Inductance(l)) => assert!((l - 1e-6).abs() < 1e-15, "{l}"),
+            other => panic!("{other:?}"),
+        }
+        let cap = C64::new(0.5, -1.0 / (2.0 * PI * f * 100e-12));
+        match series_equivalent(cap, f) {
+            Some(Reactance::Capacitance(c)) => assert!((c - 100e-12).abs() < 1e-21, "{c}"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(series_equivalent(C64::new(50.0, 0.0), f), None);
+        assert_eq!(series_equivalent(coil, 0.0), None);
+        assert_eq!(series_equivalent(C64::new(f64::INFINITY, 0.0), f), None);
+        // Q = |X|/R; none without a positive R.
+        assert!((q_factor(coil).unwrap() - coil.im / 2.0).abs() < 1e-12);
+        assert_eq!(q_factor(C64::new(0.0, 10.0)), None);
+        assert_eq!(q_factor(C64::new(-1.0, 10.0)), None);
+        // 50 + j50 in series is 100 ∥ j100 in parallel: the same admittance 1/(50+j50).
+        let p = parallel_equivalent(C64::new(50.0, 50.0));
+        assert!((p.re - 100.0).abs() < 1e-12 && (p.im - 100.0).abs() < 1e-12);
+        let y = 1.0 / C64::new(50.0, 50.0);
+        assert!((y.re - 1.0 / p.re).abs() < 1e-15 && (y.im + 1.0 / p.im).abs() < 1e-15);
+        assert!(parallel_equivalent(C64::new(50.0, 0.0)).im.is_infinite());
+    }
+
+    #[test]
+    fn engineering_format_keeps_three_digits() {
+        assert_eq!(format_eng(1.2e-11, "F"), "12.0 pF");
+        assert_eq!(format_eng(1.234e-6, "H"), "1.23 µH");
+        assert_eq!(format_eng(999.6e-9, "H"), "1.00 µH");
+        assert_eq!(format_eng(123.456e-9, "H"), "123 nH");
+        assert_eq!(format_eng(-4.7e-12, "F"), "-4.70 pF");
+        assert_eq!(format_eng(0.0, "F"), "0 F");
+        assert_eq!(format_eng(2.5e3, "Ω"), "2.50 kΩ");
+        assert_eq!(format_eng(f64::INFINITY, "Ω"), "inf Ω");
+        assert_eq!(format_eng(1e-20, "F"), "1.000e-20 F");
     }
 
     #[test]
