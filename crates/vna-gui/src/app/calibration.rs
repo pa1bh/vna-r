@@ -424,6 +424,18 @@ impl App {
         }
     }
 
+    /// **Band** in the sweep panel: Start and Stop take the band with its margin,
+    /// Points stay, and the sweep is applied when a device is connected.
+    pub(super) fn sweep_to_band(&mut self, band: &Band) {
+        let (lo, hi) = band.with_margin(BAND_MARGIN);
+        self.start = format_hz(lo).replace(' ', "");
+        self.stop = format_hz(hi).replace(' ', "");
+        self.sweep_error = None;
+        if self.connected() {
+            self.start_sweep(self.running);
+        }
+    }
+
     /// The typed Start/Stop/Points differ from the sweep that was last applied.
     pub(super) fn grid_edited(&self) -> bool {
         let typed = parse_hz(&self.start)

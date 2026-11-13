@@ -357,6 +357,7 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 60 | Touchstone-parsertests met afwijkende bestanden: commentaar na de optieregel, dalende frequenties, oneven aantal waarden, optieregel in kleine letters | S | gedaan 2026-11-13 |
 | 69 | Grafieken delen hun frequentie-as (TDR: afstand-as) en een knop **reset view** zet alles terug op automatisch; wens van PA1BH na de QC van 13 november | S | gedaan 2026-11-13 |
 | 70 | Knop **sweep from calibration** in het calibratiepaneel: start, stop en punten op het raster van de calibratie en toepassen; wens van PA1BH | S | gedaan 2026-11-13 |
+| 71 | **Band** in het sweeppaneel: start en stop op een amateurband met 10 % marge, sweep toepassen; bandentabel voor IARU-regio 2 en een regiokeuze onder View ▸ Amateur bands; wens van Steve Falco (groups.io) | S | gedaan 2026-11-13 |
 
 ## Open
 
@@ -366,7 +367,7 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 62 | Calibratiestandaard uit een s1p-bestand (gemeten open/short/load) en een loadmodel met serie-L en parallel-C; beantwoordt punt 42: NanoVNA-Saver heeft geen kitbestandsformaat, een s1p per standaard is het praktische alternatief | M | open |
 | 63 | Calibratie-assistent: stapsgewijs short, open, load, through met een knop per stap | S/M | open: gebruiksgemak, de handleiding dekt het nu |
 | 64 | Center/Span als alternatieve invoer naast Start/Stop | S | open: extra velden in het sweeppaneel; pas doen als er behoefte aan is |
-| 65 | Bandentabel bewerkbaar (eigen banden, andere regio's) | S | open: nu een vaste tabel voor regio 1 |
+| 65 | Bandentabel bewerkbaar (eigen banden, regio 3) | S | open: vaste tabellen voor regio 1 en 2 sinds punt 71 |
 | 66 | µ-plot voor kernmateriaal (kernafmetingen en wikkelingen) en een magloop-modus die op de SWR-dip inzoomt | M | open: niche |
 | 67 | Logaritmische frequentie-as | M | open: egui_plot heeft geen log-as; zelf tekenen of wachten op upstream |
 | 68 | Waarschuwing in het segmentenpaneel als de calibratiestap grover is dan een segment (bijvoorbeeld `n-6g3` met stap 6,3 MHz onder een segment 50 k–2,5 M), met de raad een fijnere calibratie bij dat segment te zetten | S | open: gezien in de QC van 13 november (docs/08 bevinding 11), hangt samen met punt 51 |

@@ -11,8 +11,9 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
 - **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
   en een schermafbeelding van het apparaat.
 - **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Amateur
-  bands** (de amateurbanden van IARU-regio 1 als grijze achtergrond met hun naam in de
-  drie frequentiegrafieken, zodat je direct ziet of een dip in de band ligt), **Zoom** (de
+  bands** (de amateurbanden als grijze achtergrond met hun naam in de drie
+  frequentiegrafieken, zodat je direct ziet of een dip in de band ligt; eronder kies je
+  IARU-regio 1 of 2, wat ook de lijst achter **Band** in het sweeppaneel bepaalt), **Zoom** (de
   grootte van de tekst en al het andere, zie hieronder), **Connect at start** (vanzelf
   verbinden als het programma start en er een VNA aangesloten is; standaard uit) en de
   schakelaar **Developer tools**.
@@ -61,7 +62,10 @@ Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met 
 sweep** of met Return in Start of Stop; tijdens Run herstart de sweep dan met de nieuwe
 instellingen. Frequenties typ je als `50k`, `14.2M`, `1.3G` of `6.3G` (een decimale komma
 mag ook). De LiteVNA meet 50 kHz tot 6,3 GHz; meer punten geeft fijner detail maar duurt
-langer (ongeveer 300 tot 600 punten per seconde).
+langer (ongeveer 300 tot 600 punten per seconde). **Band** zet Start en Stop op een
+amateurband met aan beide kanten 10 % van de bandbreedte extra, zodat je bij het afregelen
+van een antenne ook net buiten de band kijkt (40 m in regio 1 wordt 6,98–7,22 MHz); de
+sweep wordt meteen toegepast. De lijst volgt de regio onder View ▸ Amateur bands.
 
 **Average** (alleen LiteVNA) is de bandbreedte-instelling van het apparaat zelf (1 tot 80): hoger is
 rustiger maar trager, en de instelling blijft in het apparaat staan. **Sweep avg** is iets

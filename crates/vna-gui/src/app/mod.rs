@@ -8,7 +8,7 @@ use web_time::{Duration, Instant};
 
 use egui::{Color32, RichText, Vec2};
 use egui_plot::{Legend, Line, Plot, PlotPoints, VLine};
-use litevna::bands::{bands_within, REGION_1};
+use litevna::bands::{Band, Region};
 use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::device::{log_segment_edges, plan_segments};
 use litevna::discovery::{self, PortCandidate};
@@ -135,6 +135,9 @@ const PORT_EXT_MAX_PS: f64 = 100_000.0;
 const S21_OFFSET_MAX_DB: f64 = 100.0;
 
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
+/// **Band** in the sweep panel adds this share of the band's width on each side,
+/// so that the edges of a multiband antenna's dip stay in view while tuning.
+const BAND_MARGIN: f64 = 0.10;
 
 const MARKERS: usize = 4;
 
@@ -207,6 +210,9 @@ pub struct App {
     show_s21: bool,
     /// The amateur bands as a backdrop in the frequency plots (View ▸ Amateur bands).
     show_bands: bool,
+    /// Whose table: the region chosen under View ▸ Amateur bands; also the list
+    /// behind **Band** in the sweep panel.
+    band_region: Region,
     /// Set by **reset view**: every plot drawn this frame goes back to its automatic
     /// scale. Cleared at the end of the frame.
     plot_reset: bool,
@@ -321,6 +327,7 @@ impl App {
             show_s11: true,
             show_s21: true,
             show_bands: false,
+            band_region: Region::One,
             plot_reset: false,
             plot_kinds: [TraceKind::LogMag, TraceKind::Swr, TraceKind::Phase],
             gd_aperture: 2,
@@ -907,7 +914,13 @@ impl App {
                 ui.checkbox(&mut self.show_s11, "S11");
                 ui.checkbox(&mut self.show_s21, "S21");
                 ui.checkbox(&mut self.show_bands, "Amateur bands")
-                    .on_hover_text("the IARU Region 1 amateur bands as a grey backdrop in the frequency plots");
+                    .on_hover_text("the amateur bands of the region below as a grey backdrop in the frequency plots");
+                ui.indent("band-region", |ui| {
+                    for region in Region::ALL {
+                        ui.radio_value(&mut self.band_region, region, region.name())
+                            .on_hover_text(region.where_());
+                    }
+                });
                 ui.separator();
                 zoom_menu(ui);
                 ui.separator();
@@ -980,6 +993,39 @@ impl App {
             ui.label("Stop");
             let r = ui.text_edit_singleline(&mut self.stop);
             apply_by_return |= entered(r, ui);
+            ui.end_row();
+            ui.label("Band");
+            let mut picked: Option<&'static Band> = None;
+            egui::ComboBox::from_id_salt("band")
+                .selected_text("choose…")
+                .width(90.0)
+                .show_ui(ui, |ui| {
+                    for b in self.band_region.bands() {
+                        let (lo, hi) = b.with_margin(BAND_MARGIN);
+                        if ui
+                            .selectable_label(false, b.name)
+                            .on_hover_text(format!(
+                                "{} – {}; the sweep gets {} – {}",
+                                format_hz(b.start_hz),
+                                format_hz(b.stop_hz),
+                                format_hz(lo),
+                                format_hz(hi)
+                            ))
+                            .clicked()
+                        {
+                            picked = Some(b);
+                        }
+                    }
+                })
+                .response
+                .on_hover_text(format!(
+                    "set Start and Stop to an amateur band of {} with {:.0} % of its width extra on each side, and apply the sweep; View ▸ Amateur bands chooses the region",
+                    self.band_region.name(),
+                    BAND_MARGIN * 100.0
+                ));
+            if let Some(b) = picked {
+                self.sweep_to_band(b);
+            }
             ui.end_row();
             ui.label("Points");
             egui::ComboBox::from_id_salt("points")

@@ -1258,6 +1258,25 @@ alleen de velden. Een calibratie met een puntental buiten de keuzelijst (bijvoor
 bestand van een andere versie met 301 punten) geeft de dichtstbijzijnde keuze en een rode
 regel onder het sweeppaneel dat de calibratie geïnterpoleerd wordt.
 
+## Punt 71 — Band in het sweeppaneel, regio 2
+
+**Veranderd.** `bands::REGION_2`, `Region`, `Band::with_margin`; rij **Band** in het
+sweeppaneel (keuzelijst "choose…"), radioknoppen IARU Region 1 / 2 onder View ▸ Amateur
+bands, bewaard als `band_region` (1 of 2, iets anders leest als 1).
+
+```bash
+cargo test -p litevna bands
+```
+
+GUI, zonder apparaat: View ▸ Amateur bands aan, regio 1. Band ▸ 40 m: Start `6.980MHz`,
+Stop `7.220MHz`, Points ongewijzigd; de hover van 40 m in de lijst noemt 7,000–7,200 en
+6,980–7,220. Zet regio 2: dezelfde keuze geeft 6,97–7,33 MHz, en de lijst heeft nu ook
+1.25 m, 33 cm en 5 cm; met `cal/sweep.s2p` als trace loopt de grijze 40 m-band tot 7,3 en
+80 m tot 4,0 MHz. **Met apparaat**: Run aan, Band ▸ 20 m: de sweep herstart op 13,965–
+14,385 MHz met de calibratie geïnterpoleerd (label CAL, of de waarschuwing als het bestand
+het bereik niet dekt). Herstart: regio 2 is bewaard. In de browserbouw staat het
+sweeppaneel niet, de regiokeuze en de achtergrond wel.
+
 ## Slotronde voor deze punten
 
 1. Start de GUI met je bestaande instellingen (0.3.3): ze laden; View ▸ Amateur bands

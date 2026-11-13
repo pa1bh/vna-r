@@ -12,6 +12,15 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Added
+
+- Sweep panel: **Band** sets Start and Stop to an amateur band with 10 % of its width
+  extra on each side and applies the sweep, for tuning a multiband antenna band by band.
+  Under **View ▸ Amateur bands** you now choose IARU Region 1 or Region 2 (the Americas:
+  80 m to 4.0 MHz, 40 m to 7.3 MHz, 2 m to 148 MHz, 70 cm 420–450 MHz, and the 1.25 m,
+  33 cm, 5 cm bands); the backdrop and the Band list follow it. Suggested by Steve Falco
+  on groups.io. (Work list 71.)
+
 ## [0.3.4] - 2026-11-13
 
 Eight small additions after a look at what NanoVNA-Saver does, two wishes from the first

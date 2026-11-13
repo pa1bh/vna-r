@@ -55,6 +55,8 @@ pub(super) struct Settings {
     pub(super) show_s21: bool,
     /// The amateur bands drawn behind the frequency plots.
     pub(super) show_bands: bool,
+    /// Whose bands: the IARU region's number (1 or 2); anything else reads as 1.
+    pub(super) band_region: u8,
     pub(super) view_tdr: bool,
     pub(super) tdr_vf: f64,
     pub(super) tdr_window: String,
@@ -129,6 +131,7 @@ impl Default for Settings {
             show_s11: true,
             show_s21: true,
             show_bands: false,
+            band_region: 1,
             view_tdr: false,
             tdr_vf: 0.70,
             tdr_window: "hann".into(),
@@ -182,6 +185,7 @@ impl App {
         self.show_s11 = s.show_s11;
         self.show_s21 = s.show_s21;
         self.show_bands = s.show_bands;
+        self.band_region = Region::from_number(s.band_region).unwrap_or(Region::One);
         self.view = if s.view_tdr { View::Tdr } else { View::Frequency };
         // A hand-edited or future settings file may hold 0, NaN or nonsense;
         // the DragValues only clamp on interaction.
@@ -248,6 +252,7 @@ impl App {
             show_s11: self.show_s11,
             show_s21: self.show_s21,
             show_bands: self.show_bands,
+            band_region: self.band_region.number(),
             view_tdr: self.view == View::Tdr,
             tdr_vf: self.tdr_vf,
             tdr_window: self.tdr_window.name().into(),

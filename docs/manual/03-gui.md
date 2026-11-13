@@ -11,8 +11,9 @@ with four charts. The title bar shows the version number.
 - **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
   screenshot of the device.
 - **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Amateur
-  bands** (the IARU Region 1 bands as a grey backdrop with their name in the three
-  frequency charts, so you see at once whether a dip lies in the band), **Zoom** (the
+  bands** (the amateur bands as a grey backdrop with their name in the three frequency
+  charts, so you see at once whether a dip lies in the band; below it you pick IARU
+  Region 1 or 2, which also sets the list behind **Band** in the sweep panel), **Zoom** (the
   size of the text and everything else, see below), **Connect at start** (connect by
   itself when the program starts and a VNA is plugged in; off by default) and the
   **Developer tools** toggle.
@@ -60,7 +61,10 @@ Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Ap
 sweep** or with Return in Start or Stop; during Run the sweep then restarts with the new
 settings. You type frequencies as `50k`, `14.2M`, `1.3G` or `6.3G` (a decimal comma is
 accepted too). The LiteVNA measures 50 kHz to 6.3 GHz; more points gives finer detail but
-takes longer (roughly 300 to 600 points per second).
+takes longer (roughly 300 to 600 points per second). **Band** sets Start and Stop to an
+amateur band with 10 % of its width extra on each side, so that while tuning an antenna
+you also see just beyond the band (40 m in Region 1 becomes 6.98–7.22 MHz); the sweep is
+applied at once. The list follows the region under View ▸ Amateur bands.
 
 **Average** (LiteVNA only) is the bandwidth setting of the device itself (1 to 80): higher is
 quieter but slower, and the setting stays in the device. **Sweep avg** is something
