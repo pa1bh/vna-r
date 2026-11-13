@@ -58,6 +58,28 @@ jobs:
           ./target/release/vna-cli --help
           ./target/release/vna-cli list
 
+  web:
+    # The browser build (a viewer without a device, docs/09-wasm-proef.md) is the same
+    # GUI code for another target. Nobody builds it day to day, so this job is what
+    # keeps it from rotting: it must compile, without warnings.
+    name: browser build (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        run: cargo clippy -p vna-gui --target wasm32-unknown-unknown --release -- -D warnings
+
+      - name: Build
+        run: cargo build -p vna-gui --target wasm32-unknown-unknown --release
+
   nix:
     name: nix build (flake)
     runs-on: ubuntu-latest

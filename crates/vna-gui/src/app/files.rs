@@ -2,6 +2,12 @@
 
 use super::*;
 
+/// The measurement that is built in, for the browser build: a first visitor
+/// has no file at hand. What it is stands in the file's comment lines.
+const EXAMPLE: &str = include_str!("../../web/example-ocf-antenna.s1p");
+const EXAMPLE_NAME: &str = "example-ocf-antenna.s1p";
+pub(super) const EXAMPLE_ABOUT: &str = "an off-centre-fed wire antenna for HF, 3–30 MHz, measured with a NanoVNA-F";
+
 /// A frequency for a file name: `50kHz`, `14.2MHz`, `6.3GHz` (no space, no trailing zeros).
 pub(super) fn compact_hz(hz: u64) -> String {
     let text = format_hz(hz).replace(' ', "");
@@ -43,6 +49,14 @@ impl App {
             web::PickFor::Trace
         };
         self.web.pick(purpose, "Touchstone", &["s1p", "s2p"]);
+    }
+
+    /// Show the built-in example as the trace.
+    pub(super) fn open_example(&mut self) {
+        let file = litevna::touchstone::read_touchstone_full(EXAMPLE.as_bytes(), Some(1));
+        self.show_touchstone(EXAMPLE_NAME.to_string(), &format!("the example ({EXAMPLE_ABOUT})"), file, false);
+        // One port: its S21 is a row of zeros, a flat line that only stretches the scales.
+        self.show_s21 = false;
     }
 
     /// Show a Touchstone file that was read (or say why it could not be) as
@@ -230,6 +244,18 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_built_in_example_reads_as_a_one_port_sweep() {
+        let file = litevna::touchstone::read_touchstone_full(EXAMPLE.as_bytes(), Some(1)).unwrap();
+        assert!(!file.renormalised());
+        let sweep = file.sweep;
+        assert_eq!(sweep.freqs_hz.len(), 1001);
+        assert_eq!((sweep.freqs_hz[0], sweep.freqs_hz[1000]), (3_000_000, 30_000_000));
+        // A passive antenna: no reflection above 1, and a dip somewhere that is a usable match.
+        assert!(sweep.s11.iter().all(|g| g.norm() < 1.0));
+        assert!(sweep.s11.iter().any(|g| g.norm() < 0.2));
+    }
 
     #[test]
     fn compact_hz_for_file_names() {

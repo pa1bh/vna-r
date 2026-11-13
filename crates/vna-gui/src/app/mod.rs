@@ -50,6 +50,16 @@ pub const GIT_REV: &str = env!("VNA_R_GIT_REV");
 
 const REPO_URL: &str = "https://github.com/pa1bh/vna-r";
 
+/// Where the program that measures is to be had (the browser build points there).
+const RELEASES_URL: &str = "https://github.com/pa1bh/vna-r/releases/latest";
+
+/// Whether this build can talk to a device. The browser build cannot: it is a
+/// viewer for Touchstone files and leaves out what needs a device (port,
+/// Connect, Run, the sweep settings, calibration). A constant rather than
+/// `#[cfg]`, so that both variants of the interface are compiled and checked
+/// in every build.
+const HAS_DEVICE: bool = cfg!(not(target_arch = "wasm32"));
+
 /// The manual as published for this version: `docs/manual` (English) or
 /// `docs/handleiding` (Dutch) at the release tag, so the text matches the
 /// buttons of the program that is running.
@@ -91,9 +101,9 @@ fn zoom_menu(ui: &mut egui::Ui) {
 /// What an empty chart says: how to get a trace on it.
 #[cfg(not(target_arch = "wasm32"))]
 const EMPTY_HINT: &str = "Connect and press Run";
-/// The browser build has no device: a trace can only come from a file.
+/// The browser build has no device: a trace can only come from a file or the built-in example.
 #[cfg(target_arch = "wasm32")]
-const EMPTY_HINT: &str = "No device support in the browser build: open a Touchstone file (File ▸ Open as trace…)";
+const EMPTY_HINT: &str = "Open a Touchstone file (File ▸ Open as trace…) or the example (File ▸ Open example)";
 
 /// Lines kept in the developer log.
 const LOG_LINES: usize = 400;
@@ -350,6 +360,10 @@ impl App {
                 app.apply_settings(settings);
             }
         }
+        if !HAS_DEVICE {
+            // A first visitor has no file at hand: start with something to look at.
+            app.open_example();
+        }
         app
     }
 
@@ -604,120 +618,11 @@ impl App {
     }
 
     fn top_bar(&mut self, ui: &mut egui::Ui) {
-        const PORT_SCAN_INTERVAL: f64 = 2.0;
-        let connected = self.connected();
-        if !connected && !matches!(self.connection, Connection::Connecting(_)) {
-            let now = ui.input(|i| i.time);
-            if now - self.last_port_scan > PORT_SCAN_INTERVAL {
-                self.last_port_scan = now;
-                self.refresh_ports();
-                ui.ctx()
-                    .request_repaint_after(std::time::Duration::from_secs_f64(PORT_SCAN_INTERVAL));
-            }
-        }
         ui.horizontal(|ui| {
-            ui.add_enabled_ui(!connected, |ui| {
-                let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
-                egui::ComboBox::from_id_salt("port")
-                    .selected_text(selected_text)
-                    .width(260.0)
-                    .show_ui(ui, |ui| {
-                        for p in &self.ports {
-                            let label = match &p.usb {
-                                Some(u) => format!(
-                                    "{} {} {}",
-                                    if p.looks_like_vna() { "*" } else { " " },
-                                    p.path,
-                                    u.product.clone().unwrap_or_default()
-                                ),
-                                None => format!("  {}", p.path),
-                            };
-                            ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
-                        }
-                    });
-                if ui
-                    .button("rescan")
-                    .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
-                    .clicked()
-                {
-                    self.refresh_ports();
-                }
-            });
-            match &self.connection {
-                Connection::Disconnected => {
-                    if ui.add_enabled(self.selected_port.is_some(), egui::Button::new("Connect")).clicked() {
-                        self.connect_selected();
-                    }
-                }
-                Connection::Connecting(p) => {
-                    ui.spinner();
-                    ui.label(format!("connecting {p}…"));
-                }
-                Connection::Reconnecting { port, since } => {
-                    let cancel = ui
-                        .button("Cancel")
-                        .on_hover_text("stop waiting for the device and disconnect")
-                        .clicked();
-                    ui.spinner();
-                    ui.label(
-                        RichText::new(format!(
-                            "connection dropped, waiting for {port}… {:.0} s",
-                            since.elapsed().as_secs_f32()
-                        ))
-                        .color(Color32::from_rgb(255, 150, 80)),
-                    );
-                    ui.ctx().request_repaint_after(Duration::from_millis(500));
-                    if cancel {
-                        self.running = false;
-                        self.send(Cmd::Disconnect);
-                    }
-                }
-                Connection::Connected { port, info, battery_mv } => {
-                    if ui.button("Disconnect").clicked() {
-                        self.running = false;
-                        self.send(Cmd::Disconnect);
-                    }
-                    ui.label(
-                        RichText::new(format!(
-                            "{}  {}",
-                            info.summary(),
-                            battery_mv.map(|mv| format!("{:.2} V", mv as f64 / 1000.0)).unwrap_or_default()
-                        ))
-                        .color(Color32::from_rgb(120, 200, 120)),
-                    )
-                    .on_hover_text(port);
-                }
-            }
-            ui.separator();
-            ui.add_enabled_ui(connected, |ui| {
-                // Stop is there for anything that is being measured, also a
-                // standard or a single sweep while Run is off.
-                let sweeping = self.sweeping();
-                if sweeping {
-                    if ui.button("Stop").clicked() {
-                        self.stop_sweep();
-                    }
-                } else if ui.button("Run").clicked() {
-                    self.start_sweep(true);
-                }
-                if ui.add_enabled(!sweeping, egui::Button::new("Single")).clicked() {
-                    self.start_sweep(false);
-                }
-                if ui.button("Screenshot").clicked() {
-                    self.send(Cmd::Screenshot);
-                }
-            });
-            // A sweep that takes a while (a NanoVNA-F, many points, averaged
-            // standards) shows how far it is; a quick one would only flicker.
-            if let Some((done, total, since)) = self.progress {
-                if since.elapsed() > Duration::from_millis(700) && total > 0 {
-                    ui.add(
-                        egui::ProgressBar::new(done as f32 / total as f32)
-                            .desired_width(110.0)
-                            .text(format!("{done}/{total}")),
-                    )
-                    .on_hover_text("points measured in the running sweep; Stop takes effect at the next block of data");
-                }
+            if HAS_DEVICE {
+                self.device_controls(ui);
+            } else {
+                self.viewer_controls(ui);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if let Some(err) = self.error.clone() {
@@ -739,6 +644,142 @@ impl App {
                 }
             });
         });
+    }
+
+    /// The top bar's part for the device: port, Connect, Run, Single, the progress of a sweep.
+    fn device_controls(&mut self, ui: &mut egui::Ui) {
+        const PORT_SCAN_INTERVAL: f64 = 2.0;
+        let connected = self.connected();
+        if !connected && !matches!(self.connection, Connection::Connecting(_)) {
+            let now = ui.input(|i| i.time);
+            if now - self.last_port_scan > PORT_SCAN_INTERVAL {
+                self.last_port_scan = now;
+                self.refresh_ports();
+                ui.ctx()
+                    .request_repaint_after(std::time::Duration::from_secs_f64(PORT_SCAN_INTERVAL));
+            }
+        }
+        ui.add_enabled_ui(!connected, |ui| {
+            let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
+            egui::ComboBox::from_id_salt("port")
+                .selected_text(selected_text)
+                .width(260.0)
+                .show_ui(ui, |ui| {
+                    for p in &self.ports {
+                        let label = match &p.usb {
+                            Some(u) => format!(
+                                "{} {} {}",
+                                if p.looks_like_vna() { "*" } else { " " },
+                                p.path,
+                                u.product.clone().unwrap_or_default()
+                            ),
+                            None => format!("  {}", p.path),
+                        };
+                        ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
+                    }
+                });
+            if ui
+                .button("rescan")
+                .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
+                .clicked()
+            {
+                self.refresh_ports();
+            }
+        });
+        match &self.connection {
+            Connection::Disconnected => {
+                if ui.add_enabled(self.selected_port.is_some(), egui::Button::new("Connect")).clicked() {
+                    self.connect_selected();
+                }
+            }
+            Connection::Connecting(p) => {
+                ui.spinner();
+                ui.label(format!("connecting {p}…"));
+            }
+            Connection::Reconnecting { port, since } => {
+                let cancel = ui
+                    .button("Cancel")
+                    .on_hover_text("stop waiting for the device and disconnect")
+                    .clicked();
+                ui.spinner();
+                ui.label(
+                    RichText::new(format!(
+                        "connection dropped, waiting for {port}… {:.0} s",
+                        since.elapsed().as_secs_f32()
+                    ))
+                    .color(Color32::from_rgb(255, 150, 80)),
+                );
+                ui.ctx().request_repaint_after(Duration::from_millis(500));
+                if cancel {
+                    self.running = false;
+                    self.send(Cmd::Disconnect);
+                }
+            }
+            Connection::Connected { port, info, battery_mv } => {
+                if ui.button("Disconnect").clicked() {
+                    self.running = false;
+                    self.send(Cmd::Disconnect);
+                }
+                ui.label(
+                    RichText::new(format!(
+                        "{}  {}",
+                        info.summary(),
+                        battery_mv.map(|mv| format!("{:.2} V", mv as f64 / 1000.0)).unwrap_or_default()
+                    ))
+                    .color(Color32::from_rgb(120, 200, 120)),
+                )
+                .on_hover_text(port);
+            }
+        }
+        ui.separator();
+        ui.add_enabled_ui(connected, |ui| {
+            // Stop is there for anything that is being measured, also a
+            // standard or a single sweep while Run is off.
+            let sweeping = self.sweeping();
+            if sweeping {
+                if ui.button("Stop").clicked() {
+                    self.stop_sweep();
+                }
+            } else if ui.button("Run").clicked() {
+                self.start_sweep(true);
+            }
+            if ui.add_enabled(!sweeping, egui::Button::new("Single")).clicked() {
+                self.start_sweep(false);
+            }
+            if ui.button("Screenshot").clicked() {
+                self.send(Cmd::Screenshot);
+            }
+        });
+        // A sweep that takes a while (a NanoVNA-F, many points, averaged
+        // standards) shows how far it is; a quick one would only flicker.
+        if let Some((done, total, since)) = self.progress {
+            if since.elapsed() > Duration::from_millis(700) && total > 0 {
+                ui.add(
+                    egui::ProgressBar::new(done as f32 / total as f32)
+                        .desired_width(110.0)
+                        .text(format!("{done}/{total}")),
+                )
+                .on_hover_text("points measured in the running sweep; Stop takes effect at the next block of data");
+            }
+        }
+    }
+
+    /// The top bar of the browser build instead: where a trace comes from
+    /// there, and where the program that measures is to be had.
+    fn viewer_controls(&mut self, ui: &mut egui::Ui) {
+        if ui
+            .button("Open as trace…")
+            .on_hover_text("show an .s1p/.s2p file from your computer")
+            .clicked()
+        {
+            self.open_touchstone(false);
+        }
+        if ui.button("Example").on_hover_text(EXAMPLE_ABOUT).clicked() {
+            self.open_example();
+        }
+        ui.separator();
+        ui.label("Viewer for Touchstone files; they stay on your computer. To measure with a LiteVNA or NanoVNA:");
+        ui.add(egui::Hyperlink::from_label_and_url("get vna-r", RELEASES_URL).open_in_new_tab(true));
     }
 
     fn menu_bar(&mut self, ui: &mut egui::Ui) {
@@ -764,6 +805,14 @@ impl App {
                     ui.close();
                     self.save_s2p();
                 }
+                if !HAS_DEVICE {
+                    if ui.button("Open example").on_hover_text(EXAMPLE_ABOUT).clicked() {
+                        ui.close();
+                        self.open_example();
+                    }
+                    // A calibration is for measuring, and a browser tab is not quit from a menu.
+                    return;
+                }
                 ui.separator();
                 if ui.button("Load calibration…").clicked() {
                     ui.close();
@@ -781,49 +830,51 @@ impl App {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
             });
-            ui.menu_button("Device", |ui| {
-                if connected {
-                    if ui.button("Disconnect").clicked() {
-                        ui.close();
-                        self.running = false;
-                        self.send(Cmd::Disconnect);
-                    }
-                } else if ui
-                    .add_enabled(
-                        self.selected_port.is_some() && matches!(self.connection, Connection::Disconnected),
-                        egui::Button::new("Connect"),
-                    )
-                    .clicked()
-                {
-                    ui.close();
-                    self.connect_selected();
-                }
-                if ui.button("Rescan ports").clicked() {
-                    ui.close();
-                    self.refresh_ports();
-                }
-                ui.separator();
-                ui.add_enabled_ui(connected, |ui| {
-                    let sweeping = self.sweeping();
-                    if sweeping {
-                        if ui.button("Stop").clicked() {
+            if HAS_DEVICE {
+                ui.menu_button("Device", |ui| {
+                    if connected {
+                        if ui.button("Disconnect").clicked() {
                             ui.close();
-                            self.stop_sweep();
+                            self.running = false;
+                            self.send(Cmd::Disconnect);
                         }
-                    } else if ui.button("Run").clicked() {
+                    } else if ui
+                        .add_enabled(
+                            self.selected_port.is_some() && matches!(self.connection, Connection::Disconnected),
+                            egui::Button::new("Connect"),
+                        )
+                        .clicked()
+                    {
                         ui.close();
-                        self.start_sweep(true);
+                        self.connect_selected();
                     }
-                    if ui.add_enabled(!sweeping, egui::Button::new("Single sweep")).clicked() {
+                    if ui.button("Rescan ports").clicked() {
                         ui.close();
-                        self.start_sweep(false);
+                        self.refresh_ports();
                     }
-                    if ui.button("Device screenshot").clicked() {
-                        ui.close();
-                        self.send(Cmd::Screenshot);
-                    }
+                    ui.separator();
+                    ui.add_enabled_ui(connected, |ui| {
+                        let sweeping = self.sweeping();
+                        if sweeping {
+                            if ui.button("Stop").clicked() {
+                                ui.close();
+                                self.stop_sweep();
+                            }
+                        } else if ui.button("Run").clicked() {
+                            ui.close();
+                            self.start_sweep(true);
+                        }
+                        if ui.add_enabled(!sweeping, egui::Button::new("Single sweep")).clicked() {
+                            ui.close();
+                            self.start_sweep(false);
+                        }
+                        if ui.button("Device screenshot").clicked() {
+                            ui.close();
+                            self.send(Cmd::Screenshot);
+                        }
+                    });
                 });
-            });
+            }
             ui.menu_button("View", |ui| {
                 if ui.radio(self.view == View::Frequency, "Frequency domain").clicked() {
                     self.view = View::Frequency;
@@ -837,8 +888,10 @@ impl App {
                 ui.separator();
                 zoom_menu(ui);
                 ui.separator();
-                ui.checkbox(&mut self.auto_connect, "Connect at start")
-                    .on_hover_text("connect by itself when the program starts and a VNA is plugged in");
+                if HAS_DEVICE {
+                    ui.checkbox(&mut self.auto_connect, "Connect at start")
+                        .on_hover_text("connect by itself when the program starts and a VNA is plugged in");
+                }
                 if ui
                     .checkbox(&mut self.dev_tools, "Developer tools")
                     .on_hover_text("adds a Developer menu with the log window and diagnostics for bug reports")
@@ -890,89 +943,104 @@ impl App {
         });
     }
 
-    fn side_panel(&mut self, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            ui.heading("Sweep");
-            let mut apply_by_return = false;
-            egui::Grid::new("sweep-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
-                // Return in Start or Stop applies the sweep, like the button below.
-                let entered = |r: egui::Response, ui: &egui::Ui| r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                ui.label("Start");
-                let r = ui.text_edit_singleline(&mut self.start);
-                apply_by_return |= entered(r, ui);
-                ui.end_row();
-                ui.label("Stop");
-                let r = ui.text_edit_singleline(&mut self.stop);
-                apply_by_return |= entered(r, ui);
-                ui.end_row();
-                ui.label("Points");
-                egui::ComboBox::from_id_salt("points").selected_text(self.points.to_string()).show_ui(ui, |ui| {
+    /// The side panel's sections for measuring: the sweep with its segments, and the calibration.
+    fn measuring_panels(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Sweep");
+        let mut apply_by_return = false;
+        egui::Grid::new("sweep-grid").num_columns(2).spacing([8.0, 6.0]).show(ui, |ui| {
+            // Return in Start or Stop applies the sweep, like the button below.
+            let entered = |r: egui::Response, ui: &egui::Ui| r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            ui.label("Start");
+            let r = ui.text_edit_singleline(&mut self.start);
+            apply_by_return |= entered(r, ui);
+            ui.end_row();
+            ui.label("Stop");
+            let r = ui.text_edit_singleline(&mut self.stop);
+            apply_by_return |= entered(r, ui);
+            ui.end_row();
+            ui.label("Points");
+            egui::ComboBox::from_id_salt("points")
+                .selected_text(self.points.to_string())
+                .show_ui(ui, |ui| {
                     for p in POINT_CHOICES {
                         ui.selectable_value(&mut self.points, p, p.to_string());
                     }
                 });
-                ui.end_row();
-                ui.label("Average");
-                ui.horizontal(|ui| {
-                    let has_avg = self.device_limits().is_none_or(|l| l.has_device_average);
-                    ui.add_enabled(has_avg, egui::DragValue::new(&mut self.average).range(1..=80));
-                    if ui
-                        .add_enabled(self.connected() && has_avg, egui::Button::new("set"))
-                        .on_hover_text("LiteVNA register 0x40; also changes the bandwidth in the device menu")
-                        .on_disabled_hover_text("only the LiteVNA has this register; a NanoVNA-H/-F sets its bandwidth on the device")
-                        .clicked()
-                    {
-                        self.send(Cmd::SetAverage(self.average));
-                    }
-                });
-                ui.end_row();
-                ui.label("Sweep avg");
-                ui.horizontal(|ui| {
-                    let before = self.sweep_avg;
-                    ui.add(egui::DragValue::new(&mut self.sweep_avg).range(1..=MAX_SWEEP_AVG)).on_hover_text("complex mean of the last N sweeps, in software; resets when the grid changes");
-                    if self.sweep_avg < before {
-                        while self.avg_buf.len() > self.sweep_avg {
-                            self.avg_buf.pop_front();
-                        }
-                    }
-                    if self.sweep_avg > 1 {
-                        ui.small(format!("{}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg));
-                        if ui.small_button("reset").clicked() {
-                            self.avg_buf.clear();
-                        }
-                    }
-                });
-                ui.end_row();
-            });
-            if let Some(e) = &self.sweep_error {
-                ui.colored_label(Color32::from_rgb(255, 110, 110), e);
-            }
-            let apply = ui
-                .add_enabled(self.connected(), egui::Button::new("Apply sweep"))
-                .on_hover_text("use these settings and the segments below; restarts a running sweep, otherwise does one sweep")
-                .clicked();
-            if apply || (apply_by_return && self.connected()) {
-                self.start_sweep(self.running);
-            }
-            ui.small("Frequencies: 50k, 14.2M, 1.3G. Return in Start or Stop applies. Applying while running restarts the sweep; segment changes need Apply too.");
-            if let Some(l) = self.device_limits() {
-                let below = parse_hz(&self.start).is_ok_and(|f| f < l.min_hz);
-                let above = parse_hz(&self.stop).is_ok_and(|f| f > l.max_hz);
-                let range = format!("Device range {} – {}", format_hz(l.min_hz), format_hz(l.max_hz));
-                if below || above {
-                    ui.colored_label(Color32::from_rgb(230, 150, 80), format!("{range}; the sweep goes outside it and that part is meaningless."));
-                } else {
-                    ui.small(range);
+            ui.end_row();
+            ui.label("Average");
+            ui.horizontal(|ui| {
+                let has_avg = self.device_limits().is_none_or(|l| l.has_device_average);
+                ui.add_enabled(has_avg, egui::DragValue::new(&mut self.average).range(1..=80));
+                if ui
+                    .add_enabled(self.connected() && has_avg, egui::Button::new("set"))
+                    .on_hover_text("LiteVNA register 0x40; also changes the bandwidth in the device menu")
+                    .on_disabled_hover_text("only the LiteVNA has this register; a NanoVNA-H/-F sets its bandwidth on the device")
+                    .clicked()
+                {
+                    self.send(Cmd::SetAverage(self.average));
                 }
+            });
+            ui.end_row();
+            ui.label("Sweep avg");
+            ui.horizontal(|ui| {
+                let before = self.sweep_avg;
+                ui.add(egui::DragValue::new(&mut self.sweep_avg).range(1..=MAX_SWEEP_AVG))
+                    .on_hover_text("complex mean of the last N sweeps, in software; resets when the grid changes");
+                if self.sweep_avg < before {
+                    while self.avg_buf.len() > self.sweep_avg {
+                        self.avg_buf.pop_front();
+                    }
+                }
+                if self.sweep_avg > 1 {
+                    ui.small(format!("{}/{}", self.avg_buf.len().min(self.sweep_avg), self.sweep_avg));
+                    if ui.small_button("reset").clicked() {
+                        self.avg_buf.clear();
+                    }
+                }
+            });
+            ui.end_row();
+        });
+        if let Some(e) = &self.sweep_error {
+            ui.colored_label(Color32::from_rgb(255, 110, 110), e);
+        }
+        let apply = ui
+            .add_enabled(self.connected(), egui::Button::new("Apply sweep"))
+            .on_hover_text("use these settings and the segments below; restarts a running sweep, otherwise does one sweep")
+            .clicked();
+        if apply || (apply_by_return && self.connected()) {
+            self.start_sweep(self.running);
+        }
+        ui.small("Frequencies: 50k, 14.2M, 1.3G. Return in Start or Stop applies. Applying while running restarts the sweep; segment changes need Apply too.");
+        if let Some(l) = self.device_limits() {
+            let below = parse_hz(&self.start).is_ok_and(|f| f < l.min_hz);
+            let above = parse_hz(&self.stop).is_ok_and(|f| f > l.max_hz);
+            let range = format!("Device range {} – {}", format_hz(l.min_hz), format_hz(l.max_hz));
+            if below || above {
+                ui.colored_label(
+                    Color32::from_rgb(230, 150, 80),
+                    format!("{range}; the sweep goes outside it and that part is meaningless."),
+                );
+            } else {
+                ui.small(range);
             }
-            self.segments_panel(ui);
+        }
+        self.segments_panel(ui);
 
-            ui.add_space(12.0);
-            ui.heading("Calibration");
-            self.calibration_panel(ui);
-            egui::CollapsingHeader::new("Kit fit (line open / line short)").default_open(false).show(ui, |ui| {
+        ui.add_space(12.0);
+        ui.heading("Calibration");
+        self.calibration_panel(ui);
+        egui::CollapsingHeader::new("Kit fit (line open / line short)")
+            .default_open(false)
+            .show(ui, |ui| {
                 self.kit_fit_panel(ui);
             });
+    }
+
+    fn side_panel(&mut self, ui: &mut egui::Ui) {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            if HAS_DEVICE {
+                self.measuring_panels(ui);
+            }
 
             ui.add_space(12.0);
             ui.heading("Traces");
@@ -984,6 +1052,10 @@ impl App {
                 ui.add(egui::DragValue::new(&mut self.gd_aperture).range(1..=50).suffix(" pts"));
             });
             ui.small("Pick what each plot shows in its header. Group delay = −dφ/dω over ±aperture points.");
+            if !HAS_DEVICE {
+                // Of the calibration panel, which is left out, the one setting that also works on a file.
+                self.port_extension_row(ui);
+            }
 
             ui.add_space(12.0);
             ui.heading("Time domain (TDR)");
@@ -1022,7 +1094,7 @@ impl App {
                             format_hz(stop as u64)
                         ),
                     );
-                    if ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
+                    if HAS_DEVICE && ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
                         self.start = "50k".into();
                         self.stop = format_hz(stop as u64).replace(' ', "");
                         self.points = 1001;
@@ -1083,7 +1155,12 @@ impl App {
                 self.save_s2p();
             }
             ui.horizontal(|ui| {
-                if ui.button("Open as trace…").on_hover_text("show an .s1p/.s2p file instead of the device; the next sweep replaces it").clicked() {
+                let hint = if HAS_DEVICE {
+                    "show an .s1p/.s2p file instead of the device; the next sweep replaces it"
+                } else {
+                    "show an .s1p/.s2p file from your computer"
+                };
+                if ui.button("Open as trace…").on_hover_text(hint).clicked() {
                     self.open_touchstone(false);
                 }
                 if ui.add_enabled(self.references.len() < MAX_REFS, egui::Button::new("Open as reference…")).clicked() {
@@ -1133,5 +1210,7 @@ impl eframe::App for App {
         self.screenshot_window(&ctx);
         self.about_window(&ctx);
         self.log_window(&ctx);
+        #[cfg(target_arch = "wasm32")]
+        self.web.frame_shown();
     }
 }

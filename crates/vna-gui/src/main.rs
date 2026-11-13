@@ -58,17 +58,13 @@ fn main() {
                 Box::new(|cc| Ok(Box::new(app::App::new(cc)))),
             )
             .await;
-        // The page shows a "loading" line until this point; the error replaces it if there is one.
-        let loading = document.get_element_by_id("loading");
-        match (started, loading) {
-            (Ok(()), Some(loading)) => loading.remove(),
-            (Ok(()), None) => {}
-            (Err(e), loading) => {
-                if let Some(loading) = loading {
-                    loading.set_inner_html("vna-r could not start in this browser; the console has the details.");
-                }
-                log::error!("starting eframe: {e:?}");
+        // The page shows a "loading" line, which the first frame takes away
+        // (`WebFiles::frame_shown`); an error replaces it here.
+        if let Err(e) = started {
+            if let Some(loading) = document.get_element_by_id("loading") {
+                loading.set_inner_html("vna-r could not start in this browser; the console has the details.");
             }
+            log::error!("starting eframe: {e:?}");
         }
     });
 }
