@@ -1,7 +1,8 @@
 # QC-procedure werklijst november 2026
 
-Stand: 12 november 2026: **0.3.3** is uitgebracht (wachten bij een verbinding die komt en
-gaat, in plaats van opgeven), na **0.3.2** (waarschuwing bij een sprong in de calibratie,
+Stand: 13 november 2026: **0.3.4** is uitgebracht (acht kleine punten na NanoVNA-Saver,
+gedeelde grafiek-as met reset view, sweep from calibration en de browserbouw), na **0.3.3**
+(wachten bij een verbinding die komt en gaat, in plaats van opgeven), **0.3.2** (waarschuwing bij een sprong in de calibratie,
 en opnieuw verbinden na uitval) en **0.3.1** (0.3.0 plus View ▸ Zoom); zie
 het logboek. **0.3.0** kwam na de release candidates 0.3.0-rc.1
 (vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
@@ -27,7 +28,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.3>, uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.4>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de

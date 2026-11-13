@@ -12,6 +12,18 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-11-13
+
+Eight small additions after a look at what NanoVNA-Saver does, two wishes from the first
+round of use with them, and a browser build of the GUI for looking at Touchstone files
+without a device.
+
+Tried with a LiteVNA 67 on macOS, in the GUI, with and without the device: the marker
+column, the bands, the trimmed average with a load on port 1, log spacing over
+50 kHz–6.3 GHz, the cable list, the S21 offset, the Kaiser windows, the shared axes with
+reset view, and sweep from calibration; the browser build in Chrome on macOS. **Not
+tried**: Linux and Windows, the NanoVNA-F, and other browsers.
+
 ### Added
 
 - Plots: the three frequency charts share their frequency axis and the two TDR charts
