@@ -1099,7 +1099,8 @@ vensterlijst met kaiser 6 en 13. **Niet gecontroleerd**: alles met een apparaat 
 middeling met drop en de log spacing zijn alleen op de library getest), de kabellijst en
 de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows. Uitgevoerd op
 13 november 2026 op macOS met de LiteVNA 67; uitkomst en bevindingen 10 en 11 staan in het
-logboek bovenaan.
+logboek bovenaan. Daarna kwamen op verzoek van PA1BH de punten 69 en 70 erbij; die staan
+onderaan deze ronde en zijn nog niet door hem bekeken.
 
 Alles hieronder kan **zonder apparaat** met `cal/sweep.s2p` of het voorbeeld in de
 browserbouw, tenzij anders gezegd. Begin met:
@@ -1226,6 +1227,35 @@ Verwacht: groen. Niets in het programma veranderd; de test legt vast dat comment
 optieregel, een herhaalde optieregel en een kale `#` gelezen worden, en met welke melding
 dalende frequenties en een halve regel geweigerd worden.
 
+## Punt 69 — Gedeelde frequentie-as en reset view
+
+**Veranderd.** De drie frequentiegrafieken delen hun x-as (`link_axis`), de twee
+TDR-grafieken hun afstand-as; de y-as blijft per grafiek. Knop **reset view** in de
+markerbalk en rechts in de kop van de TDR-weergave. In de browserbouw gezien: slepen in
+log mag verschuift SWR en fase mee, **reset view** zet alle drie terug.
+
+GUI, zonder apparaat met `cal/sweep.s2p`: sleep in log mag naar links. Verwacht: SWR en de
+derde grafiek tonen hetzelfde stuk spectrum, de Smith-kaart verandert niet. Zoom met
+Ctrl/⌘ en scrollen in SWR: de andere twee zoomen in frequentie mee, hun verticale schaal
+blijft. **reset view**: alle drie weer automatisch; een dubbelklik in één grafiek doet
+hetzelfde voor alle drie. TDR-weergave: sleep in de bovenste grafiek, de onderste volgt;
+**reset view** rechts in de kop zet ze terug. De gate slepen werkt nog zoals voorheen.
+
+## Punt 70 — Sweep uit de calibratie
+
+**Veranderd.** `sweep_from_calibration` in `calibration.rs`; knop **sweep from
+calibration** achter de regel "N pts, start → stop" in het calibratiepaneel. Niet op het
+scherm gezien: het paneel staat niet in de browserbouw.
+
+**Met apparaat**: Sweep 1M–30M, 201 punten, Apply. Laad `cal/n-1g.cal.json` (201 punten,
+1 MHz–1 GHz). Klik **sweep from calibration**. Verwacht: Start `1MHz`, Stop `1GHz`, Points
+201, de sweep start opnieuw (of één sweep als Run uit stond), de oranje regel "Start/Stop/
+Points differ" verschijnt niet, label CAL. Laad daarna `cal/n-hf.cal.json` (1001 punten,
+100 kHz–50 MHz) en klik weer: 100kHz–50MHz, 1001 punten. Zonder verbinding vult de knop
+alleen de velden. Een calibratie met een puntental buiten de keuzelijst (bijvoorbeeld een
+bestand van een andere versie met 301 punten) geeft de dichtstbijzijnde keuze en een rode
+regel onder het sweeppaneel dat de calibratie geïnterpoleerd wordt.
+
 ## Slotronde voor deze punten
 
 1. Start de GUI met je bestaande instellingen (0.3.3): ze laden; View ▸ Amateur bands
@@ -1234,6 +1264,7 @@ dalende frequenties en een halve regel geweigerd worden.
 3. Met de LiteVNA: 55 en 56.
 4. Sluit af, start opnieuw: Amateur bands, offset, drop, venster en VF staan zoals je ze
    achterliet.
+5. Na 13 november erbij: 69 (zonder apparaat) en 70 (met apparaat).
 
 ---
 

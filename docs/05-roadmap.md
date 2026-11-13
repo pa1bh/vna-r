@@ -355,6 +355,8 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 58 | S21-correctie voor een verzwakker aan poort 2 (dB, teruggeteld bij S21) | S | gedaan 2026-11-13 |
 | 59 | Kaiser-vensters (β 6 en 13) naast rectangular, hann en blackman | S | gedaan 2026-11-13 |
 | 60 | Touchstone-parsertests met afwijkende bestanden: commentaar na de optieregel, dalende frequenties, oneven aantal waarden, optieregel in kleine letters | S | gedaan 2026-11-13 |
+| 69 | Grafieken delen hun frequentie-as (TDR: afstand-as) en een knop **reset view** zet alles terug op automatisch; wens van PA1BH na de QC van 13 november | S | gedaan 2026-11-13 |
+| 70 | Knop **sweep from calibration** in het calibratiepaneel: start, stop en punten op het raster van de calibratie en toepassen; wens van PA1BH | S | gedaan 2026-11-13 |
 
 ## Open
 
