@@ -278,6 +278,40 @@ impl App {
         }
 
         self.standard_buttons(ui, &Standard::ALL, connected);
+        self.port_extension_row(ui);
+        ui.horizontal(|ui| {
+            let changed = ui.checkbox(&mut self.cal.apply, "apply").changed();
+            if changed {
+                self.reshow();
+            }
+            if ui.button("Load…").clicked() {
+                self.load_cal();
+            }
+            if ui.add_enabled(self.cal.set.is_some(), egui::Button::new("Save…")).clicked() {
+                self.save_cal();
+            }
+            if ui
+                .add_enabled(self.cal.set.is_some(), egui::Button::new("Clear"))
+                .on_hover_text("forget the standards in this panel; calibration files of extra segments stay in use")
+                .clicked()
+            {
+                self.cal = CalState {
+                    apply: self.cal.apply,
+                    fit_f_min: self.cal.fit_f_min.clone(),
+                    fit_as_delay: self.cal.fit_as_delay,
+                    ..Default::default()
+                };
+                // The shown data is raw again, so the CAL tag must go too.
+                self.seg_calibrated.clear();
+                if let Some(raw) = self.raw.clone() {
+                    self.set_shown(raw);
+                }
+            }
+        });
+    }
+
+    /// The port extension: a setting on what is shown, so it works on an opened file as well.
+    pub(super) fn port_extension_row(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("Port extension");
             let changed = ui
@@ -308,35 +342,6 @@ impl App {
             }
             if changed {
                 self.reshow();
-            }
-        });
-        ui.horizontal(|ui| {
-            let changed = ui.checkbox(&mut self.cal.apply, "apply").changed();
-            if changed {
-                self.reshow();
-            }
-            if ui.button("Load…").clicked() {
-                self.load_cal();
-            }
-            if ui.add_enabled(self.cal.set.is_some(), egui::Button::new("Save…")).clicked() {
-                self.save_cal();
-            }
-            if ui
-                .add_enabled(self.cal.set.is_some(), egui::Button::new("Clear"))
-                .on_hover_text("forget the standards in this panel; calibration files of extra segments stay in use")
-                .clicked()
-            {
-                self.cal = CalState {
-                    apply: self.cal.apply,
-                    fit_f_min: self.cal.fit_f_min.clone(),
-                    fit_as_delay: self.cal.fit_as_delay,
-                    ..Default::default()
-                };
-                // The shown data is raw again, so the CAL tag must go too.
-                self.seg_calibrated.clear();
-                if let Some(raw) = self.raw.clone() {
-                    self.set_shown(raw);
-                }
             }
         });
     }

@@ -30,12 +30,33 @@ pub(super) struct WebFiles {
     ctx: egui::Context,
     tx: Sender<Picked>,
     rx: Receiver<Picked>,
+    /// The page's "loading" line is still there.
+    loading_line: bool,
 }
 
 impl WebFiles {
     pub(super) fn new(ctx: egui::Context) -> Self {
         let (tx, rx) = channel();
-        WebFiles { ctx, tx, rx }
+        WebFiles {
+            ctx,
+            tx,
+            rx,
+            loading_line: true,
+        }
+    }
+
+    /// A frame was drawn. The first one takes the page's "loading" line away:
+    /// not earlier, because between starting and that frame the canvas is
+    /// still empty, and that can last seconds.
+    pub(super) fn frame_shown(&mut self) {
+        if !self.loading_line {
+            return;
+        }
+        self.loading_line = false;
+        let document = eframe::web_sys::window().and_then(|w| w.document());
+        if let Some(loading) = document.and_then(|d| d.get_element_by_id("loading")) {
+            loading.remove();
+        }
     }
 
     /// Ask for a file; it arrives through [`App::handle_picked`], or never when the user cancels.
@@ -81,6 +102,11 @@ impl App {
                         Some("s2p") => Some(2),
                         _ => None,
                     };
+                    // A viewer shows what the file has: S21 for two ports, not the
+                    // row of zeros a one-port file gets (the example switched it off).
+                    if let (PickFor::Trace, Some(ports)) = (purpose, ports) {
+                        self.show_s21 = ports == 2;
+                    }
                     let file = read_touchstone_full(bytes.as_slice(), ports);
                     self.show_touchstone(name.clone(), &name, file, purpose == PickFor::Reference);
                 }

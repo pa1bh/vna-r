@@ -1,16 +1,21 @@
 <!doctype html>
-<!-- The page of the browser spike, see docs/09-wasm-proef.md. scripts/build-web.sh
-     puts it next to vna-gui.js and vna-gui_bg.wasm in target/web. -->
+<!-- The page of the browser build of vna-r: a viewer for Touchstone files, without a
+     device (docs/09-wasm-proef.md). scripts/build-web.sh puts it next to vna-gui.js and
+     vna-gui_bg.wasm in target/web and fills in the build's fingerprint. Everything is
+     addressed relative to this page, so the folder can live anywhere on a site. -->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>vna-r</title>
+    <meta name="description" content="vna-r in the browser: look at Touchstone files (.s1p, .s2p) from a vector network analyser. SWR, Smith chart, impedance, TDR and gating. Files stay on your computer.">
+    <title>vna-r viewer</title>
+    <link rel="icon" href="data:,">
     <style>
         html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1b1b; }
         canvas { display: block; width: 100%; height: 100%; outline: none; }
-        #loading {
+        #loading, noscript {
             position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            padding: 0 16px; text-align: center;
             color: #b0b0b0; font: 16px system-ui, sans-serif; pointer-events: none;
         }
     </style>
@@ -18,11 +23,26 @@
 <body>
     <canvas id="vna-r-canvas"></canvas>
     <div id="loading">loading vna-r…</div>
+    <noscript>
+        <style>#loading { display: none; }</style>
+        vna-r in the browser needs JavaScript and WebAssembly.
+    </noscript>
     <script type="module">
-        import init from "./vna-gui.js";
-        init().catch((e) => {
-            document.getElementById("loading").textContent = "vna-r could not load: " + e;
-        });
+        // The build's fingerprint goes into both addresses: after an update a browser
+        // must not combine a cached vna-gui.js with a new vna-gui_bg.wasm, or the other
+        // way round (the two only work as a pair).
+        const build = "@BUILD@";
+        const say = (text) => {
+            const loading = document.getElementById("loading");
+            if (loading) loading.textContent = text;
+        };
+        if (typeof WebAssembly !== "object") {
+            say("vna-r needs a browser with WebAssembly.");
+        } else {
+            import(`./vna-gui.js?v=${build}`)
+                .then((glue) => glue.default({ module_or_path: `./vna-gui_bg.wasm?v=${build}` }))
+                .catch((e) => say("vna-r could not load: " + e));
+        }
     </script>
 </body>
 </html>

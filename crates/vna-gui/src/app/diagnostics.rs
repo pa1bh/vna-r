@@ -134,9 +134,13 @@ impl App {
                     ui.add_space(10.0);
                     ui.label("Desktop software for LiteVNA and NanoVNA vector network analysers:");
                     ui.label("sweeps, calibration, Smith chart, TDR, gating, references and Touchstone files.");
+                    if !HAS_DEVICE {
+                        ui.add_space(6.0);
+                        ui.label("This is the browser build: a viewer for Touchstone files, without a device.");
+                    }
                     ui.add_space(10.0);
                     ui.label(RichText::new("Bas Hendriks, PA1BH").strong());
-                    ui.hyperlink_to(REPO_URL, REPO_URL);
+                    ui.add(egui::Hyperlink::from_label_and_url(REPO_URL, REPO_URL).open_in_new_tab(true));
                     ui.add_space(10.0);
                     ui.weak("MIT licence. Written in Rust with egui.");
                     ui.add_space(6.0);
