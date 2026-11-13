@@ -1050,6 +1050,154 @@ Herhaal de stappen 2, 3, 5, 6, 11, 14 en 18 met de NanoVNA-F.
 
 ---
 
+# Ronde na NanoVNA-Saver (punten 53–60, 13 november 2026)
+
+Acht kleine punten uit de vergelijking met NanoVNA-Saver (werklijst in
+[docs/05-roadmap.md](05-roadmap.md), onderaan), elk in een eigen commit onder *Unreleased*.
+Wat ik zelf gecontroleerd heb: `cargo fmt`, `cargo clippy -D warnings`, alle tests (99 in
+de library, 8 in de GUI) en `check-manuals.sh` na elk punt; de browserbouw
+(`scripts/build-web.sh`) compileert en is in de ingebouwde browser bekeken met het
+voorbeeldbestand: de kolom L / C in de markertabel, de banden als achtergrond, de
+vensterlijst met kaiser 6 en 13. **Niet gecontroleerd**: alles met een apparaat (de
+middeling met drop en de log spacing zijn alleen op de library getest), de kabellijst en
+de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows.
+
+Alles hieronder kan **zonder apparaat** met `cal/sweep.s2p` of het voorbeeld in de
+browserbouw, tenzij anders gezegd. Begin met:
+
+```bash
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && ./scripts/check-manuals.sh
+```
+
+Verwacht: geen uitvoer van fmt en clippy, alle tests groen, "manuals in step: 10 files
+each".
+
+## Punt 53 — Kolom L / C in de markertabel
+
+**Veranderd.** `traces::series_equivalent`, `parallel_equivalent`, `q_factor`,
+`format_eng`; de markertabel heeft een kolom **L / C** tussen Z en SWR.
+
+```bash
+cargo test -p litevna equivalents_of_a_coil engineering_format
+```
+
+GUI: open `cal/sweep.s2p` als trace, zet een marker. Verwacht: de kolom toont een
+inductantie (positieve X, bijvoorbeeld `123 nH`) of een capaciteit (negatieve X, `47.0
+pF`), met drie cijfers; bij X = 0 een streepje. Wijs de waarde aan: de hover geeft `Q =
+|X|/R`, en de parallelvorm `R ∥ L of C`. Controle met de hand bij één marker: C =
+1/(2π·f·|X|) uit de Z-kolom. De regel M2−M1 heeft op die plaats een lege cel.
+
+## Punt 54 — Amateurbanden als achtergrond
+
+**Veranderd.** `litevna::bands::REGION_1` (twintig banden, 2200 m tot 6 cm), View ▸
+**Amateur bands**, bewaard in de instellingen.
+
+```bash
+cargo test -p litevna bands
+```
+
+GUI: View ▸ Amateur bands aan, sweep of bestand 1–30 MHz. Verwacht: grijze banden in de
+drie frequentiegrafieken (niet in de Smith-chart), met de naam erboven waar de namen
+elkaar niet raken; op 3–30 MHz staan er namen bij de brede banden, de smalle (30 m, 17 m,
+12 m) hebben alleen hun streep. Inzoomen op 13,5–15 MHz (slepen in de plot): de 20 m-band
+vult 14,000–14,350 MHz met naam. Zet uit, herstart: de keuze is bewaard. De banden van
+regio 1: 160 m 1,810–2,000; 80 m 3,5–3,8; 40 m 7,0–7,2; 2 m 144–146; 70 cm 430–440 MHz.
+
+## Punt 55 — Sweep avg met drop
+
+**Veranderd.** `SweepResult::average_trimmed(sweeps, drop)`; `average` is het geval
+`drop = 0`. In het sweeppaneel verschijnt **drop** vanaf Sweep avg 3, begrensd op avg − 2.
+
+```bash
+cargo test -p litevna trimmed_average
+```
+
+**Met apparaat.** Load op poort 1, Sweep avg 8, drop 0, Run. Tik tijdens het sweepen één
+keer tegen de connector (of trek de load even los en zet hem terug): de trace schiet
+omhoog en zakt in acht sweeps terug. Herhaal met drop 2: de trace beweegt niet of
+nauwelijks. Zet Sweep avg terug op 1: het veld drop verdwijnt en staat bij de volgende
+keer op 0.
+
+## Punt 56 — log spacing van segmenten
+
+**Veranderd.** `device::log_segment_edges`; knop **log spacing** naast **+ segment**,
+alleen zichtbaar met minstens één extra segment.
+
+```bash
+cargo test -p litevna log_segment_edges
+```
+
+GUI: Start 50k, Stop 6.3G, twee keer **+ segment**, **log spacing**. Verwacht: drie
+segmenten met dezelfde verhouding (ongeveer 1:50 elk): 50 k → 2,5 M, 2,5 M → 126 M,
+126 M → 6,3 G; de punten per segment en een gekozen calibratiebestand blijven staan; de
+tekstvelden zijn herschreven, er is nog niets toegepast. **Met apparaat**: Apply sweep;
+de trace is dicht op HF en grof op UHF, de markers lopen over de segmentgrenzen door. Een
+start van 0 of een stop onder de start geeft de foutregel onder het sweeppaneel.
+
+## Punt 57 — Kabellijst bij de verkortingsfactor
+
+**Veranderd.** `timedomain::CABLES` (twaalf regels, cataloguswaarden); een keuzelijst
+**cable** naast het getal in het TDR-paneel.
+
+GUI: TDR-paneel, **cable** ▸ "0.830 Aircell 7": het getal springt op 0,830 en het
+TDR-beeld rekent opnieuw (de piek van een kabel verschuift). Het getal blijft
+bewerkbaar; na een handmatige wijziging staat er in de lijst niets meer aangevinkt.
+De hover van de lijst zegt dat het nominale waarden zijn.
+
+## Punt 58 — S21-offset
+
+**Veranderd.** `SweepResult::offset_s21_db`; veld **offset** naast S21 onder Traces,
+toegepast in `set_shown`, genoemd in het exportcommentaar; bewaard.
+
+```bash
+cargo test -p litevna s21_offset
+```
+
+GUI: open `cal/sweep.s2p` als trace, marker op een punt, lees S21 dB af. Zet offset op
+20,0: S21 ligt in log mag 20 dB hoger, de marker ook, S11 ongewijzigd, de fase van S21
+ongewijzigd. Save Touchstone…: de commentaarregel bevat `S21 offset +20.0 dB` en de
+S21-kolommen zijn de gecorrigeerde waarden. Knop **0** zet hem uit. Herstart: de waarde
+is bewaard.
+
+## Punt 59 — Kaiser-vensters
+
+**Veranderd.** `Window::Kaiser6`, `Window::Kaiser13`, `Window::ALL`; de GUI-lijst en
+`vna-cli tdr --window` volgen `ALL`.
+
+```bash
+cargo test -p litevna kaiser
+vna-cli tdr --from cal/sweep.s2p --window kaiser13 --max-distance 20
+vna-cli tdr --from cal/sweep.s2p --window kaiser-13 --max-distance 20
+vna-cli tdr --from cal/sweep.s2p --window kaiser --max-distance 20
+```
+
+Verwacht: de eerste twee geven dezelfde uitvoer met "kaiser 13 window" in de kopregel;
+de derde weigert met "unknown window". GUI: Window ▸ kaiser 13 op een kabel met short:
+de piek is breder dan bij hann en de bodem tussen de pieken ligt dieper (zijlobben weg);
+kaiser 6 lijkt op hann met een stillere bodem. Herstart: de keuze is bewaard (ze wordt
+als `kaiser 13` opgeslagen en teruggelezen).
+
+## Punt 60 — Touchstone-tests
+
+```bash
+cargo test -p litevna files_from_other_programs
+```
+
+Verwacht: groen. Niets in het programma veranderd; de test legt vast dat commentaar na de
+optieregel, een herhaalde optieregel en een kale `#` gelezen worden, en met welke melding
+dalende frequenties en een halve regel geweigerd worden.
+
+## Slotronde voor deze punten
+
+1. Start de GUI met je bestaande instellingen (0.3.3): ze laden; View ▸ Amateur bands
+   staat uit, offset op 0, drop afwezig (Sweep avg 1).
+2. Loop de punten 53, 54, 57, 58 en 59 in de GUI af zoals hierboven, met `cal/sweep.s2p`.
+3. Met de LiteVNA: 55 en 56.
+4. Sluit af, start opnieuw: Amateur bands, offset, drop, venster en VF staan zoals je ze
+   achterliet.
+
+---
+
 # Open vragen
 
 1. **Punt 28, Help lokaal openen: beantwoord.** Mijn eerdere advies klopte niet (de
