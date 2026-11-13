@@ -86,17 +86,20 @@ pub(super) fn draw_bands(ui: &egui::Ui, transform: &egui_plot::PlotTransform, re
     let (lo_hz, hi_hz) = (bounds.min()[0].max(0.0) * 1e6, bounds.max()[0].max(0.0) * 1e6);
     let x_of = |hz: u64| transform.position_from_point(&egui_plot::PlotPoint::new(hz as f64 / 1e6, 0.0)).x;
     let painter = ui.painter().with_clip_rect(rect);
+    // Names are centred on their band and may be wider than it (on a wide
+    // sweep every HF band is a few pixels), but never overlap the previous
+    // name: the ones that would are left out.
+    let mut last_name_right = f32::NEG_INFINITY;
     for b in bands_within(REGION_1, lo_hz as u64, hi_hz as u64) {
         let (xa, xb) = (x_of(b.start_hz).max(rect.left()), x_of(b.stop_hz).min(rect.right()));
         let band = egui::Rect::from_min_max(egui::pos2(xa, rect.top()), egui::pos2(xb, rect.bottom()));
         painter.rect_filled(band, 0.0, Color32::from_rgba_unmultiplied(160, 160, 160, 28));
-        painter.text(
-            egui::pos2((xa + xb) / 2.0, rect.top() + 4.0),
-            egui::Align2::CENTER_TOP,
-            b.name,
-            egui::FontId::proportional(10.0),
-            Color32::from_gray(150),
-        );
+        let name = painter.layout_no_wrap(b.name.to_string(), egui::FontId::proportional(10.0), Color32::from_gray(150));
+        let left = (xa + xb - name.size().x) / 2.0;
+        if left >= last_name_right + 6.0 && left >= rect.left() {
+            last_name_right = left + name.size().x;
+            painter.galley(egui::pos2(left, rect.top() + 4.0), name, Color32::from_gray(150));
+        }
     }
 }
 
