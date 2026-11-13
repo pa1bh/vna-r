@@ -19,6 +19,9 @@ things that are not backwards compatible, such as the format of the calibration 
   the same part of the spectrum. A **reset view** button in the marker bar (and the TDR
   header) puts every chart back on its automatic scale; a double-click in a chart still
   does the same. (Work list 69.)
+- Calibration panel: **sweep from calibration** sets Start, Stop and Points to the grid of
+  the loaded or measured calibration and applies the sweep, so a loaded file is used
+  without interpolation. (Work list 70.)
 - Marker table: a column **L / C** with the reactance at the marker as the one coil or
   capacitor it is at that frequency (1 µH, 47 pF). Hovering over it gives Q (|X|/R) and
   the parallel form of the impedance, R ∥ L or C. For an unknown component on port 1 this

@@ -31,7 +31,9 @@ or you accept the error.
    **short** and **load**. For S21 also **through**: cable from port 1 to port 2.
 3. The panel reports "ready for S11" or "ready for S11 + S21". Switch **apply** on.
 4. **Save…** stores the calibration as JSON; **Load…** brings it back. A loaded file is
-   loaded again automatically at the next start.
+   loaded again automatically at the next start. **sweep from calibration**, after the
+   number of points and the range, sets the sweep's start, stop and points to the
+   calibration's grid and applies it, so that nothing is interpolated.
 
 A standard that is not right gives an orange warning: an open or short that reflects less
 than −8 dB is loose (a good open reads 0 dB on a LiteVNA and about −3 dB raw on a

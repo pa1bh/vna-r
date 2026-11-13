@@ -32,7 +32,10 @@ of je accepteert de fout.
    en **load**. Voor S21 ook **through**: kabel van poort 1 naar poort 2.
 3. Het paneel meldt "ready for S11" of "ready for S11 + S21". Zet **apply** aan.
 4. **Save…** bewaart de calibratie als JSON; **Load…** haalt hem terug. Een geladen
-   bestand wordt bij de volgende start automatisch weer geladen.
+   bestand wordt bij de volgende start automatisch weer geladen. **sweep from
+   calibration**, achter het aantal punten en het bereik, zet start, stop en punten van
+   de sweep op het raster van de calibratie en past hem toe, zodat er niets
+   geïnterpoleerd wordt.
 
 Een standaard die niet klopt, geeft een oranje waarschuwing: een open of short die minder
 dan −8 dB reflecteert zit los (een goede open geeft 0 dB op een LiteVNA en ongeveer −3 dB

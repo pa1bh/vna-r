@@ -220,14 +220,26 @@ impl App {
 
     pub(super) fn calibration_panel(&mut self, ui: &mut egui::Ui) {
         let connected = self.connected();
+        // The grid of the panel's set, and whether **sweep from calibration** was
+        // clicked; acted on after the match, which borrows the set.
+        let grid = self
+            .cal
+            .set
+            .as_ref()
+            .map(|set| (set.freqs_hz.len(), set.freqs_hz[0], *set.freqs_hz.last().unwrap()));
+        let mut take_grid = false;
         match &self.cal.set {
             Some(set) => {
-                ui.label(format!(
-                    "{} pts, {} → {}",
-                    set.freqs_hz.len(),
-                    format_hz(set.freqs_hz[0]),
-                    format_hz(*set.freqs_hz.last().unwrap())
-                ));
+                let (n, start_hz, stop_hz) = grid.expect("set is some");
+                ui.horizontal(|ui| {
+                    ui.label(format!("{n} pts, {} → {}", format_hz(start_hz), format_hz(stop_hz)));
+                    take_grid = ui
+                        .small_button("sweep from calibration")
+                        .on_hover_text(
+                            "set Start, Stop and Points to this calibration's grid and apply the sweep, so that nothing is interpolated",
+                        )
+                        .clicked();
+                });
                 let have: Vec<_> = Standard::ALL
                     .iter()
                     .chain(Standard::LINE.iter())
@@ -259,6 +271,9 @@ impl App {
             None => {
                 ui.label("no calibration — measure standards on the current sweep grid");
             }
+        }
+        if let (true, Some(g)) = (take_grid, grid) {
+            self.sweep_from_calibration(g);
         }
         if let Some(m) = &self.cal.message {
             ui.small(RichText::new(m).color(Color32::from_rgb(200, 200, 120)));
@@ -387,6 +402,25 @@ impl App {
                 RichText::new("Start/Stop/Points differ from the running sweep; measuring a standard applies them first.")
                     .color(Color32::from_rgb(230, 150, 80)),
             );
+        }
+    }
+
+    /// **sweep from calibration**: Start, Stop and Points take the calibration's grid
+    /// `(points, start_hz, stop_hz)` and the sweep is applied when a device is connected.
+    /// A point count outside the sweep panel's choices takes the nearest choice and says so.
+    pub(super) fn sweep_from_calibration(&mut self, (n, start_hz, stop_hz): (usize, u64, u64)) {
+        self.start = format_hz(start_hz).replace(' ', "");
+        self.stop = format_hz(stop_hz).replace(' ', "");
+        let nearest = POINT_CHOICES
+            .iter()
+            .copied()
+            .min_by_key(|p| (*p as i64 - n as i64).abs())
+            .expect("choices");
+        self.points = nearest;
+        self.sweep_error = (usize::from(nearest) != n)
+            .then(|| format!("the calibration has {n} points, the sweep takes {nearest}; the calibration is interpolated"));
+        if self.connected() {
+            self.start_sweep(self.running);
         }
     }
 
