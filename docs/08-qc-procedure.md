@@ -330,6 +330,43 @@ left the USB bus", de controle in rust) en meldde na 30 s "the device on … did
 back within 30 s", met de knop terug op Connect. Daarmee zijn in het venster gezien: kort
 lostrekken met herverbinden (7,6 s), uitval in rust, en opgeven na 30 s.
 
+### 13 november 2026, macOS, LiteVNA 67: ronde na NanoVNA-Saver (punten 53–60)
+
+**Door Claude gedraaid**, zonder apparaat: fmt, clippy, tests (99 + 8), `check-manuals.sh`
+en de browserbouw na elk punt; in de ingebouwde browser met het voorbeeldbestand gezien:
+de kolom L / C, de banden als achtergrond en de vensterlijst met kaiser 6 en 13.
+
+**Door PA1BH in de GUI**, met Claude als loods; release-build vanuit de sessie gestart
+met de bestaande instellingen van 0.3.3.
+
+| Blok | Wat | Uitkomst |
+|---|---|---|
+| 1, zonder apparaat | 53, 54, 57, 58, 59 met `cal/sweep.s2p`; afsluiten en opnieuw starten | goed: "alles in orde"; in `app.ron` daarna Amateur bands aan, kaiser 13, VF 0,82, offset 0, drop 0 |
+| 2, LiteVNA 67 (fw 2.2, hw 2) | 55: load op poort 1, Sweep avg 8 met drop 0 en 2, tik tegen de connector | goed |
+| 2 | 56: 50 k–6,3 G, twee segmenten, **log spacing** | goed: 50 k → 2,507 M → 125,66 M → 6,3 G, 1001 punten per segment blijven; **bevinding 10** |
+| 2 | 56: Apply sweep en Single met short, ruw en met `n-6g3` | goed: één doorlopende trace over de drie segmenten, marker op 106 en 360 MHz zonder sprong; **bevinding 11** |
+| 2 | slotronde: segmenten weg, TDR met hann, kaiser 6 en 13, afsluiten en starten | goed; in `app.ron` segmenten leeg, avg 1, drop 0, banden aan |
+
+**Bevindingen.**
+
+10. *De knop log spacing was niet te vinden.* Hij stond alleen in het paneel **Segments**
+    en pas na het eerste **+ segment**; PA1BH zocht iets met "log" in de sweepregel.
+    Gerepareerd in commit `2705f4a`: de knop staat er altijd naast **+ segment**, grijs
+    met uitleg zolang er één segment is; beide handleidingen zeggen het.
+11. *Een bult aan het begin van de sweep met `n-6g3` en een fijn eerste segment*: punt 51
+    opnieuw, in een andere gedaante. Het eerste segment (50 k–2,5 M) valt helemaal in het
+    eerste interval van die calibratie (stap 6,3 MHz) en wordt tussen twee punten
+    geïnterpoleerd; met een short loopt de trace in de Smith-kaart buiten de cirkel en
+    staat S11 boven 0 dB. Geen fout in de segmenten: zonder calibratie en met de marker
+    over de naden is het beeld goed. Werkwijze: `n-hf` (100 kHz–50 MHz) in het paneel voor
+    het eerste segment en `n-6g3` als bestand bij segment 2 en 3, start op 100 k. Niet
+    gerepareerd; werklijst 68 vraagt om een waarschuwing in het segmentenpaneel als de
+    calibratiestap grover is dan het segment.
+
+Geen bevinding, wel gezien: de referentie `hf-ocf-3-20-NanoVNA-F.s2p` (3–20 MHz) is op een
+as tot 6,3 GHz een verticale veeg bij 0; en een grafiek die met het scrollwiel tot 10 GHz
+is uitgezoomd blijft zo staan tot een dubbelklik.
+
 ---
 
 # 0.2.6 — bugfixes
@@ -1060,7 +1097,9 @@ de library, 8 in de GUI) en `check-manuals.sh` na elk punt; de browserbouw
 voorbeeldbestand: de kolom L / C in de markertabel, de banden als achtergrond, de
 vensterlijst met kaiser 6 en 13. **Niet gecontroleerd**: alles met een apparaat (de
 middeling met drop en de log spacing zijn alleen op de library getest), de kabellijst en
-de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows.
+de S21-offset op het scherm, en de native GUI op macOS, Linux en Windows. Uitgevoerd op
+13 november 2026 op macOS met de LiteVNA 67; uitkomst en bevindingen 10 en 11 staan in het
+logboek bovenaan.
 
 Alles hieronder kan **zonder apparaat** met `cal/sweep.s2p` of het voorbeeld in de
 browserbouw, tenzij anders gezegd. Begin met:

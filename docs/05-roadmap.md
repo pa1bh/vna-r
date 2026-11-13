@@ -315,7 +315,7 @@ en de meetpunten 45 tot 47; de reden staat in de statuskolom.
 | 48 | Niet-eindige waarden weigeren als standaard en in de kit-fit; Touchstone met `nan`/`inf` of dubbele frequentie weigeren | B21, B22 | S | gedaan 2026-11-10 |
 | 49 | Kleine UX-punten: Return past de sweep toe, hover bij Apply en Clear, CLI weigert tegenstrijdige vlaggen | U7, U9, U13 | S | gedaan 2026-11-10 |
 | 50 | Schermafbeeldingen in de handleiding opnieuw maken: ze zijn van 0.2.3/0.2.4 (geen menubalk, oud TDR-bereik, oude paneelteksten) | — | M | open: vraagt het apparaat met de antenne, de kabels en het filter; de handleiding vermeldt nu dat ze ouder zijn |
-| 51 | Onderkant van een brede calibratie: sweeppunten onder het tweede calibratiepunt niet tekenen, of een calibratieraster dat onderin dichter is | — | M | open: gezien in de QC (short tot +8 dB te hoog onder 6,35 MHz met `n-6g3`); nu alleen een waarschuwing |
+| 51 | Onderkant van een brede calibratie: sweeppunten onder het tweede calibratiepunt niet tekenen, of een calibratieraster dat onderin dichter is | — | M | open: gezien in de QC (short tot +8 dB te hoog onder 6,35 MHz met `n-6g3`); nu alleen een waarschuwing; op 2026-11-13 opnieuw gezien met een fijn eerste segment onder `n-6g3` (punt 68) |
 | 52 | Waarschuwen als een calibratie over een sprong in de ruwe standaardmetingen heen geïnterpoleerd wordt (bandgrens van het apparaat; LiteVNA 67 bij 100 MHz) | — | S | gedaan 2026-11-12; niet over de sprong heen interpoleren blijft open, dat vraagt de exacte grens per apparaat |
 
 ## Meten
@@ -367,3 +367,4 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 65 | Bandentabel bewerkbaar (eigen banden, andere regio's) | S | open: nu een vaste tabel voor regio 1 |
 | 66 | µ-plot voor kernmateriaal (kernafmetingen en wikkelingen) en een magloop-modus die op de SWR-dip inzoomt | M | open: niche |
 | 67 | Logaritmische frequentie-as | M | open: egui_plot heeft geen log-as; zelf tekenen of wachten op upstream |
+| 68 | Waarschuwing in het segmentenpaneel als de calibratiestap grover is dan een segment (bijvoorbeeld `n-6g3` met stap 6,3 MHz onder een segment 50 k–2,5 M), met de raad een fijnere calibratie bij dat segment te zetten | S | open: gezien in de QC van 13 november (docs/08 bevinding 11), hangt samen met punt 51 |
