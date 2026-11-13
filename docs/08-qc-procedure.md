@@ -1120,8 +1120,8 @@ keer op 0.
 
 ## Punt 56 — log spacing van segmenten
 
-**Veranderd.** `device::log_segment_edges`; knop **log spacing** naast **+ segment**,
-alleen zichtbaar met minstens één extra segment.
+**Veranderd.** `device::log_segment_edges`; knop **log spacing** naast **+ segment** in
+het paneel **Segments**, grijs zolang er één segment is.
 
 ```bash
 cargo test -p litevna log_segment_edges

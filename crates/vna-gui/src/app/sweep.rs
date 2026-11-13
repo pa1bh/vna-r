@@ -162,11 +162,11 @@ impl App {
                     let stop = format_hz(self.device_max_hz()).replace(' ', "");
                     self.extra_segments.push(SegmentSettings { start, stop, points: 1001, cal_file: None });
                 }
-                if !self.extra_segments.is_empty()
-                    && ui
-                        .small_button("log spacing")
-                        .on_hover_text("move the segment edges so that every segment spans the same ratio, from the lowest start to the highest stop; points and calibration files stay with their segment")
-                        .clicked()
+                if ui
+                    .add_enabled(!self.extra_segments.is_empty(), egui::Button::new("log spacing").small())
+                    .on_hover_text("move the segment edges so that every segment spans the same ratio, from the lowest start to the highest stop; points and calibration files stay with their segment")
+                    .on_disabled_hover_text("add a segment first: one range has nothing to spread")
+                    .clicked()
                 {
                     self.space_segments_logarithmically();
                 }
