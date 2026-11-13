@@ -466,6 +466,34 @@ mod tests {
         assert!(read_touchstone(std::io::Cursor::new("# MHz S RI R abc\n1 0 0\n"), Some(1)).is_err());
     }
 
+    /// The shapes other programs write, after a look at the files NanoVNA-Saver
+    /// keeps as regression cases: a long header, a comment after the option
+    /// line and between data lines, a repeated option line, and the bare `#`
+    /// that means the defaults (GHz, S, MA, 50 Ω).
+    #[test]
+    fn files_from_other_programs() {
+        let tapr = "! Vector Network Analyzer\n! Some club, 9 November 2019 17:48:47\n! Frequency   S11   S21   S12   S22\n\
+                    ! ListType=Lin\n\n# MHz S RI R 50\n! comment after the option line\n\
+                    28.0 0.1 0.0 0.5 0.0 0.5 0.0 0.1 0.0\n! a remark between two points\n29.0 0.2 0.0 0.4 0.0 0.4 0.0 0.2 0.0\n\
+                    # Hz S MA R 75\n30.0 0.3 0.0 0.3 0.0 0.3 0.0 0.3 0.0\n";
+        let r = read_touchstone(tapr.as_bytes(), None).unwrap();
+        assert_eq!(r.freqs_hz, vec![28_000_000, 29_000_000, 30_000_000]);
+        assert_eq!(r.s11[2], Complex64::new(0.3, 0.0), "the second option line is ignored, as v1 says");
+        assert_eq!(r.s21[1], Complex64::new(0.4, 0.0));
+
+        let bare = read_touchstone("#\n1 0.5 90\n".as_bytes(), Some(1)).unwrap();
+        assert_eq!(bare.freqs_hz, vec![1_000_000_000]);
+        assert!((bare.s11[0] - Complex64::new(0.0, 0.5)).norm() < 1e-12);
+
+        // What is refused says why: descending order, a half pair, a stray value.
+        let err = read_touchstone("# Hz S RI R 50\n2 0 0\n1 0 0\n".as_bytes(), Some(1)).unwrap_err();
+        assert_eq!(err.to_string(), "frequencies are not increasing");
+        let err = read_touchstone("# Hz S RI R 50\n1 0 0\n2 0\n".as_bytes(), Some(1)).unwrap_err();
+        assert_eq!(err.to_string(), "5 values do not form records of 3");
+        let err = read_touchstone("# Hz S RI R 50\n1 0 0 0 0\n2 0 0 0 0\n".as_bytes(), None).unwrap_err();
+        assert!(err.to_string().contains("do not form 1-port (3) or 2-port (9)"), "{err}");
+    }
+
     #[test]
     fn rejects_garbage() {
         assert!(read_touchstone(std::io::Cursor::new("# Hz S RI R 50\n1 2\n"), Some(1)).is_err());
