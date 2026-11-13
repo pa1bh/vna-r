@@ -206,6 +206,7 @@ impl App {
                 if self.gate_on {
                     ui.small("drag the orange lines to move the gate");
                 }
+                self.reset_view_button(ui);
             });
         });
 
@@ -242,7 +243,8 @@ impl App {
         let marker_x = self.tdr_marker.and_then(|i| dist.get(i).copied());
         let mut clicked_x: Option<f64> = None;
 
-        let r = Plot::new("tdr-impulse")
+        // Both distance plots share their x axis; see `kind_plot` for the frequency plots.
+        let mut plot = Plot::new("tdr-impulse")
             .height(h)
             .x_axis_label("m")
             .y_axis_label("|Γ| dB")
@@ -251,16 +253,20 @@ impl App {
             .include_x(0.0)
             .include_x(limit)
             .allow_drag(plot_drag_ok)
-            .show(ui, |pui| {
-                pui.line(Line::new("impulse", series(dist, t.impulse_mag[..n].iter().map(|m| db(*m).max(-100.0)))).color(S11_COLOR));
-                if let Some(x) = marker_x {
-                    pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
-                }
-                GateEvent::read(pui, gate_x)
-            });
+            .link_axis(egui::Id::unique("tdr-x"), [true, false]);
+        if self.plot_reset {
+            plot = plot.reset();
+        }
+        let r = plot.show(ui, |pui| {
+            pui.line(Line::new("impulse", series(dist, t.impulse_mag[..n].iter().map(|m| db(*m).max(-100.0)))).color(S11_COLOR));
+            if let Some(x) = marker_x {
+                pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
+            }
+            GateEvent::read(pui, gate_x)
+        });
         draw_gate(ui, &r.transform, r.response.rect, gate_x);
         gate_events.push(r.inner);
-        let r = Plot::new("tdr-z")
+        let mut plot = Plot::new("tdr-z")
             .height(h)
             .x_axis_label("m")
             .y_axis_label("Ω")
@@ -269,13 +275,17 @@ impl App {
             .include_x(0.0)
             .include_x(limit)
             .allow_drag(plot_drag_ok)
-            .show(ui, |pui| {
-                pui.line(Line::new("Z", series(dist, t.impedance_ohm[..n].iter().map(|z| z.min(500.0)))).color(S21_COLOR));
-                if let Some(x) = marker_x {
-                    pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
-                }
-                GateEvent::read(pui, gate_x)
-            });
+            .link_axis(egui::Id::unique("tdr-x"), [true, false]);
+        if self.plot_reset {
+            plot = plot.reset();
+        }
+        let r = plot.show(ui, |pui| {
+            pui.line(Line::new("Z", series(dist, t.impedance_ohm[..n].iter().map(|z| z.min(500.0)))).color(S21_COLOR));
+            if let Some(x) = marker_x {
+                pui.vline(VLine::new("marker", x).color(MARKER_COLORS[0]));
+            }
+            GateEvent::read(pui, gate_x)
+        });
         draw_gate(ui, &r.transform, r.response.rect, gate_x);
         gate_events.push(r.inner);
 

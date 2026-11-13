@@ -104,8 +104,10 @@ what they show:
 SWR, R + jX and |Z| are about S11 only. Under **Traces** you switch S11 and S21 on or off;
 that applies to all charts. The **offset** next to S21 is for an attenuator between the
 device under test and port 2: its value in dB is added back, so S21 shows the device alone
-in the charts, the markers and the files you save; 0 is off. Double-clicking in a chart resets the scale to automatic;
-dragging and scrolling zoom.
+in the charts, the markers and the files you save; 0 is off. Dragging and scrolling zoom.
+The three frequency charts share their frequency axis: zooming in on one puts the other
+two on the same part of the spectrum, the vertical scale stays per chart. **reset view**
+in the marker bar, or a double-click in a chart, puts the scale back to automatic.
 
 ![Group delay of 53 cm of cable: flat at 2.5 ns](../images/gui-weergaven-groepsvertraging.webp)
 

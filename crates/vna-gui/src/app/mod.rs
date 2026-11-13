@@ -207,6 +207,9 @@ pub struct App {
     show_s21: bool,
     /// The amateur bands as a backdrop in the frequency plots (View ▸ Amateur bands).
     show_bands: bool,
+    /// Set by **reset view**: every plot drawn this frame goes back to its automatic
+    /// scale. Cleared at the end of the frame.
+    plot_reset: bool,
     plot_kinds: [TraceKind; 3],
     /// Half-width (points) of the group-delay difference.
     gd_aperture: usize,
@@ -318,6 +321,7 @@ impl App {
             show_s11: true,
             show_s21: true,
             show_bands: false,
+            plot_reset: false,
             plot_kinds: [TraceKind::LogMag, TraceKind::Swr, TraceKind::Phase],
             gd_aperture: 2,
             error: None,
@@ -1271,6 +1275,7 @@ impl eframe::App for App {
             .default_size(300.0)
             .show(ui, |ui| self.side_panel(ui));
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
+        self.plot_reset = false;
         self.screenshot_window(&ctx);
         self.about_window(&ctx);
         self.log_window(&ctx);

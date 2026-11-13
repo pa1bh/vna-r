@@ -426,49 +426,66 @@ impl App {
                 }
             }
         }
-        let r = Plot::new(("plot", slot, kind.id()))
+        // The three frequency plots share their x axis (and its automatic scale), so
+        // zooming or dragging one moves the others and a double-click resets all three.
+        let mut plot = Plot::new(("plot", slot, kind.id()))
             .height((h - header_h).max(100.0))
             .legend(Legend::default())
             .x_axis_label("MHz")
             .y_axis_label(kind.unit())
             .include_y(lo)
             .include_y(hi)
-            .show(ui, |pui| {
-                for (label, x, values, color) in &ref_lines {
-                    pui.line(Line::new(label.clone(), series(x, values.iter().copied())).color(*color).width(1.0));
+            .link_axis(egui::Id::unique("freq-x"), [true, false]);
+        if self.plot_reset {
+            plot = plot.reset();
+        }
+        let r = plot.show(ui, |pui| {
+            for (label, x, values, color) in &ref_lines {
+                pui.line(Line::new(label.clone(), series(x, values.iter().copied())).color(*color).width(1.0));
+            }
+            for (label, values) in &diff_lines {
+                pui.line(
+                    Line::new(label.clone(), series(mhz, values.iter().copied()))
+                        .color(Color32::from_rgb(255, 120, 120))
+                        .style(egui_plot::LineStyle::dotted_dense()),
+                );
+            }
+            for (label, values, color, dashed) in &lines {
+                let mut line = Line::new(label.clone(), series(mhz, values.iter().copied())).color(*color);
+                if *dashed {
+                    line = line.style(egui_plot::LineStyle::dashed_loose());
                 }
-                for (label, values) in &diff_lines {
-                    pui.line(
-                        Line::new(label.clone(), series(mhz, values.iter().copied()))
-                            .color(Color32::from_rgb(255, 120, 120))
-                            .style(egui_plot::LineStyle::dotted_dense()),
-                    );
-                }
-                for (label, values, color, dashed) in &lines {
-                    let mut line = Line::new(label.clone(), series(mhz, values.iter().copied())).color(*color);
-                    if *dashed {
-                        line = line.style(egui_plot::LineStyle::dashed_loose());
-                    }
-                    pui.line(line);
-                }
-                for (k, (x, c)) in marker_lines.iter().enumerate() {
-                    pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
-                }
-                for x in edge_lines {
-                    pui.vline(
-                        VLine::new("gate edge", *x)
-                            .color(Color32::from_gray(110))
-                            .style(egui_plot::LineStyle::dashed_dense()),
-                    );
-                }
-                (pui.response().clicked(), pui.pointer_coordinate())
-            });
+                pui.line(line);
+            }
+            for (k, (x, c)) in marker_lines.iter().enumerate() {
+                pui.vline(VLine::new(format!("M{}", k + 1), *x).color(*c));
+            }
+            for x in edge_lines {
+                pui.vline(
+                    VLine::new("gate edge", *x)
+                        .color(Color32::from_gray(110))
+                        .style(egui_plot::LineStyle::dashed_dense()),
+                );
+            }
+            (pui.response().clicked(), pui.pointer_coordinate())
+        });
         if self.show_bands {
             draw_bands(ui, &r.transform, r.response.rect);
         }
         match r.inner {
             (true, Some(p)) => Some(p.x),
             _ => None,
+        }
+    }
+
+    /// **reset view**: every plot back on its automatic scale after zooming or dragging.
+    pub(super) fn reset_view_button(&mut self, ui: &mut egui::Ui) {
+        if ui
+            .small_button("reset view")
+            .on_hover_text("put the plots back on their automatic scale after zooming or dragging (a double-click in a plot does the same)")
+            .clicked()
+        {
+            self.plot_reset = true;
         }
     }
 
@@ -502,6 +519,7 @@ impl App {
             {
                 self.hold_reference();
             }
+            self.reset_view_button(ui);
             ui.separator();
             if let Some(sweep) = sweep {
                 let n = sweep.freqs_hz.len();
