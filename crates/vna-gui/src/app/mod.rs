@@ -131,6 +131,8 @@ const REF_COLORS: [Color32; 4] = [
 const MAX_REFS: usize = 4;
 /// Largest port extension the field accepts, ps (100 ns, about 20 m of cable).
 const PORT_EXT_MAX_PS: f64 = 100_000.0;
+/// Largest S21 offset the field accepts, dB (more than any attenuator one would put in front of port 2).
+const S21_OFFSET_MAX_DB: f64 = 100.0;
 
 const POINT_CHOICES: [u16; 8] = [51, 101, 201, 401, 801, 1001, 1601, 3201];
 
@@ -227,6 +229,8 @@ pub struct App {
     gate_notch: bool,
     /// Port extension: one-way delay (ps) the reference plane is moved outward by.
     port_ext_ps: f64,
+    /// Decibels added to S21 for an attenuator in front of port 2 (0 = none).
+    s21_offset_db: f64,
     /// Which gate edge the pointer hovers / drags in the TDR plots (0 = start, 1 = stop).
     gate_hover: Option<usize>,
     gate_drag: Option<usize>,
@@ -330,6 +334,7 @@ impl App {
             gate_stop_m: 0.5,
             gate_notch: false,
             port_ext_ps: 0.0,
+            s21_offset_db: 0.0,
             gate_hover: None,
             gate_drag: None,
             gate_error: None,
@@ -621,6 +626,9 @@ impl App {
     fn set_shown(&mut self, mut sweep: SweepResult) {
         if self.port_ext_ps != 0.0 {
             sweep.extend_port(self.port_ext_ps * 1e-12);
+        }
+        if self.s21_offset_db != 0.0 {
+            sweep.offset_s21_db(self.s21_offset_db);
         }
         self.shown = Some(sweep);
         self.shown_rev += 1;
@@ -1066,7 +1074,26 @@ impl App {
             ui.add_space(12.0);
             ui.heading("Traces");
             ui.checkbox(&mut self.show_s11, RichText::new("S11").color(S11_COLOR));
-            ui.checkbox(&mut self.show_s21, RichText::new("S21").color(S21_COLOR));
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut self.show_s21, RichText::new("S21").color(S21_COLOR));
+                ui.add_space(8.0);
+                ui.label("offset");
+                let changed = ui
+                    .add(egui::DragValue::new(&mut self.s21_offset_db).range(-S21_OFFSET_MAX_DB..=S21_OFFSET_MAX_DB).speed(0.1).fixed_decimals(1).suffix(" dB"))
+                    .on_hover_text(
+                        "added to S21: the value of an attenuator between the device under test and port 2 \
+                         (to protect the port from an amplifier), so S21 reads the device alone. 0 = none; \
+                         applies to the trace, the markers and exports.",
+                    )
+                    .changed();
+                if self.s21_offset_db != 0.0 && ui.small_button("0").on_hover_text("switch the offset off").clicked() {
+                    self.s21_offset_db = 0.0;
+                    self.reshow();
+                }
+                if changed {
+                    self.reshow();
+                }
+            });
             self.references_panel(ui);
             ui.horizontal(|ui| {
                 ui.label("group delay aperture");

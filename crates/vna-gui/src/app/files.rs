@@ -129,6 +129,11 @@ impl App {
         } else {
             gated
         };
+        let gated = if self.s21_offset_db != 0.0 {
+            format!("{gated}, S21 offset {:+.1} dB", self.s21_offset_db)
+        } else {
+            gated
+        };
         let comment = format!(
             "vna-r, {} points, {}{}",
             sweep.freqs_hz.len(),

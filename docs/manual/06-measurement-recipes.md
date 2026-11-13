@@ -106,8 +106,9 @@ pulls another 10 dB or so out of the noise.
 
 Like a filter. A 20 dB attenuator should lie flat at −20 dB, with S11 well below −20 dB
 at the input. For an amplifier: the LiteVNA transmits about 0 dBm; put an attenuator
-between the output and port 2 so that no more than −10 dBm arrives at port 2, and add
-that attenuation to S21. Never connect an amplifier with more than a few milliwatts of
+between the output and port 2 so that no more than −10 dBm arrives at port 2, and enter
+that attenuation as **offset** next to S21 under Traces (chapter 3); the program then adds
+it back. Never connect an amplifier with more than a few milliwatts of
 output directly to port 2.
 
 ## Unknown component on one port

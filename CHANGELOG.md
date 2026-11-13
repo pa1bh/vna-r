@@ -34,6 +34,10 @@ things that are not backwards compatible, such as the format of the calibration 
   cables (RG-58, RG-213, PTFE types, RG-8X, H155, Aircell, H2000, LMR, Aircom Plus,
   Ecoflex, window line). A starting point only: within one type the spread is a few
   percent, so a known length still decides. (Work list 57.)
+- Traces: an **offset** next to S21, in dB, for an attenuator between the device under
+  test and port 2 (to protect the port from an amplifier). The value is added back, so
+  S21 shows the device alone in the charts, the markers and saved files, whose comment
+  line names the offset. 0 is off; remembered. (Work list 58.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

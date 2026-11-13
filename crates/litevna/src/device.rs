@@ -237,6 +237,17 @@ impl SweepResult {
         }
     }
 
+    /// Add `db` to |S21| at every point, the phase unchanged: for a known
+    /// attenuator between the device under test and port 2 (to protect the
+    /// port from an amplifier), whose loss would otherwise read as the DUT's.
+    /// A negative value takes gain out instead.
+    pub fn offset_s21_db(&mut self, db: f64) {
+        let factor = 10f64.powf(db / 20.0);
+        for s in &mut self.s21 {
+            *s *= factor;
+        }
+    }
+
     /// The complex mean of several sweeps on the same grid, per point, for
     /// both S11 and S21. Averaging the complex values lowers noise without the
     /// bias that averaging magnitudes in dB has. Counts and times add up; the
@@ -1242,6 +1253,26 @@ mod tests {
         sweep.extend_port(-tau);
         sweep.extend_port(0.0);
         assert!(sweep.s11.iter().zip(&before.s11).all(|(a, b)| (a - b).norm() < 1e-9));
+    }
+
+    #[test]
+    fn s21_offset_adds_decibels_and_keeps_the_phase() {
+        let mut sweep = SweepResult {
+            s11: vec![Complex64::new(0.1, 0.0); 2],
+            s21: vec![Complex64::from_polar(0.01, 1.0); 2],
+            freqs_hz: vec![1_000_000, 2_000_000],
+            points: Vec::new(),
+            checksum_ok: 0,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::ZERO,
+        };
+        sweep.offset_s21_db(20.0);
+        assert!((sweep.s21[0].norm() - 0.1).abs() < 1e-12);
+        assert!((sweep.s21[0].arg() - 1.0).abs() < 1e-12);
+        assert_eq!(sweep.s11[0], Complex64::new(0.1, 0.0));
+        sweep.offset_s21_db(-20.0);
+        assert!((sweep.s21[1].norm() - 0.01).abs() < 1e-12);
     }
 
     #[test]

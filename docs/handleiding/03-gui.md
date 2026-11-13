@@ -103,7 +103,9 @@ kop wat ze tonen:
 | group delay | ns | −dφ/dω over ±N punten; N staat onder Traces |
 
 SWR, R + jX en |Z| gaan alleen over S11. Onder **Traces** zet je S11 en S21 aan of uit;
-dat geldt voor alle grafieken. Dubbelklik in een grafiek zet de schaal terug op
+dat geldt voor alle grafieken. De **offset** naast S21 is voor een verzwakker tussen het
+meetobject en poort 2: zijn waarde in dB wordt er weer bij opgeteld, zodat S21 alleen het
+meetobject laat zien in de grafieken, de markers en de bestanden die je bewaart; 0 is uit. Dubbelklik in een grafiek zet de schaal terug op
 automatisch; slepen en scrollen zoomt.
 
 ![Groepsvertraging van 53 cm kabel: vlak op 2,5 ns](../images/gui-weergaven-groepsvertraging.webp)

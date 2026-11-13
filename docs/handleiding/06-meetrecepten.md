@@ -108,7 +108,8 @@ stopband van −100 dB meet je dus niet. Middelen (Sweep avg 16 of meer) haalt n
 Als een filter. Een verzwakker van 20 dB hoort vlak op −20 dB te liggen, met S11 ver
 onder −20 dB aan de ingang. Voor een versterker: de LiteVNA zendt ongeveer 0 dBm; zet
 een verzwakker tussen uitgang en poort 2 zodat er niet meer dan −10 dBm op poort 2 komt,
-en tel die demping bij S21 op. Nooit een versterker met meer dan een paar milliwatt
+en vul die demping in bij **offset** naast S21 onder Traces (hoofdstuk 3), dan telt het
+programma hem op. Nooit een versterker met meer dan een paar milliwatt
 uitgang rechtstreeks op poort 2.
 
 ## Onbekend onderdeel aan één poort

@@ -73,6 +73,8 @@ pub(super) struct Settings {
     pub(super) gate_notch: bool,
     /// Port extension, one-way delay in picoseconds.
     pub(super) port_ext_ps: f64,
+    /// Decibels added to S21 for an attenuator in front of port 2.
+    pub(super) s21_offset_db: f64,
     /// Number of sweeps averaged in software (1 = off).
     pub(super) sweep_avg: usize,
     /// Sweeps left out of the software average per point (outliers), 0 = plain mean.
@@ -141,6 +143,7 @@ impl Default for Settings {
             gate_stop_m: 0.5,
             gate_notch: false,
             port_ext_ps: 0.0,
+            s21_offset_db: 0.0,
             sweep_avg: 1,
             avg_drop: 0,
             extra_segments: Vec::new(),
@@ -207,6 +210,7 @@ impl App {
         }
         self.gate_notch = s.gate_notch;
         self.port_ext_ps = finite_or(s.port_ext_ps, -PORT_EXT_MAX_PS, PORT_EXT_MAX_PS, 0.0);
+        self.s21_offset_db = finite_or(s.s21_offset_db, -S21_OFFSET_MAX_DB, S21_OFFSET_MAX_DB, 0.0);
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.avg_drop = s.avg_drop.min(self.sweep_avg.saturating_sub(2));
         self.extra_segments = s.extra_segments;
@@ -258,6 +262,7 @@ impl App {
             gate_stop_m: self.gate_stop_m,
             gate_notch: self.gate_notch,
             port_ext_ps: self.port_ext_ps,
+            s21_offset_db: self.s21_offset_db,
             sweep_avg: self.sweep_avg,
             avg_drop: self.avg_drop,
             extra_segments: self.extra_segments.clone(),
