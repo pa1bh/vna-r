@@ -36,8 +36,8 @@ fn main() -> eframe::Result {
 }
 
 /// The browser build: the same [`app::App`] in a canvas, without a device
-/// (the serial port and the worker thread do not exist there). A spike, see
-/// `docs/09-wasm-proef.md`.
+/// (the serial port and the worker thread do not exist there): a viewer for
+/// Touchstone files, see `docs/09-wasm-proef.md`.
 #[cfg(target_arch = "wasm32")]
 fn main() {
     use eframe::wasm_bindgen::JsCast as _;

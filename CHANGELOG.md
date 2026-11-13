@@ -12,6 +12,23 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Added
+
+- A browser build of the GUI: a viewer for Touchstone files, without a device
+  (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
+  off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,
+  Connect, Run, the sweep settings and the calibration. Markers, references, the Smith
+  chart, TDR and gating work on an opened `.s1p` or `.s2p`; the file stays on the
+  visitor's computer. `scripts/build-web.sh` writes three static files into `target/web`
+  that can be put on a web server, and CI builds the browser target so that it keeps
+  compiling. `docs/09-wasm-proef.md` (Dutch) says how to host it and what device support
+  in a browser would take. Tried in Chrome on macOS only; **not tried**: other browsers,
+  a phone, a web server with https and compression.
+
+  For the program itself nothing changes. The device part of its top bar and of its side
+  panel moved into functions of their own, so that the browser build can leave them out;
+  that has been built and tested but **not looked at again with a device attached**.
+
 ## [0.3.3] - 2026-11-12
 
 One correction to the reconnecting that 0.3.2 introduced.
