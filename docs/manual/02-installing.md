@@ -86,9 +86,10 @@ The flake has been built in CI on x86_64-linux and run on a NixOS laptop, CLI an
 On every tag `v*`, GitHub Actions builds one archive per platform and attaches them to a
 release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, the manual (English and
 Dutch) and on Linux the udev rule: `aarch64-macos` (Apple Silicon), `x86_64-macos` (Intel
-Mac), `x86_64-linux` and `x86_64-windows` (zip). They are ordinary dynamically linked
-binaries: on Linux the distribution's `libudev` and a desktop portal must be present, and on NixOS
-they do not work (use the flake there). Between tags there is only the CI build, which
+Mac), `x86_64-linux`, `aarch64-linux` (arm64: Asahi Linux on Apple Silicon, Raspberry Pi)
+and `x86_64-windows` (zip). They are ordinary dynamically linked binaries: on Linux the
+distribution's `libudev` and a desktop portal must be present, and on NixOS they do not
+work (use the flake there). Between tags there is only the CI build, which
 publishes nothing; build from source yourself in that case.
 
 Nothing is code-signed. **macOS** therefore refuses a binary that was downloaded with a

@@ -15,7 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # ubuntu-24.04-arm is GitHub's arm64 runner; the release ships an aarch64-linux archive.
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -36,7 +37,8 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Manuals in step (Dutch and English)
-        if: runner.os == 'Linux'
+        # Once is enough; not on the arm runner as well.
+        if: matrix.os == 'ubuntu-latest'
         run: ./scripts/check-manuals.sh
 
       - name: Build

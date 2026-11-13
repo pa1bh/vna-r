@@ -20,6 +20,9 @@ things that are not backwards compatible, such as the format of the calibration 
   80 m to 4.0 MHz, 40 m to 7.3 MHz, 2 m to 148 MHz, 70 cm 420–450 MHz, and the 1.25 m,
   33 cm, 5 cm bands); the backdrop and the Band list follow it. Suggested by Steve Falco
   on groups.io. (Work list 71.)
+- Releases: an `aarch64-linux` archive, built on GitHub's arm64 runner, for Asahi Linux
+  on Apple Silicon, Raspberry Pi and other arm64 boards; CI builds and tests on arm64 too.
+  First tried on Asahi Linux (M1) with a LiteVNA 64, built from source.
 
 ## [0.3.4] - 2026-11-13
 

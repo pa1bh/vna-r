@@ -22,6 +22,7 @@ an archive per platform with `vna-cli`, `vna-gui`, the manual (English and Dutch
 | `…-aarch64-macos.tar.gz` | Mac with Apple Silicon (M1 and later) |
 | `…-x86_64-macos.tar.gz` | Mac with an Intel processor |
 | `…-x86_64-linux.tar.gz` | Linux on x86_64; needs `libudev` and, for the file dialogs, an `xdg-desktop-portal` (every desktop environment ships one; not NixOS, see below) |
+| `…-aarch64-linux.tar.gz` | Linux on arm64 (Asahi Linux on Apple Silicon, Raspberry Pi); same requirements as x86_64 |
 | `…-x86_64-windows.zip` | Windows 10 or 11 on x86_64 |
 
 Nothing is code-signed yet. **macOS** therefore refuses to start a binary that was downloaded with a
@@ -230,7 +231,7 @@ To cut a release:
    ```
 
 3. [release.yml](.github/workflows/release.yml) checks that the tag matches the version in
-   `Cargo.toml`, builds the archives for Linux, both Macs and Windows, and creates the GitHub
+   `Cargo.toml`, builds the archives for Linux (x86_64 and arm64), both Macs and Windows, and creates the GitHub
    release with the changelog section as its text.
 
 A release candidate works the same way with a version such as `0.3.0-rc.1` and the tag
