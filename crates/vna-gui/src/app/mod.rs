@@ -233,6 +233,8 @@ pub struct App {
     gate_error: Option<String>,
     gated_cache: Option<(GateKey, Vec<Complex64>, f64)>,
     sweep_avg: usize,
+    /// Sweeps left out of the software average per point, farthest from the mean first.
+    avg_drop: usize,
     /// Last raw sweeps on the current grid, newest at the back.
     avg_buf: VecDeque<SweepResult>,
     references: Vec<Reference>,
@@ -333,6 +335,7 @@ impl App {
             gate_error: None,
             gated_cache: None,
             sweep_avg: 1,
+            avg_drop: 0,
             avg_buf: VecDeque::new(),
             references: Vec::new(),
             diff_ref: None,
@@ -1004,6 +1007,16 @@ impl App {
                     if ui.small_button("reset").clicked() {
                         self.avg_buf.clear();
                     }
+                }
+                // Leaving values out needs at least two to keep: the control
+                // appears from three sweeps on and is bounded by the count.
+                if self.sweep_avg >= 3 {
+                    self.avg_drop = self.avg_drop.min(self.sweep_avg - 2);
+                    ui.label("drop");
+                    ui.add(egui::DragValue::new(&mut self.avg_drop).range(0..=self.sweep_avg - 2))
+                        .on_hover_text("per point, leave the N sweeps farthest from the mean out of the average: a glitch in one sweep then does not count");
+                } else {
+                    self.avg_drop = 0;
                 }
             });
             ui.end_row();

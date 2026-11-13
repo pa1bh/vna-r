@@ -22,6 +22,10 @@ things that are not backwards compatible, such as the format of the calibration 
   their name in the three frequency charts, so that it is plain whether an antenna's dip
   lies in the band. Off by default; remembered. The table is fixed to Region 1 for now.
   (Work list 54.)
+- **Sweep avg** can leave outliers out: from three sweeps on, a **drop** field next to it
+  sets how many sweeps per point, farthest from the mean first, are left out of the
+  average. One glitch (a USB hiccup, a hand near the antenna) then does not pull the
+  trace. Default 0, the plain mean as before; remembered. (Work list 55.)
 - A browser build of the GUI: a viewer for Touchstone files, without a device
   (WebAssembly, drawn with WebGPU). It opens with a built-in example measurement, an
   off-centre-fed wire antenna for HF, and leaves out what needs an analyser: the port,

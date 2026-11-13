@@ -84,8 +84,9 @@ impl App {
     }
 
     /// Add a raw sweep to the ring buffer and return the complex mean of the
-    /// last `sweep_avg` sweeps (the newest alone when averaging is off). The
-    /// buffer resets when the grid changes. Averaging complex values shrinks
+    /// last `sweep_avg` sweeps (the newest alone when averaging is off),
+    /// leaving out the `avg_drop` outliers per point. The buffer resets when
+    /// the grid changes. Averaging complex values shrinks
     /// noise without biasing the magnitude, unlike averaging dB.
     pub(super) fn push_average(&mut self, raw: SweepResult) -> SweepResult {
         if self.avg_buf.front().is_some_and(|b| b.freqs_hz != raw.freqs_hz) {
@@ -95,7 +96,7 @@ impl App {
         while self.avg_buf.len() > self.sweep_avg.max(1) {
             self.avg_buf.pop_front();
         }
-        SweepResult::average(self.avg_buf.iter()).expect("buffer holds one grid")
+        SweepResult::average_trimmed(self.avg_buf.iter(), self.avg_drop).expect("buffer holds one grid")
     }
 
     /// Extra segments with their own calibration files.

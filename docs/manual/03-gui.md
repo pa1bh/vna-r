@@ -66,7 +66,9 @@ takes longer (roughly 300 to 600 points per second).
 quieter but slower, and the setting stays in the device. **Sweep avg** is something
 different: the program averages the last N sweeps as complex values. That suppresses noise
 at low levels without distorting the magnitude, and a counter shows how many sweeps are
-already included. If you change the grid, the averaging starts over.
+already included. If you change the grid, the averaging starts over. From three sweeps
+on, **drop** leaves the N sweeps farthest from the mean out at every point, so one glitch
+(a USB hiccup, a hand near the antenna) does not count; 0 is the plain mean.
 
 ## Segments
 

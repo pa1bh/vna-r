@@ -67,7 +67,10 @@ langer (ongeveer 300 tot 600 punten per seconde).
 rustiger maar trager, en de instelling blijft in het apparaat staan. **Sweep avg** is iets
 anders: het programma middelt de laatste N sweeps complex. Dat drukt ruis op lage niveaus
 zonder de magnitude te vertekenen, en een teller laat zien hoeveel sweeps al meetellen.
-Verander je het raster, dan begint het middelen opnieuw.
+Verander je het raster, dan begint het middelen opnieuw. Vanaf drie sweeps laat **drop**
+per punt de N sweeps die het verst van het gemiddelde liggen buiten beschouwing, zodat
+één storing (een USB-hik, een hand bij de antenne) niet meetelt; 0 is het gewone
+gemiddelde.
 
 ## Segmenten
 

@@ -214,21 +214,36 @@ impl SweepResult {
     /// raw records are those of the newest sweep. `None` for no sweeps or
     /// sweeps on different grids.
     pub fn average<'a>(sweeps: impl IntoIterator<Item = &'a SweepResult>) -> Option<SweepResult> {
+        Self::average_trimmed(sweeps, 0)
+    }
+
+    /// [`average`](Self::average) that first leaves out, per point and per
+    /// parameter, the `drop` values farthest from the plain mean: a glitch in
+    /// one sweep (a USB hiccup, a hand near the antenna) then does not pull
+    /// the mean. At least one value always remains, so with fewer than
+    /// `drop + 1` sweeps (a buffer still filling) fewer are dropped.
+    pub fn average_trimmed<'a>(sweeps: impl IntoIterator<Item = &'a SweepResult>, drop: usize) -> Option<SweepResult> {
         let sweeps: Vec<&SweepResult> = sweeps.into_iter().collect();
         let newest = *sweeps.last()?;
         if sweeps.iter().any(|s| s.freqs_hz != newest.freqs_hz) {
             return None;
         }
-        let n = sweeps.len() as f64;
+        let drop = drop.min(sweeps.len() - 1);
         let mut out = newest.clone();
-        for (i, (a, b)) in out.s11.iter_mut().zip(out.s21.iter_mut()).enumerate() {
-            let (mut s1, mut s2) = (Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0));
-            for sw in &sweeps {
-                s1 += sw.s11[i];
-                s2 += sw.s21[i];
+        let mut values: Vec<Complex64> = Vec::with_capacity(sweeps.len());
+        let mut trimmed_mean = |pick: &dyn Fn(&SweepResult) -> Complex64| -> Complex64 {
+            values.clear();
+            values.extend(sweeps.iter().map(|s| pick(s)));
+            let mean = values.iter().sum::<Complex64>() / values.len() as f64;
+            if drop > 0 {
+                values.sort_by(|a, b| (a - mean).norm().total_cmp(&(b - mean).norm()));
+                values.truncate(values.len() - drop);
             }
-            *a = s1 / n;
-            *b = s2 / n;
+            values.iter().sum::<Complex64>() / values.len() as f64
+        };
+        for i in 0..out.freqs_hz.len() {
+            out.s11[i] = trimmed_mean(&|s| s.s11[i]);
+            out.s21[i] = trimmed_mean(&|s| s.s21[i]);
         }
         out.checksum_ok = sweeps.iter().map(|s| s.checksum_ok).sum();
         out.checksum_bad = sweeps.iter().map(|s| s.checksum_bad).sum();
@@ -1198,6 +1213,37 @@ mod tests {
         sweep.extend_port(-tau);
         sweep.extend_port(0.0);
         assert!(sweep.s11.iter().zip(&before.s11).all(|(a, b)| (a - b).norm() < 1e-9));
+    }
+
+    #[test]
+    fn trimmed_average_leaves_out_the_glitch() {
+        let freqs: Vec<u64> = vec![1_000_000, 2_000_000, 3_000_000];
+        let sweep = |v: f64| SweepResult {
+            s11: vec![Complex64::new(v, 0.0); 3],
+            s21: vec![Complex64::new(0.0, v); 3],
+            freqs_hz: freqs.clone(),
+            points: Vec::new(),
+            checksum_ok: 1,
+            checksum_bad: 0,
+            duplicates: 0,
+            elapsed: Duration::from_millis(10),
+        };
+        // Four quiet sweeps and one glitch of 1.0 at every point.
+        let sweeps = vec![sweep(0.10), sweep(0.11), sweep(1.0), sweep(0.09), sweep(0.10)];
+        let plain = SweepResult::average(&sweeps).unwrap();
+        assert!((plain.s11[1].re - 0.28).abs() < 1e-12);
+        let trimmed = SweepResult::average_trimmed(&sweeps, 1).unwrap();
+        assert!((trimmed.s11[1].re - 0.10).abs() < 1e-12, "{}", trimmed.s11[1].re);
+        assert!((trimmed.s21[1].im - 0.10).abs() < 1e-12);
+        // Counts still add up over all five sweeps; dropping more than there
+        // are sweeps keeps one; a lone sweep is returned as it is.
+        assert_eq!(trimmed.checksum_ok, 5);
+        assert_eq!(trimmed.elapsed, Duration::from_millis(50));
+        let one_left = SweepResult::average_trimmed(&sweeps, 9).unwrap();
+        assert!(one_left.s11[0].re.is_finite());
+        let alone = SweepResult::average_trimmed(&sweeps[2..3], 2).unwrap();
+        assert_eq!(alone.s11[0].re, 1.0);
+        assert!(SweepResult::average_trimmed(&sweeps[..0], 1).is_none());
     }
 
     #[test]
