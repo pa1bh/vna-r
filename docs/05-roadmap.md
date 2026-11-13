@@ -325,3 +325,45 @@ en de meetpunten 45 tot 47; de reden staat in de statuskolom.
 | 45 | FIFO-timeouts bij average 80 en lage shell-bandbreedte | B18 | open: `vna-cli sweep --average 80 --points 1001` op de LiteVNA; lukt dat, of komt er "timeout while reading"? |
 | 46 | Stale records na een configuratiewijziging (zelfde aantal punten, ander raster) | B20 | open: de test `records_in_flight_after_the_clear…` legt het huidige gedrag vast; of de records van vóór de wijziging zijn moet de hardware zeggen |
 | 47 | Windows met een apparaat (`list`, `info`, `sweep`, `screenshot --trace`) | — | geen tester |
+
+---
+
+# Werklijst na NanoVNA-Saver, 13 november 2026
+
+Stand: 2026-11-13. Op 13 november is [NanoVNA-Saver](https://github.com/NanoVNA-Saver/nanovna-saver)
+(Python, GPL-3, laatste release 0.7.3 van februari 2025) doorgelezen en naast vna-r gelegd.
+Het meeste heeft vna-r al, vaak zorgvuldiger (polaire interpolatie, gating, kit-fit,
+sprongwaarschuwing, herverbinden; hun open issue "Open and Short recorded as the same at
+the start of sweep" is ons probleem van de verouderde FIFO-records). Wat de moeite waard
+is om over te nemen staat hieronder; omdat de licenties verschillen (GPL-3 tegen MIT) is
+alles op eigen idee gebouwd, geen code overgenomen. De deltamarker (verschil tussen twee
+markers) die daar als voorbeeld werd genoemd bleek al in de markertabel te zitten.
+
+De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
+*Unreleased* in de CHANGELOG; de controle ervan staat in
+[docs/08-qc-procedure.md](08-qc-procedure.md), onder "Ronde na NanoVNA-Saver".
+
+## Gedaan
+
+| # | Werk | Grootte | Status |
+|---|------|---------|--------|
+| 53 | Markertabel: serie-equivalent L of C van de reactantie, Q (|X|/R) en de parallel-equivalent in de hover | S | gedaan 2026-11-13 |
+| 54 | Amateurbanden (IARU regio 1) als schaduw in de frequentieplots, View ▸ Amateur bands | S | gedaan 2026-11-13 |
+| 55 | Sweep avg met uitschieterverwijdering: per punt de N verst van het gemiddelde liggende sweeps weglaten | S | gedaan 2026-11-13 |
+| 56 | Segmentgrenzen logaritmisch verdelen met één knop | S | gedaan 2026-11-13 |
+| 57 | Kabeltabel voor de snelheidsfactor in het TDR-paneel | S | gedaan 2026-11-13 |
+| 58 | S21-correctie voor een verzwakker aan poort 2 (dB, teruggeteld bij S21) | S | gedaan 2026-11-13 |
+| 59 | Kaiser-vensters (β 6 en 13) naast rectangular, hann en blackman | S | gedaan 2026-11-13 |
+| 60 | Touchstone-parsertests met afwijkende bestanden: commentaar na de optieregel, dalende frequenties, oneven aantal waarden, optieregel in kleine letters | S | gedaan 2026-11-13 |
+
+## Open
+
+| # | Werk | Grootte | Status |
+|---|------|---------|--------|
+| 61 | Analysepanelen: SWR-dips (begin, minimum, einde, breedte onder een grens), resonantie via nuldoorgangen van de fase, filteranalyse (−3/−6/−10/−20/−60 dB-punten, midden, Q, flanksteilheid dB/octaaf), piekzoeken; zet de markers op de gevonden punten | M | open: antwoorden in plaats van plots; de knop "min SWR" is er het begin van |
+| 62 | Calibratiestandaard uit een s1p-bestand (gemeten open/short/load) en een loadmodel met serie-L en parallel-C; beantwoordt punt 42: NanoVNA-Saver heeft geen kitbestandsformaat, een s1p per standaard is het praktische alternatief | M | open |
+| 63 | Calibratie-assistent: stapsgewijs short, open, load, through met een knop per stap | S/M | open: gebruiksgemak, de handleiding dekt het nu |
+| 64 | Center/Span als alternatieve invoer naast Start/Stop | S | open: extra velden in het sweeppaneel; pas doen als er behoefte aan is |
+| 65 | Bandentabel bewerkbaar (eigen banden, andere regio's) | S | open: nu een vaste tabel voor regio 1 |
+| 66 | µ-plot voor kernmateriaal (kernafmetingen en wikkelingen) en een magloop-modus die op de SWR-dip inzoomt | M | open: niche |
+| 67 | Logaritmische frequentie-as | M | open: egui_plot heeft geen log-as; zelf tekenen of wachten op upstream |
