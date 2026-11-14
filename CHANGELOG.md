@@ -12,6 +12,16 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-11-14
+
+A band picker for the sweep, asked for on groups.io, and a first archive for arm64
+Linux. The CI's Nix job now caches the dependencies (12 minutes down to under 2).
+
+Tried with a LiteVNA 67 on macOS, in the GUI: the Band row in both regions, the Region 2
+backdrop, and the region surviving a restart. vna-r itself ran on Asahi Linux (M1) with a
+LiteVNA 64, built from source. **Not tried**: the `aarch64-linux` archive itself, which
+this release builds for the first time; Windows; the NanoVNA-F.
+
 ### Added
 
 - Sweep panel: **Band** sets Start and Stop to an amateur band with 10 % of its width
