@@ -7,7 +7,7 @@ difference trace, segments, time-domain reflectometry (TDR) with gating, and Tou
 export. Hobby project by Bas Hendriks, PA1BH.
 
 Status: verified on a LiteVNA 64, a LiteVNA 67 and a NanoVNA-F 4.3, on macOS and on Linux (NixOS,
-Fedora); the Windows build has not been tried with a device yet. The current version is in
+Fedora, and Fedora Asahi Remix on an M1 with the `aarch64-linux` archive); the Windows build has not been tried with a device yet. The current version is in
 `Cargo.toml`; changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ![vna-r measuring an off-centre-fed HF dipole with a LiteVNA 67](docs/images/gui-ocf-antenne.webp)

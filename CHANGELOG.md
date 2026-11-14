@@ -12,6 +12,12 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Changed
+
+- README: the `aarch64-linux` archive of 0.3.5 has since been tried, on Fedora Asahi Remix 44
+  (Apple M1) with a LiteVNA 64: connecting, calibrating, saving the calibration and measuring
+  all worked. The 0.3.5 notes still say it was untried.
+
 ## [0.3.5] - 2026-11-14
 
 A band picker for the sweep, asked for on groups.io, and a first archive for arm64

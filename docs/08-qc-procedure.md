@@ -1,7 +1,8 @@
 # QC-procedure werklijst november 2026
 
 Stand: 14 november 2026: **0.3.5** is uitgebracht (Band-keuze met regio 2, een eerste
-aarch64-linux-archief dat nog niemand heeft geprobeerd, en een snellere nix-taak in de CI), na
+aarch64-linux-archief, dezelfde dag door PA1BH op Fedora Asahi Remix met een LiteVNA 64 gedraaid, en
+een snellere nix-taak in de CI), na
 **0.3.4** (acht kleine punten na NanoVNA-Saver,
 gedeelde grafiek-as met reset view, sweep from calibration en de browserbouw), **0.3.3**
 (wachten bij een verbinding die komt en gaat, in plaats van opgeven), **0.3.2** (waarschuwing bij een sprong in de calibratie,
@@ -371,6 +372,31 @@ met de bestaande instellingen van 0.3.3.
 Geen bevinding, wel gezien: de referentie `hf-ocf-3-20-NanoVNA-F.s2p` (3–20 MHz) is op een
 as tot 6,3 GHz een verticale veeg bij 0; en een grafiek die met het scrollwiel tot 10 GHz
 is uitgezoomd blijft zo staan tot een dubbelklik.
+
+### 14 november 2026, Fedora Asahi Remix 44 (Apple M1, aarch64), LiteVNA 64 (fw 2.2, hw 2): archief 0.3.5
+
+**Door PA1BH**, op eigen initiatief, op een MacBook Pro M1 met Fedora Linux Asahi Remix 44
+(KDE Plasma): eerst (13 november) uit de bron gebouwd met `cargo build`, "lijkt prima te
+werken"; daarna het archief `vna-r-v0.3.5-aarch64-linux.tar.gz` van de release uitgepakt
+en gedraaid. Dat is de eerste keer dat vna-r op arm64-Linux draait en de eerste keer dat
+het arm-archief ergens is geprobeerd.
+
+| Wat | Uitkomst |
+|---|---|
+| Archief uitpakken en `vna-gui` starten | goed: venster "vna-r 0.3.5", KDE-titelbalk |
+| Rechten op de poort | nodig: zonder de udev-regel uit het archief (of een `chmod 666` op `/dev/ttyACM0`) mag de gebruiker de poort niet openen, zoals hoofdstuk 2 van de handleiding zegt |
+| Verbinden op `/dev/ttyACM0` | goed: bovenbalk "LiteVNA fw 2.2 hw 2 3.92 V", Device range 50.000 kHz – 6.300000 GHz |
+| Calibratie 1 M–1 G, 201 punten, open/short/load; **Save…** | goed: "ready for S11", bewaard als `~/Documents/litevna-64-1MHz-1GHz.cal.json` via de bestandsdialoog (xdg-portal op KDE) |
+| S11 van een antenne over 1 M–1 G met twee markers en de deltaregel | goed: "het lijkt allemaal goed te werken" (schermafbeelding) |
+| S21, TDR en de knop **Screenshot** | goed, later die dag: "werkt" |
+
+Niet gemeld: **Open as trace…** en **Save Touchstone…**. De bestandsdialoog werkt dus wel op Fedora met KDE; de open vraag over de
+dialogen op NixOS (bevinding 8) staat daar los van.
+
+Geen bevinding, wel gezien: met 201 punten over 1 GHz (stap 5 MHz) en een lange voedingslijn
+draait de Smith-kaart tientallen rondjes en wikkelt de fase per paar punten; dat is de kabel,
+niet de software. Meer punten of een segment per band maakt het leesbaar; voor de antenne zelf
+helpt **Port extension** of een calibratie aan het einde van de kabel.
 
 ---
 
