@@ -9,8 +9,10 @@ text, one line per frequency, with an option line that states the unit and the f
 `vna-cli sweep --s2p name.s2p`. vna-r writes Hz, real/imaginary, 50 Ω, with S12 and
 S22 as zero because the LiteVNA does not measure them. For a one-port device such as an
 antenna, give the file the extension `.s1p` in the GUI or use `--s1p name.s1p`: that
-writes S11 only. The comment lines state whether the
-data was calibrated, gated or averaged. With the gate on, the gated S11 is written.
+writes S11 only. The GUI proposes the frequency range as the name
+(`sweep-1MHz-30MHz.s2p`). The comment line states whether the data was calibrated, raw
+or from a file, and the gate, port extension and S21 offset that were on. With the gate
+on, the gated S11 is written.
 For segments that touch each other, the shared point is written once, because
 Touchstone requires strictly increasing frequencies.
 
@@ -30,7 +32,10 @@ so impedance and SWR come out right; S21 stays as in the file, and the message u
 A calibration is a JSON file with the frequency grid, the kit definitions and the raw
 measurements of each standard. Storing the raw measurements rather than the error terms
 is what makes interpolation and the kit fit possible afterwards. GUI and CLI use the same
-format; `vna-cli cal show --file x.cal.json` prints the contents in readable form.
+format; `vna-cli cal show --file x.cal.json` prints the contents in readable form. The
+file carries a format number (`"format": 1`); a file from a newer vna-r with a higher
+number is refused with a message to update. The GUI proposes the frequency range as the
+name (`1MHz-30MHz.cal.json`).
 
 A calibration belongs to one device, one kit and one reference plane. Store them under
 recognisable names, for example `n-hf.cal.json` and `n-6g3.cal.json`, and put in `--note`
@@ -49,7 +54,7 @@ writes distance, time, impulse, step and impedance. For spreadsheets and your ow
 References from **Hold** are kept between sessions: vna-r writes them as `ref-0.s2p` to
 `ref-3.s2p` in the folder `references` next to its settings (on macOS
 `~/Library/Application Support/vna-r`, on Linux `~/.local/share/vna-r`, on Windows
-`%APPDATA%\vna-r`). To keep one for good or pass it on, copy that file, or **Save
+`%APPDATA%\vna-r\data`). To keep one for good or pass it on, copy that file, or **Save
 Touchstone…** while the measurement is live and later **Open as reference…**.
 
 ## Screenshots

@@ -9,8 +9,10 @@ tekst, één regel per frequentie, met een optieregel die eenheid en formaat aan
 `vna-cli sweep --s2p naam.s2p`. vna-r schrijft Hz, reëel/imaginair, 50 Ω, met S12 en
 S22 als nul omdat de LiteVNA die niet meet. Voor een eenpoort zoals een antenne geef je
 het bestand in de GUI de extensie `.s1p` of gebruik je `--s1p naam.s1p`: dan wordt
-alleen S11 geschreven. De commentaarregels vermelden of de data
-gecalibreerd, gegate of gemiddeld was. Met gate aan wordt de gegate S11 geschreven.
+alleen S11 geschreven. De GUI stelt het frequentiebereik als naam voor
+(`sweep-1MHz-30MHz.s2p`). De commentaarregel vermeldt of de data gecalibreerd, ruw of uit
+een bestand was, en welke gate, poortverlenging en S21-offset aanstonden. Met gate aan
+wordt de gegate S11 geschreven.
 Bij segmenten die elkaar raken wordt het gedeelde punt eenmaal geschreven, omdat
 Touchstone strikt oplopende frequenties eist.
 
@@ -30,7 +32,10 @@ onder **Files** zegt het erbij. Met de CLI:
 Een calibratie is een JSON-bestand met het frequentieraster, de kit-definities en de ruwe
 metingen van elke standaard. Dat de ruwe metingen bewaard worden en niet de fouttermen,
 maakt interpolatie en de kit-fit achteraf mogelijk. GUI en CLI gebruiken hetzelfde
-formaat; `vna-cli cal show --file x.cal.json` drukt de inhoud leesbaar af.
+formaat; `vna-cli cal show --file x.cal.json` drukt de inhoud leesbaar af. Het bestand
+draagt een formaatnummer (`"format": 1`); een bestand van een nieuwere vna-r met een hoger
+nummer wordt geweigerd met de melding om bij te werken. De GUI stelt het frequentiebereik
+als naam voor (`1MHz-30MHz.cal.json`).
 
 Een calibratie hoort bij één apparaat, één kit en één referentievlak. Bewaar ze
 herkenbaar, bijvoorbeeld `n-hf.cal.json` en `n-6g3.cal.json`, en zet in `--note` wat
@@ -49,7 +54,7 @@ schrijft afstand, tijd, impuls, stap en impedantie. Voor spreadsheets en eigen s
 Referenties uit **Hold** blijven tussen sessies bewaard: vna-r schrijft ze als
 `ref-0.s2p` tot `ref-3.s2p` in de map `references` naast zijn instellingen (op macOS
 `~/Library/Application Support/vna-r`, op Linux `~/.local/share/vna-r`, op Windows
-`%APPDATA%\vna-r`). Wil je er een voorgoed houden of doorgeven: kopieer dat bestand, of
+`%APPDATA%\vna-r\data`). Wil je er een voorgoed houden of doorgeven: kopieer dat bestand, of
 **Save Touchstone…** terwijl de meting live is en later **Open as reference…**.
 
 ## Schermafbeeldingen

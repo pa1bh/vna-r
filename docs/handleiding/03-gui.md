@@ -6,8 +6,8 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
 
 ## Menubalk
 
-- **File**: Touchstone-bestanden openen als trace of referentie, opslaan als .s2p,
-  calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
+- **File**: Touchstone-bestanden openen als trace of referentie, opslaan als Touchstone
+  (.s2p, of .s1p voor alleen S11), calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
 - **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
   en een schermafbeelding van het apparaat.
 - **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Amateur
@@ -54,8 +54,8 @@ grafieken; maak het venster groter of scrol in het linkerpaneel.
    punten op een LiteVNA en binnen 301 punten (ongeveer drie seconden) op een NanoVNA-F.
 
 Toetsen, zolang je niet in een veld typt: spatie is Run of Stop, `S` een enkele sweep,
-`1` tot `4` kiezen de actieve marker en de pijltjestoetsen verplaatsen hem, `H` houdt de
-trace vast als referentie, `G` schakelt de gate, `T` wisselt tussen frequentie- en
+`1` tot `4` kiezen de actieve marker en de pijltjestoetsen verplaatsen hem (in het
+tijddomein de TDR-marker), `H` houdt de trace vast als referentie, `G` schakelt de gate, `T` wisselt tussen frequentie- en
 tijddomein. De batterijspanning in de bovenbalk wordt elke minuut opnieuw gelezen.
 
 Onder **Sweep** stel je **Start**, **Stop** en **Points** in en bevestig je met **Apply
@@ -127,7 +127,8 @@ reactantie als de spoel of condensator die hij op die frequentie is (**L / C**: 
 een filter of de afstand tussen twee resonanties. Wijs je de L / C-waarde aan, dan zie je
 Q (|X|/R) en de parallelvorm van de impedantie, R ∥ L of C, voor een parallelkring of een
 trap. De knoppen **min SWR**, **max S21** en **min S21**
-springen met de actieve marker naar dat punt.
+springen met de actieve marker naar dat punt; **clear** haalt de actieve marker weg,
+**clear all** alle vier.
 
 Rechtsboven staat een label dat zegt wat je ziet: **CAL** (gecalibreerd), **RAW**
 (ongecorrigeerd), **CAL\*** (sommige segmenten niet gecalibreerd), **GATED** (S11 is
@@ -153,9 +154,11 @@ apparaat zelf liet zien.
 
 ## Wat bewaard blijft
 
-Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg, segmenten,
-het calibratiebestand en of het toegepast wordt, de poortverlenging, de weergavekeuzes,
-TDR- en gate-instellingen, markerfrequenties, **Connect at start**, de zoom en de
+Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg en drop,
+segmenten, het calibratiebestand en of het toegepast wordt, de kit-fit-instellingen, de
+poortverlenging, de S21-offset, de weergavekeuzes met de amateurbanden en hun regio, de
+apertuur van de groepsvertraging, TDR- en gate-instellingen, markerfrequenties, de
+referentie van de Δ-trace, **Connect at start**, **Developer tools**, de zoom en de
 venstergrootte. Bij de volgende start komt dat
 terug; het calibratiebestand wordt automatisch geladen en de markers worden bij de eerste
 sweep op de dichtstbijzijnde frequentie gezet. Ook de referenties blijven bewaard, als

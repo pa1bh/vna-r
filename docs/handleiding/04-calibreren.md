@@ -40,7 +40,8 @@ of je accepteert de fout.
 Een standaard die niet klopt, geeft een oranje waarschuwing: een open of short die minder
 dan −8 dB reflecteert zit los (een goede open geeft 0 dB op een LiteVNA en ongeveer −3 dB
 ruw op een NanoVNA-F), een load boven −10 dB is niet aangesloten of stuk, een
-through onder −6 dB zit niet aan poort 2. Neem die serieus; een calibratie met een losse
+through onder −6 dB zit niet aan poort 2, een line open of line short onder −6 dB heeft
+geen open of short aan het verre einde. Neem die serieus; een calibratie met een losse
 standaard "lost op" maar geeft onzin, en de meting van de load erna ziet er dan toch
 perfect uit omdat de load zijn eigen nulpunt definieert.
 

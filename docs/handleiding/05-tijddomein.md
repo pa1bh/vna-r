@@ -30,6 +30,11 @@ gekozen dat er vóór het referentievlak niets reflecteert. De laagste gemeten f
 bepalen nog wel het trage deel van de stap, dus een slecht gecalibreerde onderkant (zie de
 waarschuwing in hoofdstuk 4) toont zich als een scheve lijn, niet als een verschoven lijn.
 
+De twee grafieken delen hun afstandsas: zoom of sleep je de ene, dan volgt de andere;
+**reset view** in de kop, of een dubbelklik, zet ze terug op hun automatische schaal. Een
+klik plaatst de TDR-marker, en de pijltjestoetsen verschuiven hem (met shift tien stappen
+tegelijk).
+
 ![TDR van 53 cm kabel met short: piek op 0,53 m, gate eromheen](../images/gui-tdr-gate.webp)
 
 ## Resolutie en bereik

@@ -47,7 +47,7 @@ draws with wgpu, which picks a graphics adapter at start: Vulkan when it can, ot
 OpenGL. On an older NVIDIA card with the open-source nouveau driver (Kepler, GeForce
 600/700) Vulkan is the experimental NVK driver and frames arrive late; vna-r recognises it
 and picks OpenGL there itself, as it does for software rendering (llvmpipe) whenever a
-real GPU is available. **Help ▸ About** shows what was chosen. If it still stutters, start
+real GPU is available. **Help ▸ About vna-r** shows what was chosen. If it still stutters, start
 with `WGPU_BACKEND=gl ./vna-gui`; conversely `WGPU_BACKEND=vulkan` forces Vulkan.
 `WAYLAND_DISPLAY= ./vna-gui` tries X11 instead of Wayland, and `RUST_LOG=info ./vna-gui`
 prints on the terminal which adapters were found and which one was chosen. Report what
@@ -74,8 +74,8 @@ program has the port (GUI connected while you use the CLI, or NanoVNA-Saver open
 Close that first. If it happens occasionally right after plugging in, try again; the
 device sometimes needs a second.
 
-**"target grid lies outside the calibrated span"**. The sweep falls outside the span of
-the loaded calibration file. Load the right file or adjust the sweep. Until then the
+**"target grid … lies outside the calibrated span …"**, with both ranges in Hz. The sweep
+falls outside the span of the loaded calibration file. Load the right file or adjust the sweep. Until then the
 sweep is shown raw: the panel says "not applied" with this message and the label is RAW,
 or CAL\* when other segments are calibrated.
 
@@ -109,7 +109,7 @@ measurement. `vna-cli release`, or switch it off and on.
 ## Reporting a problem
 
 Report bugs and wishes at <https://github.com/pa1bh/vna-r/issues> (**Help ▸ Report a
-problem…** in the GUI opens that page). Include which version you use (**Help ▸ About**
+problem…** in the GUI opens that page). Include which version you use (**Help ▸ About vna-r**
 or `vna-cli --version`), which device and which firmware, and what you were doing. The easiest way:
 switch on **View ▸ Developer tools** and choose **Developer ▸ Copy diagnostics**; that puts the
 version, device, sweep settings, calibration, the last error and the log on the

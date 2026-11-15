@@ -9,7 +9,8 @@ Frequencies: `50k`, `1M`, `14.2M`, `1.3G`, `6.3G` (a decimal comma is accepted t
 With `--json`, the commands `list`, `info`, `sweep`, `tdr` and `cal show` print one JSON
 document on stdout instead of a table, for use in scripts; progress and warnings stay on
 stderr. A sweep gives every point as `{"freq_hz": …, "s11": [re, im], "s21": [re, im]}`,
-`tdr` the listed reflections under `peaks` and the whole curve under `trace`.
+`tdr` the listed reflections under `peaks` and the whole curve under `trace`, `cal show`
+the jumps between adjacent calibration points under `jumps`.
 
 ## list
 
@@ -96,8 +97,9 @@ Measure calibration standards into a file, or inspect and edit the file.
 | `clear` | delete the file |
 
 `--note "text"` stores a note in the file. An implausible standard measurement gives a
-WARNING on stderr. Short forms are accepted: `thru` for `through`, and `o`, `s`, `l`, `t`
-and `i` for the first five standards.
+WARNING on stderr. Short forms are accepted: `thru` for `through`, `isol` for `isolation`,
+`line_open` and `line_short` with or without the underscore, and `o`, `s`, `l`, `t` and
+`i` for the first five standards.
 
 ```bash
 vna-cli cal open --file cal/n-hf.cal.json --start 100k --stop 50M --points 1001
@@ -119,7 +121,7 @@ reflections with distance, |Γ| and the impedance behind them.
 | option | meaning |
 |---|---|
 | `--cal <file>` | strongly recommended |
-| `--vf <0.1..1>` | velocity factor, default 0.70 |
+| `--vf <factor>` | velocity factor, default 0.70 |
 | `--window rectangular\|hann\|blackman\|kaiser6\|kaiser13` | default hann |
 | `--peaks <n>` | number of reflections, default 5 |
 | `--max-distance <m>` | do not look further than this |

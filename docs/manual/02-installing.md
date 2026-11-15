@@ -110,7 +110,7 @@ xattr -dr com.apple.quarantine vna-r-v*-aarch64-macos
 starts the program. The Windows build compiles and passes CI but has not yet been tried
 with a device; reports are welcome. Ports are named `COM3` and the like; Windows 10 and
 later include the USB serial driver that the LiteVNA and the NanoVNA-F use. What has changed per version is listed in
-`CHANGELOG.md`; which version you are running is shown under **Help ▸ About** or with
+`CHANGELOG.md`; which version you are running is shown under **Help ▸ About vna-r** or with
 `vna-cli --version`.
 
 ## Connecting
@@ -160,3 +160,22 @@ original sweep. Its bandwidth is set on the device itself; the
 The serial port can only be open in one program at a time. If the GUI is connected, the CLI
 gives an error saying the port is busy; click **Disconnect** first. The same
 applies to NanoVNA-Saver or any other program that talks to the device.
+
+## In the browser, without a device
+
+The same GUI also builds to WebAssembly: a viewer for Touchstone files (.s1p, .s2p) in a
+browser tab, with the Smith chart, the plots, markers, references, TDR and gate, but
+without anything that needs a device: no port, sweep or calibration. The page opens with
+an example measurement (the OCF antenna of chapter 6) and **Open as trace…** loads your
+own file; it stays in the browser, nothing is uploaded. It is not hosted anywhere yet;
+building it yourself needs the Rust target once and then one script:
+
+```bash
+rustup target add wasm32-unknown-unknown
+scripts/build-web.sh
+python3 -m http.server -d target/web 8080
+```
+
+Then open <http://localhost:8080>. The folder `target/web` holds three static files, which
+is the whole site; copy them to any web server. The background is in
+`docs/09-wasm-proef.md` (Dutch).

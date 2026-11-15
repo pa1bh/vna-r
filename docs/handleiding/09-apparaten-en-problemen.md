@@ -48,7 +48,7 @@ met wgpu, dat per start een grafische adapter kiest: Vulkan als dat kan, anders 
 Op een oudere NVIDIA-kaart met de open-source nouveau-driver (Kepler, GeForce 600/700)
 is Vulkan de experimentele NVK-driver en komen beelden te laat; vna-r herkent die en kiest
 daar zelf OpenGL, net als bij software-rendering (llvmpipe) zolang er een echte GPU is.
-**Help ▸ About** toont wat er gekozen is. Hapert het toch, start dan met
+**Help ▸ About vna-r** toont wat er gekozen is. Hapert het toch, start dan met
 `WGPU_BACKEND=gl ./vna-gui`; omgekeerd dwingt `WGPU_BACKEND=vulkan` Vulkan af.
 `WAYLAND_DISPLAY= ./vna-gui` probeert X11 in plaats van Wayland, en `RUST_LOG=info
 ./vna-gui` laat op de terminal zien welke adapters er waren en welke is gekozen. Meld wat
@@ -75,8 +75,8 @@ ander programma heeft de poort (GUI verbonden terwijl je de CLI gebruikt, of
 NanoVNA-Saver open). Sluit dat eerst. Komt het incidenteel voor direct na het
 aansluiten, probeer dan opnieuw; het apparaat heeft soms een seconde nodig.
 
-**"target grid lies outside the calibrated span"**. De sweep valt buiten het bereik van
-het geladen calibratiebestand. Laad het juiste bestand of pas de sweep aan. De sweep
+**"target grid … lies outside the calibrated span …"**, met beide bereiken in Hz. De sweep
+valt buiten het bereik van het geladen calibratiebestand. Laad het juiste bestand of pas de sweep aan. De sweep
 wordt tot die tijd ruw getoond: het paneel zegt "not applied" met deze melding en het
 label is RAW, of CAL\* als andere segmenten wel gecalibreerd zijn.
 
@@ -112,7 +112,7 @@ meting staan. `vna-cli release`, of uit en aan.
 ## Een probleem melden
 
 Meld fouten en wensen op <https://github.com/pa1bh/vna-r/issues> (**Help ▸ Report a
-problem…** in de GUI opent die pagina). Zet erbij welke versie je gebruikt (**Help ▸ About**
+problem…** in de GUI opent die pagina). Zet erbij welke versie je gebruikt (**Help ▸ About vna-r**
 of `vna-cli --version`), welk apparaat en welke firmware, en wat je deed. Het makkelijkst:
 zet **View ▸ Developer tools** aan en kies **Developer ▸ Copy diagnostics**; dat zet
 versie, apparaat, sweep-instellingen, calibratie, de laatste fout en het log op het

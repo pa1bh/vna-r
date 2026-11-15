@@ -74,7 +74,7 @@ to date.
 
 **Graphics on Linux.** The GUI draws with wgpu and prefers Vulkan, except on drivers known to
 stutter (NVK on older NVIDIA cards under nouveau) or software rasterisers, where it picks OpenGL. If
-menus feel sluggish, check the renderer line under **Help ▸ About** and try `WGPU_BACKEND=gl`; the
+menus feel sluggish, check the renderer line under **Help ▸ About vna-r** and try `WGPU_BACKEND=gl`; the
 manual's troubleshooting chapter has more.
 
 **File dialogs on Linux.** Open and Save go through the desktop portal (`xdg-desktop-portal`
@@ -104,7 +104,7 @@ group. The port is `/dev/ttyACM*`; on macOS it is `/dev/cu.usbmodem…` and no d
    reference, and **Δ** next to a reference draws live minus reference in every view.
 
 The menu bar has **File** (Touchstone and calibration files), **Device**, **View** and **Help**,
-with **Help ▸ About** showing the version and build. Settings (port, sweep, calibration file,
+with **Help ▸ About vna-r** showing the version and build. Settings (port, sweep, calibration file,
 views, TDR, markers, references, window size) are saved on exit and restored at the next start.
 
 The same from the command line:
@@ -141,20 +141,27 @@ its own.
 ## What it does
 
 - **Views.** Smith chart (S11) plus three plots that each pick their own view: log magnitude, linear
-  magnitude, phase, SWR, R + jX, |Z| or group delay. S11 and S21 can be shown or hidden; double-click
-  resets the zoom.
+  magnitude, phase, SWR, R + jX, |Z| or group delay. S11 and S21 can be shown or hidden. The three
+  frequency plots share one frequency axis; **reset view** or a double-click puts them back on their
+  automatic scale. **View ▸ Zoom** scales the whole interface (75–250 %).
+- **Bands.** **View ▸ Amateur bands** draws the amateur bands behind the plots, IARU Region 1 or
+  Region 2; the **Band** row in the sweep panel sets Start and Stop to a band with 10 % of its width
+  extra on each side, for tuning a multiband antenna band by band.
 - **Calibration.** SOL(T) with open/short/load/through/isolation on any grid, interpolated to other
   grids within the calibrated range, saved as JSON. Above about 1 GHz the **Kit fit** estimates the
   open/short asymmetry of the kit from a cable measured with open and short at the far end (as a
   capacitance or an offset delay) and **Apply to kit** puts it into the calibration.
   `vna-cli cal check` reports what a calibration leaves over on a cable measurement.
   **Port extension** moves the reference plane by a delay, for an adapter or fixture behind
-  the calibration plane.
+  the calibration plane. **sweep from calibration** sets the sweep to the calibration's own grid,
+  so that nothing is interpolated; a calibration that jumps between adjacent points (the LiteVNA 67
+  around 100 MHz) gives a warning when it is interpolated across the jump.
 - **Segments.** Extra frequency ranges swept after the first and shown as one trace, each with its
   own calibration file if you like, for example 100 kHz–50 MHz with an HF calibration next to
-  50 MHz–6.3 GHz with a wide one. CLI: `--segment 100k:50M:1001@hf.cal.json`.
-- **Markers.** Four markers with a table of frequency, S11, Z, SWR and S21 and the difference between
-  the first two; arrow keys nudge the active one (shift: ten points), buttons jump to minimum SWR,
+  50 MHz–6.3 GHz with a wide one; **log spacing** moves the segment edges so that every segment
+  spans the same ratio. CLI: `--segment 100k:50M:1001@hf.cal.json`.
+- **Markers.** Four markers with a table of frequency, S11, Z, the reactance as L or C, SWR and S21
+  and the difference between the first two; arrow keys nudge the active one (shift: ten points), buttons jump to minimum SWR,
   maximum S21 or minimum S21. Markers keep their frequency when the sweep changes.
 - **Keys.** Space is Run or Stop, `S` a single sweep, `1`–`4` choose the marker, `H` holds a
   reference, `G` switches the gate, `T` switches between frequency and time domain.
@@ -162,13 +169,23 @@ its own.
   in the unit of each view (dB, degrees, SWR, ohm, nanoseconds). References are kept between
   sessions; any .s1p/.s2p file can be opened as a reference too.
 - **Averaging.** The device's own averaging (LiteVNA, 1–80) and a complex software average of the
-  last N sweeps, which lowers noise without biasing the magnitude the way averaging in dB does.
-- **Time domain.** TDR from the sweep (window, velocity factor, distance axis), and a draggable
+  last N sweeps, which lowers noise without biasing the magnitude the way averaging in dB does;
+  **drop** leaves the outliers out of that average.
+- **S21 offset.** Adds the value of an attenuator in front of port 2 back to S21, so that the plot
+  and the files show the device under test alone.
+- **Time domain.** TDR from the sweep (window: rectangular, hann, blackman, kaiser 6 or 13;
+  velocity factor from a cable list or typed; distance axis), and a draggable
   **Gate** that keeps or removes (*notch*) the reflections between two distances; the frequency
   view then shows the gated S11. CLI: `vna-cli sweep --gate 0.9:1.2`, `vna-cli tdr --from file.s2p`.
 - **Files.** Touchstone .s1p/.s2p export and import (RI/MA/DB, Hz to GHz, including files written by
   the analyser itself), as the live trace or as a reference; device screenshots as PNG. The CLI
   also writes CSV (with impedance and group delay) and, with `--json`, machine-readable output.
+- **Connection.** When the device drops off the USB bus the GUI waits up to 30 s for it to come
+  back and reconnects; a sweep that was running continues.
+- **In the browser.** The same GUI builds to WebAssembly as a viewer for Touchstone files without a
+  device: `scripts/build-web.sh` writes three static files to `target/web`, ready for any web
+  server; the page opens with an example measurement and files stay in the browser. Not hosted
+  anywhere yet; notes in [docs/09-wasm-proef.md](docs/09-wasm-proef.md) (Dutch).
 - **Developer tools.** Off by default; **View ▸ Developer tools** adds a log window and
   **Copy diagnostics** for bug reports.
 
@@ -198,7 +215,7 @@ Two protocols behind one `Vna` handle, chosen by USB id:
 ## Reporting problems
 
 Open an issue at <https://github.com/pa1bh/vna-r/issues> (**Help ▸ Report a problem…** in the GUI).
-Please include the version (**Help ▸ About** or `vna-cli --version`), your device and firmware, and
+Please include the version (**Help ▸ About vna-r** or `vna-cli --version`), your device and firmware, and
 what you did. Easiest: turn on **View ▸ Developer tools**, choose **Developer ▸ Copy diagnostics**
 and paste the result. For CLI problems, the output with `--trace` helps.
 
@@ -211,13 +228,14 @@ and paste the result. For CLI problems, the output with `--trace` helps.
 | `crates/vna-gui` | Desktop GUI (egui/eframe). |
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) checks formatting and clippy, builds and
-tests on Ubuntu, macOS and Windows, checks that the two manuals have the same structure
+tests on Ubuntu (x86_64 and arm64), macOS and Windows, builds the browser version for wasm32
+with clippy, checks that the two manuals have the same structure
 ([scripts/check-manuals.sh](scripts/check-manuals.sh)) and builds the Nix flake on every push.
 
 ## Versions and releases
 
 The version number lives once in `Cargo.toml` under `[workspace.package]` and applies to the library,
-`vna-cli`, `vna-gui` and the flake. The GUI shows it in the title bar and under **Help ▸ About** (with
+`vna-cli`, `vna-gui` and the flake. The GUI shows it in the title bar and under **Help ▸ About vna-r** (with
 the git revision recorded by `build.rs`), the CLI with `vna-cli --version`.
 
 To cut a release:

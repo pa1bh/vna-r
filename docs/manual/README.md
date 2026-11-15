@@ -13,7 +13,7 @@ The chapters build on one another, but can also be read on their own:
 1. [Introduction: what a VNA measures](01-introduction.md). S11, S21, reflection coefficient, SWR,
    impedance, dB and phase, the Smith chart, and how vna-r is put together.
 2. [Installing and connecting](02-installing.md). Building on macOS and Linux, the USB port,
-   first contact, what the device's screen does during a measurement.
+   first contact, what the device's screen does during a measurement, the browser viewer.
 3. [The GUI](03-gui.md). Menu bar, sweep, segments, views, markers, averaging,
    settings that are remembered.
 4. [Calibrating](04-calibrating.md). Why it is necessary, open/short/load/through step by step,
@@ -31,8 +31,9 @@ The chapters build on one another, but can also be read on their own:
    reporting a problem, what you can trust.
 
 Those who want the background will find the research and development notes in `docs/01`
-to `docs/08` (Dutch): the USB protocols, the calibration model with measurements, the TDR
-mathematics, the roadmap, and the review and test procedure of version 0.3.
+to `docs/09` (Dutch): the USB protocols, the calibration model with measurements, the TDR
+mathematics, the roadmap, the review and test procedure of version 0.3, and the browser
+build.
 
 ## Conventions
 

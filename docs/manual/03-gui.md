@@ -6,8 +6,8 @@ with four charts. The title bar shows the version number.
 
 ## Menu bar
 
-- **File**: open Touchstone files as a trace or as a reference, save as .s2p, load and
-  save a calibration, quit. The same buttons are also in the left panel.
+- **File**: open Touchstone files as a trace or as a reference, save as Touchstone (.s2p,
+  or .s1p for S11 only), load and save a calibration, quit. The same buttons are also in the left panel.
 - **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
   screenshot of the device.
 - **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Amateur
@@ -53,8 +53,8 @@ or scroll in the left panel.
    points on a LiteVNA and within 301 points (about three seconds) on a NanoVNA-F.
 
 Keys, as long as you are not typing in a field: space is Run or Stop, `S` a single
-sweep, `1` to `4` choose the active marker and the arrow keys move it, `H` holds the
-trace as a reference, `G` switches the gate, `T` switches between frequency and time
+sweep, `1` to `4` choose the active marker and the arrow keys move it (in the time domain, the
+TDR marker), `H` holds the trace as a reference, `G` switches the gate, `T` switches between frequency and time
 domain. The battery voltage in the top bar is read again every minute.
 
 Under **Sweep** you set **Start**, **Stop** and **Points** and confirm with **Apply
@@ -124,7 +124,7 @@ reactance as the coil or capacitor it is at that frequency (**L / C**: 1 µH, 47
 and S21; if there are two, also the difference, handy for the bandwidth of a filter or
 the spacing between two resonances. Hovering over the L / C value gives Q (|X|/R) and the
 parallel form of the impedance, R ∥ L or C, for a parallel circuit or a trap. The buttons **min SWR**, **max S21** and **min S21** jump
-the active marker to that point.
+the active marker to that point; **clear** removes the active marker, **clear all** all four.
 
 Top right is a label that says what you are looking at: **CAL** (calibrated), **RAW**
 (uncorrected), **CAL\*** (some segments not calibrated), **GATED** (S11 is gated,
@@ -149,10 +149,11 @@ button to save it as PNG. Handy for documenting what the device itself was showi
 
 ## What is remembered
 
-On quitting, the following are saved: port, start, stop, points, average, sweep avg,
-segments, the calibration file and whether it is applied, the port extension, the view
-choices, TDR and gate settings, marker frequencies, **Connect at start**, the zoom and
-the window size. At the next start that all comes back;
+On quitting, the following are saved: port, start, stop, points, average, sweep avg and
+drop, segments, the calibration file and whether it is applied, the kit-fit settings, the
+port extension, the S21 offset, the view choices with the amateur bands and their region,
+the group delay aperture, TDR and gate settings, marker frequencies, the reference of the
+Δ trace, **Connect at start**, **Developer tools**, the zoom and the window size. At the next start that all comes back;
 the calibration file is loaded automatically and the markers are placed at the nearest
 frequency on the first sweep. The references are kept too, as files next to the settings.
 Not saved are the measurement data of the live trace.

@@ -10,7 +10,8 @@ Met `--json` geven de commando's `list`, `info`, `sweep`, `tdr` en `cal show` é
 JSON-document op stdout in plaats van een tabel, voor gebruik in scripts; voortgang en
 waarschuwingen blijven op stderr. Een sweep geeft elk punt als
 `{"freq_hz": …, "s11": [re, im], "s21": [re, im]}`, `tdr` de gevonden reflecties onder
-`peaks` en de hele curve onder `trace`.
+`peaks` en de hele curve onder `trace`, `cal show` de sprongen tussen naburige
+calibratiepunten onder `jumps`.
 
 ## list
 
@@ -98,7 +99,8 @@ Calibratiestandaarden meten in een bestand, of het bestand inspecteren en bewerk
 
 `--note "tekst"` bewaart een notitie in het bestand. Een onwaarschijnlijke
 standaardmeting geeft een WARNING op stderr. Korte vormen mogen ook: `thru` voor
-`through`, en `o`, `s`, `l`, `t` en `i` voor de eerste vijf standaarden.
+`through`, `isol` voor `isolation`, `line_open` en `line_short` met of zonder
+onderstreepje, en `o`, `s`, `l`, `t` en `i` voor de eerste vijf standaarden.
 
 ```bash
 vna-cli cal open --file cal/n-hf.cal.json --start 100k --stop 50M --points 1001
@@ -120,7 +122,7 @@ reflecties op met afstand, |Γ| en de impedantie erachter.
 | optie | betekenis |
 |---|---|
 | `--cal <bestand>` | sterk aanbevolen |
-| `--vf <0.1..1>` | verkortingsfactor, standaard 0,70 |
+| `--vf <factor>` | verkortingsfactor, standaard 0,70 |
 | `--window rectangular\|hann\|blackman\|kaiser6\|kaiser13` | standaard hann |
 | `--peaks <n>` | aantal reflecties, standaard 5 |
 | `--max-distance <m>` | niet verder kijken dan dit |

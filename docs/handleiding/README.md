@@ -13,7 +13,8 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
 1. [Inleiding: wat een VNA meet](01-inleiding.md). S11, S21, reflectiecoëfficiënt, SWR,
    impedantie, dB en fase, de Smith-chart, en hoe vna-r in elkaar zit.
 2. [Installeren en aansluiten](02-installeren.md). Bouwen op macOS en Linux, de USB-poort,
-   het eerste contact, wat het scherm van het apparaat doet tijdens een meting.
+   het eerste contact, wat het scherm van het apparaat doet tijdens een meting, de viewer
+   in de browser.
 3. [De GUI](03-gui.md). Menubalk, sweep, segmenten, weergaven, markers, middelen,
    instellingen die bewaard blijven.
 4. [Calibreren](04-calibreren.md). Waarom het moet, open/short/load/through stap voor stap,
@@ -30,9 +31,9 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
    en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, een
    probleem melden, wat je kunt vertrouwen.
 
-Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/08` de onderzoeks- en
+Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/09` de onderzoeks- en
 ontwikkelnotities: de USB-protocollen, het calibratiemodel met metingen, de TDR-wiskunde,
-de roadmap, en de doorlichting en testprocedure van versie 0.3.
+de roadmap, de doorlichting en testprocedure van versie 0.3, en de browserbouw.
 
 ## Conventies
 

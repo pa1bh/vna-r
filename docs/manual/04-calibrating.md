@@ -38,7 +38,8 @@ or you accept the error.
 A standard that is not right gives an orange warning: an open or short that reflects less
 than −8 dB is loose (a good open reads 0 dB on a LiteVNA and about −3 dB raw on a
 NanoVNA-F), a load above −10 dB is not connected or broken, a through below −6 dB
-is not attached to port 2. Take those seriously; a calibration with a loose standard
+is not attached to port 2, a line open or line short below −6 dB has no open or short at
+the far end. Take those seriously; a calibration with a loose standard
 "solves" but gives nonsense, and the measurement of the load afterwards still looks
 perfect because the load defines its own zero point.
 

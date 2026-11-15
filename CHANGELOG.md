@@ -12,6 +12,18 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Changed
+
+- README and both manuals brought up to date with 0.3.0–0.3.6 after a check against the
+  code: the README's feature list (bands, Band row, zoom, shared axis with reset view, sweep
+  from calibration, log spacing, drop, S21 offset, Kaiser windows, reconnecting, the
+  browser build, arm64 in CI); the manual gains the browser viewer (chapter 2), the clear
+  buttons, the TDR marker keys, the full list of remembered settings, the line open/short
+  warning, the shared TDR axis, the default file names and the calibration format number,
+  the `jumps` in `cal show --json` and the standard aliases. Corrected: the Windows folder
+  of the references is `%APPDATA%\vna-r\data`, the Touchstone comment does not mention
+  averaging, the menu entry is **Help ▸ About vna-r**.
+
 ## [0.3.6] - 2026-11-15
 
 Three Region 2 band edges set right after a check against the ARRL chart, and the arm64

@@ -30,6 +30,11 @@ before the reference plane. The lowest measured frequencies still shape the slow
 the step, so a poorly calibrated bottom end (see the warning in chapter 4) shows up as a
 tilt of the line rather than a shift.
 
+The two graphs share their distance axis: zoom or drag one and the other follows;
+**reset view** in the header, or a double-click, puts them back on their automatic
+scale. A click places the TDR marker, and the arrow keys move it (with shift, ten steps
+at a time).
+
 ![TDR of a 53 cm cable with a short: peak at 0.53 m, gate around it](../images/gui-tdr-gate.webp)
 
 ## Resolution and range

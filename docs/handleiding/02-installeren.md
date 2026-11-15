@@ -111,7 +111,7 @@ uitvoeren* start het programma. De Windows-build compileert en doorloopt de CI, 
 nog niet met een apparaat geprobeerd; meldingen zijn welkom. Poorten heten daar `COM3`
 en dergelijke; Windows 10 en later hebben het USB-seriële stuurprogramma voor de LiteVNA
 en de NanoVNA-F aan boord. Wat er per versie veranderd is staat in
-`CHANGELOG.md`; welke versie je draait zie je onder **Help ▸ About** of met
+`CHANGELOG.md`; welke versie je draait zie je onder **Help ▸ About vna-r** of met
 `vna-cli --version`.
 
 ## Aansluiten
@@ -161,3 +161,22 @@ oorspronkelijke sweep terug. Zijn bandbreedte stel je op het apparaat zelf in; h
 De seriële poort kan maar door één programma open zijn. Staat de GUI verbonden, dan geeft
 de CLI een foutmelding dat de poort bezet is; klik dan eerst op **Disconnect**. Hetzelfde
 geldt voor NanoVNA-Saver of een ander programma dat met het apparaat praat.
+
+## In de browser, zonder apparaat
+
+Dezelfde GUI is ook als WebAssembly te bouwen: een viewer voor Touchstone-bestanden (.s1p,
+.s2p) in een browsertab, met de Smith-chart, de grafieken, markers, referenties, TDR en
+gate, maar zonder alles wat een apparaat nodig heeft: geen poort, sweep of calibratie. De
+pagina opent met een voorbeeldmeting (de OCF-antenne uit hoofdstuk 6) en **Open as
+trace…** laadt je eigen bestand; dat blijft in de browser, er wordt niets geüpload. Hij
+staat nog nergens online; zelf bouwen vraagt eenmalig het Rust-doel en daarna één script:
+
+```bash
+rustup target add wasm32-unknown-unknown
+scripts/build-web.sh
+python3 -m http.server -d target/web 8080
+```
+
+Open daarna <http://localhost:8080>. De map `target/web` bevat drie statische bestanden,
+en dat is de hele site; kopieer ze naar een willekeurige webserver. De achtergrond staat
+in `docs/09-wasm-proef.md`.
