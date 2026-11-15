@@ -1,6 +1,7 @@
 # QC-procedure werklijst november 2026
 
-Stand: 14 november 2026: **0.3.5** is uitgebracht (Band-keuze met regio 2, een eerste
+Stand: 15 november 2026: **0.3.6** is uitgebracht (drie bandranden van regio 2 verbeterd na de
+ARRL-kaart van Steve Falco, en de Asahi-test in de README), na **0.3.5** (Band-keuze met regio 2, een eerste
 aarch64-linux-archief, dezelfde dag door PA1BH op Fedora Asahi Remix met een LiteVNA 64 gedraaid, en
 een snellere nix-taak in de CI), na
 **0.3.4** (acht kleine punten na NanoVNA-Saver,
@@ -31,7 +32,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.5>, uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.6>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de

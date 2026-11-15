@@ -12,6 +12,16 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-11-15
+
+Three Region 2 band edges set right after a check against the ARRL chart, and the arm64
+Linux archive confirmed on real hardware.
+
+Tried: the corrected table in the library tests only; the `aarch64-linux` archive of 0.3.5
+on Fedora Asahi Remix 44 (Apple M1) with a LiteVNA 64 (connect, calibrate, save, S11, S21,
+TDR, screenshot; the udev rule is needed). **Not tried**: the new edges on the screen,
+Windows, the NanoVNA-F.
+
 ### Changed
 
 - Amateur bands, Region 2: three edges corrected against the ARRL chart of January 2026:
