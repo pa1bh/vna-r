@@ -14,6 +14,10 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Changed
 
+- Amateur bands, Region 2: three edges corrected against the ARRL chart of January 2026:
+  60 m ends at 5406.3 kHz, 9 cm is 3300–3450 MHz, and 1.25 m has its 219–220 MHz piece
+  (fixed digital message forwarding only) next to 222–225 MHz. Reported by Steve Falco,
+  AC2XM, on groups.io.
 - README: the `aarch64-linux` archive of 0.3.5 has since been tried, on Fedora Asahi Remix 44
   (Apple M1) with a LiteVNA 64: connecting, calibrating, saving the calibration and measuring
   all worked. The 0.3.5 notes still say it was untried.
