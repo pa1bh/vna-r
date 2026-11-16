@@ -1,0 +1,64 @@
+# vna-server as a service: an analyser on USB, shared with the vna-r GUI over
+# the network (docs/manual/10-network.md). For a Raspberry Pi with a 64-bit
+# Raspberry Pi OS, or any Linux computer with systemd. From the unpacked
+# release archive:
+#
+#   sudo install -m 755 vna-server /usr/local/bin/
+#   sudo cp 70-litevna.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   sudo cp vna-server.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now vna-server
+#
+# Then the page is at http://<this computer>:8080/, and the log is
+# `journalctl -u vna-server -f`. Other options (--port, --name, --listen) go on
+# the ExecStart line below; `sudo systemctl edit --full vna-server` changes it.
+#
+# The serial port: the udev rule gives the analyser's port to the group
+# dialout (Debian, Raspberry Pi OS, Ubuntu and Fedora give ttyACM ports that
+# group anyway). The rule's uaccess tag only helps a person logged in at the
+# computer, not a service, so the service runs as a user of its own that
+# systemd makes up when it starts (DynamicUser) and puts in dialout. On Arch
+# the group is uucp: change SupplementaryGroups and the GROUP= of the rule.
+#
+# Stopping sends SIGTERM: the server lets go of the analyser first, so that a
+# LiteVNA leaves USB mode and gets its own screen back.
+
+[Unit]
+Description=vna-r server: a LiteVNA or NanoVNA on USB, for the vna-r GUI on the network
+Documentation=https://github.com/pa1bh/vna-r/blob/main/docs/manual/10-network.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/vna-server --listen 0.0.0.0:8080
+DynamicUser=yes
+SupplementaryGroups=dialout
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Hardening that leaves the serial port alone. Not PrivateDevices, which
+# would hide /dev/ttyACM*, and no device allow-list, which would have to
+# guess the port's name. DynamicUser already implies ProtectSystem=strict,
+# ProtectHome=read-only, PrivateTmp and NoNewPrivileges.
+CapabilityBoundingSet=
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+# Network for the clients; netlink and unix sockets for udev, which finds the port.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

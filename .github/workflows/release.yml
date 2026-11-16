@@ -1,11 +1,17 @@
 name: Release
 
-# Pushing a tag such as v0.2.0 builds vna-cli and vna-gui for Linux (x86_64 and
-# aarch64), macOS (Apple Silicon and Intel) and Windows and attaches archives to a
-# GitHub release. These are plain dynamically linked binaries: on Linux they need
-# libudev from the distribution and a desktop portal for the file dialogs (not for
-# NixOS; use the flake there).
+# Pushing a tag such as v0.2.0 builds vna-cli, vna-gui and vna-server for Linux
+# (x86_64 and aarch64), macOS (Apple Silicon and Intel) and Windows and attaches
+# archives to a GitHub release. These are plain dynamically linked binaries: on
+# Linux they need libudev from the distribution and a desktop portal for the file
+# dialogs (not for NixOS; use the flake there).
 # Nothing is code-signed; the manual explains Gatekeeper and SmartScreen.
+#
+# The browser build is made once, in the job `web`, and handed to every platform
+# job, whose vna-server embeds it (VNA_R_WEB_DIR, see crates/vna-server/build.rs).
+# Building it on each of the five runners would install the wasm32 target and
+# build wasm-bindgen-cli five times over for the same three files. The same
+# files are also attached on their own, for putting the page on a website.
 
 on:
   push:
@@ -15,8 +21,46 @@ permissions:
   contents: write
 
 jobs:
+  web:
+    name: browser build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: web
+
+      - name: Build the browser build
+        # Writes target/web; builds wasm-bindgen-cli into target/web-tools first.
+        run: scripts/build-web.sh
+
+      - name: Package the page for a website
+        run: |
+          name=vna-r-${GITHUB_REF_NAME}-web
+          cp -r target/web "$name"
+          zip -r "$name.zip" "$name"
+          sha256sum "$name.zip" > "$name.zip.sha256"
+          ls -l "$name.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: target/web/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-archive
+          path: |
+            vna-r-*-web.zip
+            vna-r-*-web.zip.sha256
+
   build:
     name: ${{ matrix.target }}
+    needs: web
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -65,8 +109,16 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: web
+
       - name: Build
         shell: bash
+        env:
+          # vna-server embeds the page from here; the build fails if it is incomplete.
+          VNA_R_WEB_DIR: ${{ github.workspace }}/web
         run: |
           if [ -n "${{ matrix.cargo_target }}" ]; then
             cargo build --workspace --release --target "${{ matrix.cargo_target }}"
@@ -86,13 +138,13 @@ jobs:
           cp README.md CHANGELOG.md LICENSE "$name"/
           cp -r docs/manual docs/handleiding docs/images "$name/docs/"
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "$bin/vna-cli.exe" "$bin/vna-gui.exe" "$name"/
+            cp "$bin/vna-cli.exe" "$bin/vna-gui.exe" "$bin/vna-server.exe" "$name"/
             7z a -tzip "$name.zip" "$name" > /dev/null
             sha256sum "$name.zip" > "$name.zip.sha256"
           else
-            cp "$bin/vna-cli" "$bin/vna-gui" "$name"/
+            cp "$bin/vna-cli" "$bin/vna-gui" "$bin/vna-server" "$name"/
             if [ "${{ runner.os }}" = "Linux" ]; then
-              cp linux/70-litevna.rules "$name"/
+              cp linux/70-litevna.rules linux/vna-server.service "$name"/
             fi
             tar czf "$name.tar.gz" "$name"
             shasum -a 256 "$name.tar.gz" > "$name.tar.gz.sha256"
@@ -108,7 +160,7 @@ jobs:
             vna-r-*.sha256
 
   release:
-    needs: build
+    needs: [web, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +177,12 @@ jobs:
           cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          # The archives only: dist also holds the loose files of the artifact
+          # `web`, which the platform jobs built into vna-server.
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
           # The changelog section is the release text; no auto-generated notes under it.
           body_path: notes.md
           generate_release_notes: false

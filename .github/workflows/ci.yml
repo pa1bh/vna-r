@@ -120,4 +120,5 @@ jobs:
         run: |
           ./result/bin/vna-cli --help
           ./result/bin/vna-cli list
+          ./result/bin/vna-server --version
           ls -l ./result/lib/udev/rules.d/

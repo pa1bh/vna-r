@@ -61,11 +61,16 @@
             # build.rs shows this in About and --version; the store copy has no .git.
             VNA_R_GIT_REV = self.shortRev or self.dirtyShortRev or "unknown";
 
-            # The tests need no hardware.
+            # The tests need no hardware. Those of vna-server start a server on
+            # 127.0.0.1, which the macOS sandbox only allows when asked.
             doCheck = true;
+            __darwinAllowLocalNetworking = true;
 
             # Ship the udev rule so `services.udev.packages = [ vna-r ]` works on NixOS,
-            # and give the GUI the graphics libraries on its search path.
+            # and give the GUI the graphics libraries on its search path. vna-server
+            # is installed like the other two, but without the browser build (that
+            # needs the wasm32 target and wasm-bindgen, which this build does not
+            # have): its page says so, and the vna-r program can still connect to it.
             postInstall = lib.optionalString stdenv.hostPlatform.isLinux ''
               install -Dm644 linux/70-litevna.rules $out/lib/udev/rules.d/70-litevna.rules
               wrapProgram $out/bin/vna-gui --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibs}
@@ -91,6 +96,7 @@
           default = { type = "app"; program = "${pkg}/bin/vna-gui"; };
           vna-gui = { type = "app"; program = "${pkg}/bin/vna-gui"; };
           vna-cli = { type = "app"; program = "${pkg}/bin/vna-cli"; };
+          vna-server = { type = "app"; program = "${pkg}/bin/vna-server"; };
         });
 
       devShells = forAll (pkgs:
