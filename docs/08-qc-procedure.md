@@ -1,6 +1,7 @@
 # QC-procedure werklijst november 2026
 
-Stand: 15 november 2026: **0.3.6** is uitgebracht (drie bandranden van regio 2 verbeterd na de
+Stand: 16 november 2026: **0.4.0** is uitgebracht (meten via het netwerk: `vna-server`, de
+pagina in de browser die meet, en Device ▸ Add server… in het programma), na **0.3.6** (drie bandranden van regio 2 verbeterd na de
 ARRL-kaart van Steve Falco, en de Asahi-test in de README), na **0.3.5** (Band-keuze met regio 2, een eerste
 aarch64-linux-archief, dezelfde dag door PA1BH op Fedora Asahi Remix met een LiteVNA 64 gedraaid, en
 een snellere nix-taak in de CI), na
@@ -12,8 +13,8 @@ het logboek. **0.3.0** kwam na de release candidates 0.3.0-rc.1
 (vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
 het eerste deel van de QC op macOS met de LiteVNA 67), en na een ronde met de NanoVNA-F
 op NixOS en macOS. Wat getest is, wat gevonden is en wat nog openstaat, staat in het
-logboek hieronder. Op 16 november kwam daar het meten via het netwerk bij (punt 72), gebouwd op een
-branch en nog niet met een apparaat nagelopen: zie "Ronde client/server" onderaan. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+logboek hieronder. Op 16 november kwam daar het meten via het netwerk bij (punt 72), dezelfde dag
+gebouwd, met de LiteVNA 67, de NanoVNA-F en een Raspberry Pi nagelopen en uitgebracht als 0.4.0: zie "Ronde client/server" onderaan. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
 
@@ -33,7 +34,7 @@ cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.2.5
 ```
 
 Op een andere machine neem je in plaats van de eerste twee regels het archief van de
-release: <https://github.com/pa1bh/vna-r/releases/tag/v0.3.6>, uitpakken
+release: <https://github.com/pa1bh/vna-r/releases/tag/v0.4.0>, uitpakken
 zoals in hoofdstuk 2 van de handleiding en de map in je PATH zetten.
 
 De eerste regel bouwt wat je test; de tweede maakt dat `vna-cli` en `vna-gui` in de
@@ -1327,7 +1328,9 @@ Meten via het netwerk: `vna-server`, de pagina in de browser die meet, en **Devi
 server…** in het programma. Het ontwerp en wat er gebouwd is staan in
 [docs/10-client-server.md](10-client-server.md), de gebruikerskant in hoofdstuk 10 van de
 handleiding. Gebouwd op 16 november op de branch `feature/client-server`, een commit per
-onderdeel, nog niet in `main` en niet uitgebracht.
+onderdeel; dezelfde dag naar `main` gegaan en uitgebracht als 0.4.0, nadat het logboek
+hieronder liet zien dat het programma zoals het was nog werkt (de kabeltest) en dat de
+server met echte apparaten doet wat hij moet doen.
 
 Wat ik zelf gecontroleerd heb: `cargo fmt`, `cargo clippy -D warnings` op native en op
 wasm32, alle tests (103 in de library, 10 in de GUI, 39 in `vna-link`, 23 in
@@ -1348,7 +1351,6 @@ is alleen met hardware te zien.
 ## Voorbereiding
 
 ```bash
-git switch feature/client-server
 scripts/build-web.sh
 cargo build --workspace --release
 export PATH="$PWD/target/release:$PATH"

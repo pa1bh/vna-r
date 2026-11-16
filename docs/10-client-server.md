@@ -1,11 +1,11 @@
 # Client en server: een VNA aan een Raspberry Pi, de GUI in de browser
 
-Stand: 16 november 2026. Dit begon die dag als ontwerpnotitie en is dezelfde dag gebouwd,
-op de branch `feature/client-server` (werklijstpunt 72). Het ontwerp hieronder staat er
-zoals het geschreven is; wat er gebouwd is en waar dat van het ontwerp afwijkt staat in
-het hoofdstuk "Gebouwd" direct hierna. Getest met een gesimuleerd apparaat; de QC met een
-LiteVNA en een NanoVNA-F staat in [docs/08](08-qc-procedure.md) onder "Ronde
-client/server" en is nog niet gedaan.
+Stand: 16 november 2026. Dit begon die dag als ontwerpnotitie, is dezelfde dag gebouwd
+(werklijstpunt 72), naar `main` gegaan en uitgebracht als **0.4.0**. Het ontwerp hieronder
+staat er zoals het geschreven is; wat er gebouwd is en waar dat van het ontwerp afwijkt
+staat in het hoofdstuk "Gebouwd" direct hierna. Wat met een LiteVNA, een NanoVNA-F en een
+Raspberry Pi gezien is, en wat nog niet, staat in het logboek in
+[docs/08](08-qc-procedure.md) onder "Ronde client/server".
 
 De vraag was hoeveel werk een client/server-model is en of het haalbaar is: een "server"
 op een Raspberry Pi met de VNA aan de USB-poort, en de bestaande browserbouw van de GUI
@@ -19,8 +19,8 @@ verandert. Hoe dat past staat onder "Een server is een poort".
 
 ## Gebouwd
 
-Op de branch `feature/client-server`, een commit per onderdeel, in de volgorde van de
-stappen uit "Werk, in stappen". Voor de gebruiker staat het in hoofdstuk 10 van de handleiding
+Een commit per onderdeel (op de branch `feature/client-server`, die na het mergen is
+opgeruimd), in de volgorde van de stappen uit "Werk, in stappen". Voor de gebruiker staat het in hoofdstuk 10 van de handleiding
 ([Nederlands](handleiding/10-netwerk.md), [Engels](manual/10-network.md)).
 
 | Onderdeel | Waar | Wat |

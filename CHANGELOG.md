@@ -12,6 +12,26 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-16
+
+Measuring over the network. A new program, `vna-server`, shares the analyser on its USB
+port; you measure from a browser, with the page the server serves, or from the program
+with **Device ▸ Add server…**. For someone who never uses a server the program gains that
+one menu item and nothing else.
+
+Tried: with the LiteVNA 67 on macOS, the program as it was (the device thread moved to a
+crate of its own): sweeps, and the cable pulled during a sweep, which is reported and
+picked up again. With the NanoVNA-F on macOS: S21, also above 280 MHz. `vna-server` on
+macOS with the LiteVNA 67, and on a Raspberry Pi 4 (Raspberry Pi OS on Debian 13, built on
+the Pi) as the systemd service with a NanoVNA-F; the program and a Chromium browser as
+its clients, two viewers at once, a server that restarts under a running sweep. **Not
+tried**: the archives of this release, whose workflow builds `vna-server` and the browser
+page for the first time; the page that measures in Safari, in Firefox and on a phone; a
+LiteVNA on a Raspberry Pi (a LiteVNA 64 kept dropping off the USB of a Pi 4, which reported
+over-current; a keyboard and the NanoVNA-F on the same port did not, so it is likely what
+the LiteVNA draws while it charges, and a powered hub its cure); pulling the analyser's
+cable out of a server; Linux and Windows as server or client; the Nix package.
+
 ### Added
 
 - Measuring over the network. `vna-server` runs on a computer with the analyser on its USB

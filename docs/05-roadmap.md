@@ -358,7 +358,7 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 69 | Grafieken delen hun frequentie-as (TDR: afstand-as) en een knop **reset view** zet alles terug op automatisch; wens van PA1BH na de QC van 13 november | S | gedaan 2026-11-13 |
 | 70 | Knop **sweep from calibration** in het calibratiepaneel: start, stop en punten op het raster van de calibratie en toepassen; wens van PA1BH | S | gedaan 2026-11-13 |
 | 71 | **Band** in het sweeppaneel: start en stop op een amateurband met 10 % marge, sweep toepassen; bandentabel voor IARU-regio 2 en een regiokeuze onder View ▸ Amateur bands; wens van Steve Falco (groups.io) | S | gedaan 2026-11-13 |
-| 72 | Meten via het netwerk: `vna-server` deelt een analyzer aan USB (een Raspberry Pi bijvoorbeeld), de browserbouw en het programma verbinden ermee over een WebSocket; een gesimuleerd apparaat om zonder analyzer te werken. Ontwerp in [docs/10](10-client-server.md), wens van PA1BH | L | gebouwd 2026-11-16 op de branch `feature/client-server`; QC met apparaten open, zie [docs/08](08-qc-procedure.md) "Ronde client/server" |
+| 72 | Meten via het netwerk: `vna-server` deelt een analyzer aan USB (een Raspberry Pi bijvoorbeeld), de browserbouw en het programma verbinden ermee over een WebSocket; een gesimuleerd apparaat om zonder analyzer te werken. Ontwerp in [docs/10](10-client-server.md), wens van PA1BH | L | gedaan 2026-11-16 en uitgebracht in 0.4.0; wat met apparaten gezien is en wat niet staat in [docs/08](08-qc-procedure.md) "Ronde client/server" |
 
 ## Open
 
