@@ -26,7 +26,8 @@ omdat het moeizaamst verworven deel (de oude FIFO-records, het herverbinden na U
 de aanloopscan van de NanoVNA-F) niet wordt aangeraakt.
 
 De grootste valkuil is geen Rust maar de browser. WebGPU is er niet overal, ook niet op
-https, dus de terugval naar WebGL moet werken, en die is nooit gezien. En een pagina op
+https, dus de terugval naar WebGL moet werken. Dat doet hij: geprobeerd op 16 november,
+zonder een regel code te veranderen. En een pagina op
 https mag alleen in Chrome met een Pi over http praten. Daarom twee ingangen naast
 elkaar: de Pi serveert de pagina zelf, en dezelfde pagina staat op de eigen website. Zie
 "De browser: WebGL, https en twee ingangen".
@@ -247,7 +248,13 @@ getest. De bronnen staan onderaan dit hoofdstuk.
 De browserbouw tekent via wgpu. Dat kent in de browser twee wegen: WebGPU als de browser
 het heeft, anders WebGL2. Het omschakelen gebeurt vanzelf bij het starten. eframe 0.37
 bouwt standaard alleen wgpu mee (de eigen OpenGL-renderer `glow` zit er niet in), dus die
-terugval is al deel van de huidige build. Docs/09 meldt dat hij nooit is gezien.
+terugval is al deel van de huidige build.
+
+**Geprobeerd op 16 november** (branch `spike/webgl-fallback`, verslag in docs/09 onder
+Getest): dezelfde build over http op een LAN-adres, dus zonder veilige context. De
+renderer is dan `Gl` op WebGL 2.0 in plaats van `BrowserWebGpu`; de voorbeeldmeting,
+markers, TDR, zoomen en slepen werken en het beeld is gelijk aan dat met WebGPU. Dat was
+in Chromium op een Mac. Firefox, Safari en een echte telefoon of tablet zijn niet gezien.
 
 Voor vna-r maakt het in beeld en snelheid geen verschil: het programma tekent 2D (lijnen,
 tekst, een Smith-chart) en WebGPU levert pas iets op bij zwaar 3D-werk of rekenen op de
@@ -272,7 +279,7 @@ telefoon en de tablet in de tuin zijn juist waar dit ontwerp voor is.
 De keuze die wel bestaat is welke WebGL-weg: de terugval van wgpu, of voor de webbouw de
 `glow`-renderer van egui. Die tweede geeft naar verwachting een kleinere download (niet
 gemeten) en is in browsers de oudste weg van egui, maar het is een tweede renderer naast
-wgpu op native. Eerst de terugval proberen; werkt die goed, dan verandert er niets.
+wgpu op native. De terugval werkt, dus er verandert niets: de webbouw blijft op wgpu.
 
 ### Een https-pagina en een Pi over http
 
@@ -373,10 +380,15 @@ kunnen als eigen release uit voordat de server bestaat.
 
 - Formaat van het protocol: postcard (compact) of JSON (leesbaar). Neiging: JSON voor de
   eerste versie, om de debugbaarheid; wisselen is later één regel per kant.
-- Werkt de WebGL-terugval van wgpu goed genoeg, of wordt de webbouw `glow`? Dit is het
-  eerste om te proberen, nog voor stap 1: het beslist of de rest zin heeft. De proef is
-  klein: de bestaande build openen vanaf een andere computer over http op een LAN-adres,
-  of in Firefox op Linux.
+- ~~Werkt de WebGL-terugval van wgpu goed genoeg, of wordt de webbouw `glow`?~~ Ja,
+  geprobeerd op 16 november in Chromium op een Mac; de webbouw blijft op wgpu. Nog te
+  doen: dezelfde pagina op een echte telefoon en tablet (Safari op iOS, Chrome op Android)
+  en in Firefox.
+- De indeling op een telefoon. Rechtop (375 punten breed) vult het zijpaneel het hele
+  scherm en zijn de grafieken niet te zien; dwars is het krap. Voor "afregelen vanaf een
+  telefoon in de tuin" moet het zijpaneel op een smal scherm kunnen inklappen of onder de
+  grafieken komen. Dat staat los van de server en van de renderer, en het raakt de
+  interface van het programma: een eigen besluit.
 - Doet de uitzondering van Chrome wat de documentatie zegt, met een naam op `.local` en
   met een IP-adres, ook op Android? En wat doen Safari en Firefox precies met `ws://`
   naar `localhost` en naar het LAN? Proberen zodra er een server is.

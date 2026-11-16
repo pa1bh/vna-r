@@ -83,7 +83,8 @@ staan in `localStorage` van de browser van de bezoeker.
 Waar de webserver voor moet zorgen:
 
 - **https.** WebGPU bestaat alleen in een veilige context (https of localhost). Over
-  gewoon http valt de pagina terug op WebGL, en die terugval is niet getest.
+  gewoon http valt de pagina terug op WebGL. Dat werkt (gezien op 16 november, zie
+  Getest), dus https is voor de viewer wenselijk maar niet nodig.
 - **Compressie.** Met brotli is de wasm 2,3 MB, met gzip 3,5 MB, zonder 11,6 MB. De meeste
   servers comprimeren `application/wasm` niet uit zichzelf; zet het aan of zet een
   vooraf gecomprimeerd bestand ernaast als de server dat kan aanbieden.
@@ -171,9 +172,42 @@ zoals bij een eerste bezoek:
   calibratie of Quit;
 - de pagina laadt de twee bestanden via de adressen met de vingerafdruk.
 
-**Niet getest:** Edge, Firefox en Safari; opslaan in een gewone browser (de download
-zelf); de terugval naar WebGL (zit erin via `egui-wgpu`, maar is niet gezien); Windows en
-Linux; een telefoon of een smal venster (de zin in de bovenbalk is lang); een echte
+Op 16 november **de terugval naar WebGL**, als proef voor docs/10 (branch
+`spike/webgl-fallback`), weer in de ingebouwde browser (Chromium) op macOS, op een Mac met
+een M5 Pro. Dezelfde build, zonder een regel code te veranderen, geserveerd met
+`python3 -m http.server` en geopend op twee adressen:
+
+| | `http://localhost:8080` | `http://192.168.3.235:8080` (LAN-adres) |
+|---|---|---|
+| veilige context | ja | nee |
+| `navigator.gpu` | aanwezig | afwezig |
+| renderer volgens het programma | `BrowserWebGpu` | `Gl`, ANGLE (Metal), WebGL 2.0 (OpenGL ES 3.0 Chromium) |
+
+Op het LAN-adres meldt `egui-wgpu` in de console dat WebGPU alleen in een veilige context
+bestaat en start wgpu op WebGL 2. Wat daarmee is gezien:
+
+- de voorbeeldmeting: Smith-chart, log mag, SWR en fase, tekst en lijnen zoals met
+  WebGPU (naast elkaar gelegd op hetzelfde vensterformaat, geen verschil te zien);
+- een marker plaatsen in de SWR-grafiek: de uitlezing en de markering in alle vier de
+  grafieken;
+- **TDR** en terug naar Frequency;
+- zoomen met het scrollwiel en slepen in een grafiek;
+- het venster van formaat veranderen, ook naar telefoonformaat (375×812 en 812×375);
+- frametijden tijdens die handelingen: mediaan 8,3 ms, 99e percentiel 9,4 ms, dus het
+  tempo van het scherm (120 Hz). Voor WebGPU is dat niet vergeleken: het browserpaneel
+  stond toen verborgen en werd afgeknepen.
+
+De terugval werkt dus zonder ingreep, en er is geen reden om voor de browserbouw op een
+andere renderer (`glow`) over te stappen.
+
+Een bevinding die niets met de renderer te maken heeft: op telefoonformaat rechtop (375
+punten breed) vult het zijpaneel het hele scherm en zijn de grafieken niet te zien. Dwars
+(812×375) staan de Smith-chart en één grafiek er, krap. De indeling is voor een telefoon
+dus nog niet bruikbaar.
+
+**Niet getest:** Edge, Firefox en Safari (dus ook WebGL in die browsers en op een echte
+telefoon of tablet); opslaan in een gewone browser (de download zelf); Windows en
+Linux; aanraken op een echt aanraakscherm; een echte
 webserver met https en compressie. Het native programma is na het verhuizen van de balk
 en het zijpaneel gebouwd, getest en met clippy nagekeken, maar niet opnieuw bekeken met
 een apparaat eraan.
