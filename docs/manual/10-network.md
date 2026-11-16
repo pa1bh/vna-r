@@ -112,6 +112,10 @@ They all see the same analyser:
 
 - Everyone can steer. Press **Run** in one browser, and the others see their **Stop**
   button appear and the same sweep come in; anyone can press Stop.
+- Everyone has their own sweep settings, and the analyser does what was asked last. So the
+  trace you see can be of someone else's sweep: it then runs over their frequencies and
+  points, not over what your own Start and Stop fields say. Press **Run** or **Single**
+  yourself and the analyser measures with your settings again, for everyone.
 - Everyone has their own calibration. The server passes on raw measurements only; the
   calibration is applied in each program or browser. When you measure a standard, only you
   get the result.

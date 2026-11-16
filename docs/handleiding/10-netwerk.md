@@ -113,6 +113,11 @@ door elkaar. Ze zien allemaal dezelfde analyzer:
 
 - Iedereen kan sturen. Druk in de ene browser op **Run**, en bij de anderen verschijnt de
   knop **Stop** en komt dezelfde sweep binnen; iedereen kan op Stop drukken.
+- Iedereen heeft zijn eigen sweepinstellingen, en de analyzer doet wat het laatst gevraagd
+  is. Het spoor dat je ziet kan dus van de sweep van een ander zijn: het loopt dan over
+  diens frequenties en punten, niet over wat er in je eigen velden Start en Stop staat.
+  Druk zelf op **Run** of **Single** en de analyzer meet weer met jouw instellingen, voor
+  iedereen.
 - Iedereen heeft zijn eigen calibratie. De server geeft alleen ruwe metingen door; de
   calibratie wordt in elk programma of elke browser zelf toegepast. Meet jij een
   standaard, dan krijg alleen jij het resultaat.
