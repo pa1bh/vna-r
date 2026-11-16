@@ -6,7 +6,6 @@
 
 mod app;
 mod smith;
-mod worker;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Arc;
@@ -17,7 +16,7 @@ use eframe::egui_wgpu::{wgpu, WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     // `RUST_LOG=info` shows eframe's and wgpu's choices (adapter, backend) on stderr.
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn,vna_gui=info")).init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn,vna_gui=info,vna_link=info")).init();
     let mut wgpu_setup = WgpuSetupCreateNew::without_display_handle();
     wgpu_setup.native_adapter_selector = Some(Arc::new(pick_adapter));
     let options = eframe::NativeOptions {

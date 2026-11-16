@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 // `Instant` from std panics in a browser; web-time is std itself on native.
 use web_time::{Duration, Instant};
 
@@ -23,9 +24,9 @@ use litevna::traces::{
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
+use vna_link::{Cmd, Event, Purpose, WorkerHandle};
 
 use crate::smith::SmithChart;
-use crate::worker::{self, Cmd, Event, Purpose, WorkerHandle};
 
 mod calibration;
 mod diagnostics;
@@ -293,7 +294,8 @@ enum View {
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::dark());
-        let worker = worker::spawn(cc.egui_ctx.clone());
+        let ctx = cc.egui_ctx.clone();
+        let worker = vna_link::spawn(Arc::new(move || ctx.request_repaint()));
         let mut app = App {
             worker,
             ports: Vec::new(),

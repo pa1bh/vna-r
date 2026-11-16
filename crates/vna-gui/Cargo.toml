@@ -17,6 +17,7 @@ workspace = true
 
 [dependencies]
 litevna = { path = "../litevna" }
+vna-link = { path = "../vna-link" }
 num-complex = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }

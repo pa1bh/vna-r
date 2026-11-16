@@ -3950,8 +3950,17 @@ dependencies = [
  "rfd",
  "ron",
  "serde",
+ "vna-link",
  "wasm-bindgen-futures",
  "web-time",
+]
+
+[[package]]
+name = "vna-link"
+version = "0.3.6"
+dependencies = [
+ "litevna",
+ "log",
 ]
 
 [[package]]

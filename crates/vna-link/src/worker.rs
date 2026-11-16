@@ -1,7 +1,8 @@
 //! The device lives on its own thread: serial I/O blocks, the UI must not.
 //!
 //! The UI sends [`Cmd`]s and receives [`Event`]s over channels. After every
-//! event the worker asks egui to repaint, so the UI never has to poll.
+//! event the worker calls the [`Notify`] it was spawned with (the GUI asks
+//! egui to repaint there), so the UI never has to poll.
 //!
 //! A sweep can take long (a NanoVNA-F does about 115 points/s). While one
 //! runs, the worker looks at the command queue after every block of data the
@@ -24,6 +25,7 @@
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -104,18 +106,22 @@ pub enum Event {
     },
 }
 
+/// Called by the worker after every event it sends, from the worker thread.
+/// It must return quickly: during a sweep it runs once per block of data.
+pub type Notify = Arc<dyn Fn() + Send + Sync>;
+
 pub struct WorkerHandle {
     pub tx: Sender<Cmd>,
     pub rx: Receiver<Event>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spawn(ctx: egui::Context) -> WorkerHandle {
+pub fn spawn(notify: Notify) -> WorkerHandle {
     let (cmd_tx, cmd_rx) = channel::<Cmd>();
     let (evt_tx, evt_rx) = channel::<Event>();
     thread::Builder::new()
         .name("litevna-worker".into())
-        .spawn(move || run(cmd_rx, evt_tx, ctx))
+        .spawn(move || run(cmd_rx, evt_tx, notify))
         .expect("spawn worker thread");
     WorkerHandle { tx: cmd_tx, rx: evt_rx }
 }
@@ -123,7 +129,7 @@ pub fn spawn(ctx: egui::Context) -> WorkerHandle {
 /// The browser build: a handle nobody listens to. Commands are dropped and no
 /// event ever arrives, so the program stays "not connected".
 #[cfg(target_arch = "wasm32")]
-pub fn spawn(_ctx: egui::Context) -> WorkerHandle {
+pub fn spawn(_notify: Notify) -> WorkerHandle {
     let (cmd_tx, _) = channel::<Cmd>();
     let (_, evt_rx) = channel::<Event>();
     WorkerHandle { tx: cmd_tx, rx: evt_rx }
@@ -242,7 +248,7 @@ struct Worker {
     /// Commands read from `cmds` while a sweep ran, to be handled in order after it.
     backlog: VecDeque<Cmd>,
     events: Sender<Event>,
-    ctx: egui::Context,
+    notify: Notify,
 }
 
 /// A command after which the result of a running sweep is no longer wanted.
@@ -262,7 +268,7 @@ fn interrupts(cmd: &Cmd) -> bool {
     )
 }
 
-fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
+fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify) {
     let mut w = Worker {
         dev: None,
         port: None,
@@ -273,7 +279,7 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
         cmds,
         backlog: VecDeque::new(),
         events,
-        ctx,
+        notify,
     };
     loop {
         // First what arrived during the last sweep. Then: only peek when
@@ -319,7 +325,7 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, ctx: egui::Context) {
 impl Worker {
     fn emit(&self, e: Event) {
         let _ = self.events.send(e);
-        self.ctx.request_repaint();
+        (self.notify)();
     }
 
     /// A failure that ends continuous sweeping (sweep, connect).
@@ -545,7 +551,7 @@ impl Worker {
                     cmds,
                     backlog,
                     events,
-                    ctx,
+                    notify,
                     ..
                 } = self;
                 let d = dev.as_mut().expect("checked above");
@@ -554,7 +560,7 @@ impl Worker {
                         done: before + done,
                         total,
                     });
-                    ctx.request_repaint();
+                    notify();
                     while let Ok(c) = cmds.try_recv() {
                         let stop = interrupts(&c);
                         backlog.push_back(c);
@@ -636,7 +642,7 @@ mod tests {
         assert_eq!(settle_for(u8::MAX), SETTLE_MAX);
     }
 
-    /// With a device: `VNA_R_TEST_PORT=/dev/… cargo test -p vna-gui -- --ignored --nocapture hardware_session`.
+    /// With a device: `VNA_R_TEST_PORT=/dev/… cargo test -p vna-link -- --ignored --nocapture hardware_session`.
     /// Sweeps continuously for `VNA_R_TEST_SECONDS` (default 20), stops, sits
     /// idle for five seconds and does a single sweep, printing every event.
     /// Untouched, the link must hold. With `VNA_R_EXPECT_DROP=1` pull the
@@ -648,7 +654,7 @@ mod tests {
         let port = std::env::var("VNA_R_TEST_PORT").expect("VNA_R_TEST_PORT");
         let secs: u64 = std::env::var("VNA_R_TEST_SECONDS").ok().and_then(|s| s.parse().ok()).unwrap_or(20);
         let expect_drop = std::env::var("VNA_R_EXPECT_DROP").is_ok();
-        let w = spawn(egui::Context::default());
+        let w = spawn(Arc::new(|| {}));
         let t0 = Instant::now();
         let stamp = |t0: Instant| format!("{:6.1}s", t0.elapsed().as_secs_f32());
         let sweep = |continuous| Cmd::Sweep {

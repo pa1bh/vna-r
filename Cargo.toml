@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/litevna", "crates/vna-cli", "crates/vna-gui"]
+members = ["crates/litevna", "crates/vna-cli", "crates/vna-gui", "crates/vna-link"]
 
 [workspace.package]
 version = "0.3.6"

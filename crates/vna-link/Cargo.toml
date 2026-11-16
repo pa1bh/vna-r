@@ -1,0 +1,15 @@
+[package]
+name = "vna-link"
+version.workspace = true
+description = "The device thread shared by the vna-r GUI and server: commands in, events out"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+litevna = { path = "../litevna" }
+log = { workspace = true }

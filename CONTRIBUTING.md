@@ -27,7 +27,8 @@ complete shell. No test needs a device.
 |---|---|
 | `crates/litevna` | The library. No UI, no `anyhow`; errors are `litevna::Error`. |
 | `crates/vna-cli` | Command line tool; thin, argument parsing and printing. |
-| `crates/vna-gui` | egui/eframe GUI. `app/` is the state and the panels (see below), `worker.rs` the device thread, `smith.rs` the Smith chart. |
+| `crates/vna-gui` | egui/eframe GUI. `app/` is the state and the panels (see below), `smith.rs` the Smith chart. |
+| `crates/vna-link` | The device thread (`worker.rs`): takes `Cmd`s, sends `Event`s. No egui, so a server can use it too. |
 | `crates/build_git_rev.rs` | Build script shared by the two binaries (git revision for About and `--version`). |
 | `docs/manual`, `docs/handleiding` | The user manual, English and Dutch, chapter for chapter the same. |
 | `docs/01` … `docs/10` | Research notes, roadmap, analysis, QC procedure and design notes, in Dutch. |
@@ -44,8 +45,8 @@ Inside the library, from the wire upwards:
   `traces` (dB, SWR, impedance, group delay), `touchstone` (files) and `freq` (parsing
   `14.2M`) are pure maths on `SweepResult` and know nothing about devices.
 
-The GUI keeps all serial I/O on the worker thread. The UI sends `worker::Cmd` and gets
-`worker::Event`; nothing under `app/` may block on the device.
+The GUI keeps all serial I/O on the worker thread of `vna-link`. The UI sends
+`vna_link::Cmd` and gets `vna_link::Event`; nothing under `app/` may block on the device.
 
 `app/mod.rs` holds the `App` struct, the constants, the frame (top bar, menu bar, side
 panel) and the handling of worker events. The rest of `impl App` is spread over

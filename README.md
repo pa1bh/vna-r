@@ -228,6 +228,7 @@ and paste the result. For CLI problems, the output with `--trace` helps.
 | `crates/litevna` | Library: LiteVNA register protocol and NanoVNA text shell, port discovery, SOLT calibration with kit fit and interpolation, trace maths, TDR and gating, Touchstone. No UI. |
 | `crates/vna-cli` | Command line tool on top of the library. |
 | `crates/vna-gui` | Desktop GUI (egui/eframe). |
+| `crates/vna-link` | The thread that owns the device for the GUI: commands in, events out. |
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) checks formatting and clippy, builds and
 tests on Ubuntu (x86_64 and arm64), macOS and Windows, builds the browser version for wasm32
