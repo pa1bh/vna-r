@@ -1684,10 +1684,19 @@ het punt waar het in deze ronde om ging: de draad die het apparaat bedient is ve
 PA1BH deed daarnaast een aantal gewone proeven, lokaal en met de CLI op de Pi: geen
 bijzonderheden.
 
-**Niet gedaan:** de NanoVNA-F rechtstreeks aan de Mac en met een doorverbinding tussen de
-poorten (of S21 boven 280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel
-van een analyzer uit de server trekken (E4), de pagina die meet in Safari, Firefox en op
-een telefoon, en de rest van deel C in het venster.
+**De NanoVNA-F rechtstreeks aan de Mac, door PA1BH (A2): in orde.** Sweeps met S21 gaan
+goed, ook op de hogere frequenties. De aanloopscan, die deze firmware nodig heeft om S21
+boven 280 MHz te houden, doet dus ook na de verhuizing van de worker zijn werk.
+
+Daarmee is gedaan wat vóór het mergen naar `main` nodig was: de kabeltest met de LiteVNA
+67, en de NanoVNA-F over de eigen USB.
+
+**Niet gedaan, en geen bezwaar tegen mergen:** de kabel van een analyzer uit de server
+trekken (E4), de pagina die meet in Safari, Firefox en op een telefoon (D1, D6), de rest
+van deel C in het venster, de LiteVNA 64 aan de Pi met een volle accu of een hub, en
+bevinding 4 (de server bij een apparaat dat komt en gaat), die is uitgesteld. De
+release-workflow draait pas bij een tag en is nog nooit gedraaid: een release candidate
+test hem.
 
 ## Bevindingen tijdens het bouwen
 
