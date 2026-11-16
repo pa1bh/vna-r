@@ -28,7 +28,7 @@ complete shell. No test needs a device.
 | `crates/litevna` | The library. No UI, no `anyhow`; errors are `litevna::Error`. |
 | `crates/vna-cli` | Command line tool; thin, argument parsing and printing. |
 | `crates/vna-gui` | egui/eframe GUI. `app/` is the state and the panels (see below), `smith.rs` the Smith chart. |
-| `crates/vna-link` | The device thread (`worker.rs`): takes `Cmd`s, sends `Event`s. No egui, so a server can use it too. |
+| `crates/vna-link` | The handle the GUI holds (`handle.rs`): `Cmd`s in, `Event`s out, from the device thread (`worker.rs`) or a vna-server (`remote.rs`, the messages in `wire.rs`). No egui, so the server runs the same worker. |
 | `crates/vna-server` | Headless server: the worker, a hub for the WebSocket clients (`hub.rs`), the web client over HTTP (`web.rs`, embedded by `build.rs`). |
 | `crates/build_git_rev.rs` | Build script part shared by the three binaries (git revision for About and `--version`). |
 | `docs/manual`, `docs/handleiding` | The user manual, English and Dutch, chapter for chapter the same. |

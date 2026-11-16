@@ -42,11 +42,16 @@ impl Client {
         Client { ws }
     }
 
-    /// Connected, past the hello, and the device is there.
+    /// Connected, past the hello and the catch-up, and the device is there.
     fn ready(addr: SocketAddr) -> Client {
         let mut c = Client::connect(addr);
         c.hello();
-        c.until(|e| matches!(e, Event::Connected { .. }));
+        let seen = c.until(|e| matches!(e, Event::Connected { .. }));
+        // The catch-up ends with `Continuous`; unless the device only came
+        // after it, it follows `Connected`.
+        if !seen.iter().any(|e| matches!(e, Event::Continuous(_))) {
+            assert!(matches!(c.event(), Event::Continuous(_)));
+        }
         c
     }
 
@@ -148,6 +153,7 @@ fn a_late_joiner_is_brought_up_to_date() {
     let mut b = Client::connect(addr);
     b.hello();
     assert!(matches!(b.event(), Event::Connected { .. }));
+    assert!(matches!(b.event(), Event::Continuous(false)));
     match b.event() {
         Event::SweepDone { result, purpose, .. } => assert_eq!((result.freqs_hz.len(), purpose), (51, Purpose::Display)),
         other => panic!("{other:?}"),
@@ -280,6 +286,7 @@ fn without_a_device_a_client_is_told_and_hears_when_it_comes() {
         Event::Error { msg, stops_sweep: false } => assert!(msg.contains("no analyser"), "{msg}"),
         other => panic!("{other:?}"),
     }
+    assert!(matches!(c.event(), Event::Continuous(false)));
     c.send(sweep(11, Purpose::Display, false));
     assert!(matches!(c.event(), Event::Error { stops_sweep: true, .. }));
     // the device is plugged in

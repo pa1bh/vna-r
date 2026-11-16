@@ -27,10 +27,6 @@ const WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 /// How often a client's thread looks for messages to send: the longest a
 /// message waits in its outbox.
 const POLL: Duration = Duration::from_millis(25);
-/// A client is pinged this often, and let go when nothing at all came from
-/// it for `SILENT_FOR` (a phone that left the wifi without saying goodbye).
-const PING_EVERY: Duration = Duration::from_secs(20);
-const SILENT_FOR: Duration = Duration::from_secs(60);
 /// A client sends commands of a few hundred bytes; nothing bigger is read.
 const MAX_CLIENT_MESSAGE: usize = 64 << 10;
 
@@ -276,7 +272,9 @@ fn websocket(stream: Replay, peer: SocketAddr, origin: Option<String>, shared: &
             let _ = ws.flush();
             break "closed by the server".to_string();
         }
-        if pinged.elapsed() >= PING_EVERY {
+        // Pinged now and then, and let go when nothing at all came from it
+        // for a while: a phone that left the wifi without saying goodbye.
+        if pinged.elapsed() >= shared.ping_every {
             pinged = Instant::now();
             if let Err(e) = ws.send(Message::Ping(Vec::new())) {
                 break format!("sending: {e}");
@@ -303,8 +301,8 @@ fn websocket(stream: Replay, peer: SocketAddr, origin: Option<String>, shared: &
             }
             Ok(_) => heard = Instant::now(),
             Err(tungstenite::Error::Io(e)) if is_timeout(&e) => {
-                if heard.elapsed() > SILENT_FOR {
-                    break format!("nothing heard for {} s", SILENT_FOR.as_secs());
+                if heard.elapsed() > shared.silent_for {
+                    break format!("nothing heard for {:?}", shared.silent_for);
                 }
             }
             Err(e) => break e.to_string(),

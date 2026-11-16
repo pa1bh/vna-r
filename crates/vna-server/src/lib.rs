@@ -73,6 +73,12 @@ pub struct Config {
     /// plugged in". Not something to set otherwise.
     #[doc(hidden)]
     pub port_present: Option<PortCheck>,
+    /// How often a client is pinged, and how long it may be silent before
+    /// it is let go (20 s and 60 s). Settable for tests.
+    #[doc(hidden)]
+    pub ping_every: Duration,
+    #[doc(hidden)]
+    pub silent_for: Duration,
 }
 
 impl Config {
@@ -84,6 +90,8 @@ impl Config {
             web_dir: None,
             search_every: Duration::from_secs(2),
             port_present: None,
+            ping_every: Duration::from_secs(20),
+            silent_for: Duration::from_secs(60),
         }
     }
 }
@@ -104,12 +112,15 @@ pub(crate) struct Shared {
     pub(crate) web: web::Web,
     pub(crate) next_id: AtomicU64,
     pub(crate) active: AtomicUsize,
+    pub(crate) ping_every: Duration,
+    pub(crate) silent_for: Duration,
 }
 
 /// A running server.
 pub struct Server {
     addr: SocketAddr,
     hub: Sender<ToHub>,
+    clients: Arc<AtomicUsize>,
     stopping: Arc<AtomicBool>,
     listener: Option<JoinHandle<()>>,
 }
@@ -121,12 +132,14 @@ impl Server {
         let listener = TcpListener::bind(config.listen)?;
         let addr = listener.local_addr()?;
         log::info!("listening on http://{addr}; web client {}", web.describe());
-        let hub = hub::start(&config);
+        let (hub, clients) = hub::start(&config);
         let shared = Arc::new(Shared {
             hub: hub.clone(),
             web,
             next_id: AtomicU64::new(1),
             active: AtomicUsize::new(0),
+            ping_every: config.ping_every,
+            silent_for: config.silent_for,
         });
         let stopping = Arc::new(AtomicBool::new(false));
         let stop = stopping.clone();
@@ -136,6 +149,7 @@ impl Server {
         Ok(Server {
             addr,
             hub,
+            clients,
             stopping,
             listener: Some(listener),
         })
@@ -143,6 +157,11 @@ impl Server {
 
     pub fn local_addr(&self) -> SocketAddr {
         self.addr
+    }
+
+    /// WebSocket clients connected now.
+    pub fn clients(&self) -> usize {
+        self.clients.load(Ordering::SeqCst)
     }
 
     /// Let go of the device, so that a LiteVNA leaves USB mode and gets its

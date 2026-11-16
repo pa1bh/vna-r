@@ -17,8 +17,8 @@
 //! it then waits for the port to come back, reconnects and carries on with
 //! what it was doing. See [`Lost`].
 //!
-//! The browser build has no threads and no serial port: there [`spawn`] only
-//! hands out the channels and nothing answers.
+//! The browser build has no threads and no serial port, so no worker: there
+//! the handle (`handle.rs`) only talks to a server.
 //!
 //! A port named [`SIMULATOR`](crate::SIMULATOR) opens a simulated device
 //! instead of a serial port; everything else here stays the same for it.
@@ -28,7 +28,6 @@
 use std::collections::VecDeque;
 use std::ops::ControlFlow;
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -38,6 +37,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::device::Device;
 use crate::sim;
+use crate::{Notify, Options};
 
 /// Why a sweep was requested; decides what the UI does with the result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -126,48 +126,17 @@ pub enum Event {
     Continuous(bool),
 }
 
-/// Called by the worker after every event it sends, from the worker thread.
-/// It must return quickly: during a sweep it runs once per block of data.
-pub type Notify = Arc<dyn Fn() + Send + Sync>;
-
-pub struct WorkerHandle {
-    pub tx: Sender<Cmd>,
-    pub rx: Receiver<Event>,
-}
-
-/// What a worker does beyond what one UI on the same machine needs.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Options {
-    /// Send [`Event::Continuous`] whenever it changes whether continuous
-    /// sweeping is on (or will resume when a lost link is back). A server
-    /// sets this, so that all its clients know; a local UI knows what it
-    /// asked for and leaves it off.
-    pub announce_continuous: bool,
-}
-
-/// The worker for a local UI: [`spawn_with`] with the default [`Options`].
-pub fn spawn(notify: Notify) -> WorkerHandle {
-    spawn_with(notify, Options::default())
-}
-
+/// Start the worker thread: commands in, events out. [`crate::WorkerHandle`]
+/// puts it behind the handle the GUI holds; a server uses it directly.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn spawn_with(notify: Notify, options: Options) -> WorkerHandle {
+pub(crate) fn start(notify: Notify, options: Options) -> (Sender<Cmd>, Receiver<Event>) {
     let (cmd_tx, cmd_rx) = channel::<Cmd>();
     let (evt_tx, evt_rx) = channel::<Event>();
     thread::Builder::new()
         .name("litevna-worker".into())
         .spawn(move || run(cmd_rx, evt_tx, notify, options))
         .expect("spawn worker thread");
-    WorkerHandle { tx: cmd_tx, rx: evt_rx }
-}
-
-/// The browser build: a handle nobody listens to. Commands are dropped and no
-/// event ever arrives, so the program stays "not connected".
-#[cfg(target_arch = "wasm32")]
-pub fn spawn_with(_notify: Notify, _options: Options) -> WorkerHandle {
-    let (cmd_tx, _) = channel::<Cmd>();
-    let (_, evt_rx) = channel::<Event>();
-    WorkerHandle { tx: cmd_tx, rx: evt_rx }
+    (cmd_tx, evt_rx)
 }
 
 /// How often an idle worker looks whether the port of its device still exists.
@@ -678,6 +647,7 @@ impl Worker {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     fn cfg() -> SweepConfig {
         SweepConfig::linear(1_000_000, 30_000_000, 101).unwrap()
@@ -714,11 +684,12 @@ mod tests {
     /// reconnect and sweep again.
     #[test]
     #[ignore = "needs a device on VNA_R_TEST_PORT"]
+    #[cfg(not(target_arch = "wasm32"))]
     fn hardware_session() {
         let port = std::env::var("VNA_R_TEST_PORT").expect("VNA_R_TEST_PORT");
         let secs: u64 = std::env::var("VNA_R_TEST_SECONDS").ok().and_then(|s| s.parse().ok()).unwrap_or(20);
         let expect_drop = std::env::var("VNA_R_EXPECT_DROP").is_ok();
-        let w = spawn(Arc::new(|| {}));
+        let w = crate::spawn(Arc::new(|| {}));
         let t0 = Instant::now();
         let stamp = |t0: Instant| format!("{:6.1}s", t0.elapsed().as_secs_f32());
         let sweep = |continuous| Cmd::Sweep {
@@ -727,8 +698,8 @@ mod tests {
             continuous,
             repeat: 1,
         };
-        w.tx.send(Cmd::Connect(port)).unwrap();
-        w.tx.send(sweep(true)).unwrap();
+        w.send(Cmd::Connect(port));
+        w.send(sweep(true));
         let (mut sweeps, mut lost, mut connects, mut sweeps_after_reconnect) = (0, 0, 0, 0);
         let mut phase = 0;
         loop {
@@ -737,7 +708,7 @@ mod tests {
                 1 => Duration::from_secs(secs + 5),
                 _ => Duration::from_secs(secs + 15),
             };
-            match w.rx.recv_timeout(limit.saturating_sub(t0.elapsed())) {
+            match w.recv_timeout(limit.saturating_sub(t0.elapsed())) {
                 Ok(Event::SweepDone { result, .. }) => {
                     sweeps += 1;
                     if connects > 1 {
@@ -760,11 +731,11 @@ mod tests {
                 Ok(other) => println!("{} {other:?}", stamp(t0)),
                 Err(RecvTimeoutError::Timeout) if phase == 0 => {
                     println!("{} {sweeps} sweeps; stop, then idle", stamp(t0));
-                    w.tx.send(Cmd::Stop).unwrap();
+                    w.send(Cmd::Stop);
                     phase = 1;
                 }
                 Err(RecvTimeoutError::Timeout) if phase == 1 => {
-                    w.tx.send(sweep(false)).unwrap();
+                    w.send(sweep(false));
                     phase = 2;
                 }
                 Err(e) => panic!("{} no event: {e:?}", stamp(t0)),

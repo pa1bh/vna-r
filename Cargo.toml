@@ -40,9 +40,10 @@ log = "0.4"
 env_logger = "0.11"
 # std::time::Instant that also works in a browser (it is std itself on native).
 web-time = "1.1"
-# vna-server. tungstenite in the version ewebsock 0.8 uses natively, so that the
-# server and the native client (docs/10) share one copy.
+# The client/server mode (docs/10). tungstenite in the version ewebsock 0.8 uses
+# natively, so that the server and the native client share one copy.
 tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+ewebsock = "0.8"
 httparse = "1.10"
 flate2 = "1"
 ctrlc = { version = "3.5", features = ["termination"] }

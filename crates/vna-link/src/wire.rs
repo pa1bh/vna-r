@@ -3,15 +3,20 @@
 //!
 //! The server owns the device. It greets every client with a [`Hello`],
 //! brings a client that joins late up to date by sending it ordinary events
-//! (the last [`Event::Connected`], [`Event::Continuous`] when the device is
-//! sweeping, the last display [`Event::SweepDone`]), and from then on
-//! forwards what its worker reports. A client sends [`ClientMsg`]s: the
-//! commands of [`Cmd`] that make sense remotely.
+//! (the last [`Event::Connected`], `LinkLost` or `Disconnected`, then
+//! [`Event::Continuous`] with whether the device sweeps, then the last
+//! display [`Event::SweepDone`]), and from then on forwards what its worker
+//! reports. A client sends [`ClientMsg`]s: the commands of [`Cmd`] that make
+//! sense remotely.
+//!
+//! What comes from the network is checked before it is handed on: a sweep's
+//! lists have one length, its segments add up to it, a screenshot's pixels
+//! fill it. The GUI assumes all that of a local device too.
 //!
 //! JSON, so that a session can be read in the browser's developer tools. Two
 //! things are not written the obvious way, because of their size: the raw
 //! FIFO records of a sweep go as the bytes the device sent, and a screenshot's
-//! pixels as base64 (see [`sweep`] and [`screenshot`]). Neither the GUI nor the
+//! pixels as base64 (see `sweep` and `screenshot` below). Neither the GUI nor the
 //! server sees those forms: they deal in [`Event`] and [`Cmd`].
 //!
 //! Compatibility: a field added later must have a default on the reading
@@ -183,7 +188,7 @@ impl ServerMsg {
                 ours: PROTOCOL_VERSION,
                 theirs: h.protocol,
             }),
-            Ok(m) => Ok(m),
+            Ok(m) => check(&m).map(|()| m),
             Err(e) => {
                 // A hello whose other fields changed: its version is still readable.
                 #[derive(Deserialize)]
@@ -204,6 +209,22 @@ impl ServerMsg {
             }
         }
     }
+}
+
+/// Across the fields of an event: the segments of a sweep add up to its
+/// points (the GUI slices the sweep by them). Within a sweep or a screenshot
+/// the serde helpers below check.
+fn check(m: &ServerMsg) -> Result<(), Error> {
+    if let ServerMsg::Event(Event::SweepDone { cfgs, result, .. }) = m {
+        let planned: usize = cfgs.iter().map(|c| c.points as usize).sum();
+        if planned != result.freqs_hz.len() || cfgs.iter().any(|c| c.points == 0) {
+            return Err(Error::Malformed(format!(
+                "a sweep of {} points over segments of {planned}",
+                result.freqs_hz.len()
+            )));
+        }
+    }
+    Ok(())
 }
 
 impl ClientMsg {
@@ -298,6 +319,7 @@ pub(crate) mod sweep {
             missing,
         } = In::deserialize(d)?;
         if records.is_empty() && missing.is_empty() {
+            check(&sweep).map_err(D::Error::custom)?;
             return Ok(sweep);
         }
         if !sweep.points.is_empty() {
@@ -330,7 +352,28 @@ pub(crate) mod sweep {
             return Err(D::Error::custom("missing points not in ascending order"));
         }
         sweep.points = points;
+        check(&sweep).map_err(D::Error::custom)?;
         Ok(sweep)
+    }
+
+    /// What the GUI takes for granted about a sweep, and a local device
+    /// guarantees: a sweep from the network is checked before it gets there.
+    fn check(s: &SweepResult) -> Result<(), String> {
+        let n = s.freqs_hz.len();
+        if n == 0 {
+            return Err("a sweep without points".into());
+        }
+        if s.s11.len() != n || s.s21.len() != n {
+            return Err(format!(
+                "a sweep of {n} frequencies with {} S11 and {} S21 values",
+                s.s11.len(),
+                s.s21.len()
+            ));
+        }
+        if !s.points.is_empty() && s.points.len() != n {
+            return Err(format!("a sweep of {n} frequencies with {} FIFO records", s.points.len()));
+        }
+        Ok(())
     }
 }
 
@@ -373,12 +416,25 @@ pub(crate) mod screenshot {
 
     pub(crate) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Screenshot, D::Error> {
         let w = Wire::deserialize(d)?;
+        let data = BASE64.decode(&w.data).map_err(D::Error::custom)?;
+        // What the drivers guarantee and the GUI's conversion to an image
+        // assumes (it panics on a wrong size): RGB565, width × height pixels.
+        let expected = w.width as usize * w.height as usize * 2;
+        if w.width == 0 || w.height == 0 || w.bits_per_pixel != 16 || data.len() != expected {
+            return Err(D::Error::custom(format!(
+                "a screenshot of {}×{} at {} bits per pixel with {} bytes",
+                w.width,
+                w.height,
+                w.bits_per_pixel,
+                data.len()
+            )));
+        }
         Ok(Screenshot {
             width: w.width,
             height: w.height,
             bits_per_pixel: w.bits_per_pixel,
             big_endian: w.big_endian,
-            data: BASE64.decode(&w.data).map_err(D::Error::custom)?,
+            data,
         })
     }
 }
@@ -497,6 +553,10 @@ mod tests {
         }
     }
 
+    fn grid(n: u16) -> Vec<SweepConfig> {
+        vec![SweepConfig::linear(1_000_000, 30_000_000, n).unwrap()]
+    }
+
     fn cfgs() -> Vec<SweepConfig> {
         vec![
             SweepConfig::linear(1_000_000, 30_000_000, 101).unwrap(),
@@ -577,7 +637,7 @@ mod tests {
         bad[0x1F] ^= 0xFF;
         s.points[3] = Some(FifoPoint::parse(&bad).unwrap());
         let Event::SweepDone { result, .. } = round_trip(Event::SweepDone {
-            cfgs: cfgs(),
+            cfgs: grid(20),
             result: s.clone(),
             purpose: Purpose::Display,
             repeat: 1,
@@ -591,7 +651,7 @@ mod tests {
         let mut gaps = lite_sweep(3);
         gaps.points = vec![None; 3];
         let text = ServerMsg::Event(Event::SweepDone {
-            cfgs: cfgs(),
+            cfgs: grid(3),
             result: gaps,
             purpose: Purpose::Display,
             repeat: 1,
@@ -611,7 +671,7 @@ mod tests {
         s.s11[1] = Complex64::new(f64::NAN, f64::NAN);
         s.s21[2] = Complex64::new(f64::INFINITY, f64::NEG_INFINITY);
         let Event::SweepDone { result, .. } = round_trip(Event::SweepDone {
-            cfgs: cfgs(),
+            cfgs: grid(5),
             result: s,
             purpose: Purpose::Display,
             repeat: 1,
@@ -750,5 +810,42 @@ mod tests {
         println!("1001-point LiteVNA sweep: {lite} bytes; shell sweep: {shell} bytes; screenshot 480x320: {shot} bytes");
         println!("as JSON numbers the FIFO records alone would be {records_as_json} bytes, the pixels {pixels_as_json}");
         assert!(lite < 150_000 && shell < 110_000 && shot < 420_000);
+    }
+
+    #[test]
+    fn what_the_gui_takes_for_granted_is_checked_on_arrival() {
+        let sweep_done = |cfgs, result| {
+            ServerMsg::Event(Event::SweepDone {
+                cfgs,
+                result,
+                purpose: Purpose::Display,
+                repeat: 1,
+            })
+            .encode()
+        };
+        let rejected = |text: String| matches!(ServerMsg::decode(&text), Err(Error::Malformed(_)));
+        // S11 shorter than the grid
+        let mut s = shell_sweep(10);
+        s.s11.pop();
+        assert!(rejected(sweep_done(grid(10), s)));
+        // records for some of the points only
+        let mut s = lite_sweep(10);
+        s.points.truncate(9);
+        assert!(rejected(sweep_done(grid(10), s)));
+        // segments that do not add up to the sweep, and an empty sweep
+        assert!(rejected(sweep_done(grid(11), lite_sweep(10))));
+        let mut empty = shell_sweep(2);
+        (empty.freqs_hz, empty.s11, empty.s21) = (vec![], vec![], vec![]);
+        assert!(rejected(sweep_done(vec![], empty)));
+        // a screenshot whose pixels do not fill it, or are not RGB565
+        let mut shot = screenshot();
+        shot.data.pop();
+        assert!(rejected(ServerMsg::Event(Event::Screenshot(shot)).encode()));
+        let mut shot = screenshot();
+        shot.bits_per_pixel = 8;
+        shot.data.truncate(480 * 320);
+        assert!(rejected(ServerMsg::Event(Event::Screenshot(shot)).encode()));
+        // and what is right still passes
+        assert!(ServerMsg::decode(&sweep_done(grid(10), lite_sweep(10))).is_ok());
     }
 }

@@ -1,15 +1,25 @@
-//! `vna-link` — the link between a front-end and an analyser: a thread that
-//! owns the device, takes [`Cmd`]s and answers with [`Event`]s.
+//! `vna-link` — the link between a front-end and an analyser: the GUI sends
+//! [`Cmd`]s and gets [`Event`]s through one [`WorkerHandle`], whether the
+//! analyser is on a serial port of this machine (a worker thread that owns
+//! the device) or behind a vna-server on the network (a WebSocket session).
 //!
-//! The GUI uses it today; it has no dependency on egui so that a headless
-//! server can run the same thread (docs/10-client-server.md). [`wire`] is
-//! what a server and its clients send each other. A port named [`SIMULATOR`]
-//! opens a device that exists only in software.
+//! It has no dependency on egui, so that the server runs the same worker
+//! (docs/10-client-server.md). [`wire`] is what a server and its clients send
+//! each other. A port named [`SIMULATOR`] opens a device that exists only in
+//! software.
 
+mod address;
 mod device;
+mod handle;
+mod remote;
 mod sim;
 pub mod wire;
 mod worker;
 
+pub use address::{is_server_address, server_url, DEFAULT_SERVER_PORT};
+#[cfg(not(target_arch = "wasm32"))]
+pub use handle::spawn_worker;
+pub use handle::{spawn, spawn_with, Notify, Options, WorkerHandle};
+pub use remote::RemoteTiming;
 pub use sim::{DEFAULT_RATE as SIMULATOR_RATE, SIMULATOR};
-pub use worker::{spawn, spawn_with, Cmd, Event, Notify, Options, Purpose, WorkerHandle, RECONNECT_FOR};
+pub use worker::{Cmd, Event, Purpose, RECONNECT_FOR};

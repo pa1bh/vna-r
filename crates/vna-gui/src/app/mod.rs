@@ -498,11 +498,11 @@ impl App {
     }
 
     fn send(&self, cmd: Cmd) {
-        let _ = self.worker.tx.send(cmd);
+        self.worker.send(cmd);
     }
 
     fn handle_events(&mut self, ctx: &egui::Context) {
-        while let Ok(evt) = self.worker.rx.try_recv() {
+        while let Some(evt) = self.worker.try_recv() {
             match evt {
                 Event::Connected { port, info, battery_mv } => {
                     if let Connection::Reconnecting { since, .. } = &self.connection {

@@ -228,7 +228,7 @@ and paste the result. For CLI problems, the output with `--trace` helps.
 | `crates/litevna` | Library: LiteVNA register protocol and NanoVNA text shell, port discovery, SOLT calibration with kit fit and interpolation, trace maths, TDR and gating, Touchstone. No UI. |
 | `crates/vna-cli` | Command line tool on top of the library. |
 | `crates/vna-gui` | Desktop GUI (egui/eframe). |
-| `crates/vna-link` | The thread that owns the device for the GUI: commands in, events out. |
+| `crates/vna-link` | Between the GUI and the analyser: commands in, events out, from a device thread or a vna-server. |
 | `crates/vna-server` | Headless server: the analyser on USB (a Raspberry Pi, say), the GUI over a WebSocket on the LAN. |
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) checks formatting and clippy, builds and

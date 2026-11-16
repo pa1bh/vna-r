@@ -9,6 +9,7 @@
 use std::collections::VecDeque;
 use std::net::SocketAddr;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -142,14 +143,18 @@ enum DeviceState {
 }
 
 /// Start the worker, the forwarder and the hub.
-pub(crate) fn start(config: &Config) -> Sender<ToHub> {
+/// The number is that of the clients connected, kept up to date by the hub.
+pub(crate) fn start(config: &Config) -> (Sender<ToHub>, Arc<AtomicUsize>) {
     let (tx, rx) = channel();
-    let worker = vna_link::spawn_with(
+    let (commands, events) = vna_link::spawn_worker(
         // The forwarder below blocks on the events, it needs no wake-up.
         Arc::new(|| {}),
-        Options { announce_continuous: true },
+        Options {
+            announce_continuous: true,
+            ..Options::default()
+        },
     );
-    let events = worker.rx;
+    let count = Arc::new(AtomicUsize::new(0));
     let forward = tx.clone();
     thread::Builder::new()
         .name("forwarder".into())
@@ -163,8 +168,9 @@ pub(crate) fn start(config: &Config) -> Sender<ToHub> {
         .expect("spawn forwarder thread");
     let disconnected: Arc<str> = ServerMsg::Event(Event::Disconnected).encode().into();
     let hub = Hub {
-        worker: worker.tx,
+        worker: commands,
         clients: Vec::new(),
+        count: count.clone(),
         choice: config.device.clone(),
         port_present: config.port_present.clone(),
         search_every: config.search_every,
@@ -185,7 +191,7 @@ pub(crate) fn start(config: &Config) -> Sender<ToHub> {
         .name("hub".into())
         .spawn(move || hub.run(rx))
         .expect("spawn hub thread");
-    tx
+    (tx, count)
 }
 
 fn notice(msg: &str) -> Arc<str> {
@@ -200,6 +206,8 @@ fn notice(msg: &str) -> Arc<str> {
 struct Hub {
     worker: Sender<Cmd>,
     clients: Vec<Client>,
+    /// `clients.len()`, for whoever holds the server.
+    count: Arc<AtomicUsize>,
     choice: DeviceChoice,
     port_present: Option<PortCheck>,
     search_every: Duration,
@@ -251,6 +259,7 @@ impl Hub {
             ToHub::Leave { id, why, ack } => {
                 if let Some(i) = self.clients.iter().position(|c| c.id == id) {
                     let c = self.clients.remove(i);
+                    self.count.store(self.clients.len(), Ordering::SeqCst);
                     log::info!("client {id} ({}) left: {why}; {} connected", c.peer, self.clients.len());
                     self.forget(id);
                 }
@@ -272,18 +281,19 @@ impl Hub {
         );
         // Bring it up to date with ordinary events: the device, whether it
         // sweeps, the last sweep. A few messages, so they always fit.
+        // `Continuous` comes either way, so that a client that reconnects
+        // knows after it whether it must start its sweeping again.
         outbox.push(Kind::Other, self.hello.clone());
         outbox.push(Kind::Other, self.device_line.clone());
         if !self.has_device() {
             outbox.push(Kind::Other, self.no_device.clone());
         }
-        if self.continuous {
-            outbox.push(Kind::Other, encode(Event::Continuous(true)));
-        }
+        outbox.push(Kind::Other, encode(Event::Continuous(self.continuous)));
         if let Some(s) = &self.last_sweep {
             outbox.push(Kind::Display, s.clone());
         }
         self.clients.push(Client { id, peer, outbox });
+        self.count.store(self.clients.len(), Ordering::SeqCst);
     }
 
     /// A client is gone: forget what it asked for, and stop the device when
@@ -435,6 +445,7 @@ impl Hub {
     fn drop_client(&mut self, id: u64) {
         if let Some(i) = self.clients.iter().position(|c| c.id == id) {
             let c = self.clients.remove(i);
+            self.count.store(self.clients.len(), Ordering::SeqCst);
             log::warn!("client {id} ({}) cannot keep up; dropped", c.peer);
             self.forget(id);
         }

@@ -1,8 +1,9 @@
 //! The real worker with the simulated device: what a client of `vna-link`
 //! sees, without hardware. Every test reads the event stream; the one wait
 //! in here is a timeout that only fires when something is broken.
+//! The worker is a thread, so these run natively only.
+#![cfg(not(target_arch = "wasm32"))]
 
-use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,23 +14,23 @@ use vna_link::{spawn, spawn_with, Cmd, Event, Options, Purpose, WorkerHandle, SI
 fn connect(rate: &str) -> WorkerHandle {
     let w = spawn(Arc::new(|| {}));
     let port = format!("{SIMULATOR}{rate}");
-    w.tx.send(Cmd::Connect(port.clone())).unwrap();
-    match next(&w.rx) {
+    w.send(Cmd::Connect(port.clone()));
+    match next(&w) {
         Event::Connected { port: p, .. } => assert_eq!(p, port),
         other => panic!("{other:?}"),
     }
     w
 }
 
-fn next(rx: &Receiver<Event>) -> Event {
-    rx.recv_timeout(Duration::from_secs(10)).expect("an event within 10 s")
+fn next(w: &WorkerHandle) -> Event {
+    w.recv_timeout(Duration::from_secs(10)).expect("an event within 10 s")
 }
 
 /// Events up to and including the first one `stop` accepts.
-fn until(rx: &Receiver<Event>, stop: impl Fn(&Event) -> bool) -> Vec<Event> {
+fn until(w: &WorkerHandle, stop: impl Fn(&Event) -> bool) -> Vec<Event> {
     let mut seen = Vec::new();
     loop {
-        let e = next(rx);
+        let e = next(w);
         let done = stop(&e);
         seen.push(e);
         if done {
@@ -58,31 +59,31 @@ fn is_done(e: &Event) -> bool {
 #[test]
 fn connect_identity_battery_and_screenshot() {
     let w = spawn(Arc::new(|| {}));
-    w.tx.send(Cmd::Connect(SIMULATOR.into())).unwrap();
-    let Event::Connected { info, battery_mv, .. } = next(&w.rx) else {
+    w.send(Cmd::Connect(SIMULATOR.into()));
+    let Event::Connected { info, battery_mv, .. } = next(&w) else {
         panic!()
     };
     assert_eq!(info.model, "vna-r simulator");
     assert!(info.summary().contains("no hardware"), "{}", info.summary());
     assert_eq!(battery_mv, Some(3950));
     assert!(!info.limits.has_device_average);
-    w.tx.send(Cmd::Battery).unwrap();
-    assert!(matches!(next(&w.rx), Event::Battery(3950)));
-    w.tx.send(Cmd::Screenshot).unwrap();
-    let Event::Screenshot(shot) = next(&w.rx) else { panic!() };
+    w.send(Cmd::Battery);
+    assert!(matches!(next(&w), Event::Battery(3950)));
+    w.send(Cmd::Screenshot);
+    let Event::Screenshot(shot) = next(&w) else { panic!() };
     assert_eq!((shot.width, shot.height, shot.data.len()), (480, 320, 480 * 320 * 2));
     // averaging on the device: the simulator has none, and says nothing
-    w.tx.send(Cmd::SetAverage(4)).unwrap();
-    w.tx.send(Cmd::Disconnect).unwrap();
-    assert!(matches!(next(&w.rx), Event::Disconnected));
+    w.send(Cmd::SetAverage(4));
+    w.send(Cmd::Disconnect);
+    assert!(matches!(next(&w), Event::Disconnected));
 }
 
 #[test]
 fn a_single_sweep_comes_back_on_the_grid_asked_for() {
     let w = connect("0");
     let cfgs = vec![lin(1_000_000, 30_000_000, 101), lin(30_000_000, 450_000_000, 51)];
-    w.tx.send(sweep(cfgs.clone(), Purpose::Display, false, 3)).unwrap();
-    let events = until(&w.rx, is_done);
+    w.send(sweep(cfgs.clone(), Purpose::Display, false, 3));
+    let events = until(&w, is_done);
     let progress: Vec<(usize, usize)> = events
         .iter()
         .filter_map(|e| match e {
@@ -112,11 +113,10 @@ fn a_single_sweep_comes_back_on_the_grid_asked_for() {
 #[test]
 fn continuous_sweeping_goes_on_until_stop() {
     let w = connect("0");
-    w.tx.send(sweep(vec![lin(1_000_000, 30_000_000, 201)], Purpose::Display, true, 1))
-        .unwrap();
+    w.send(sweep(vec![lin(1_000_000, 30_000_000, 201)], Purpose::Display, true, 1));
     let mut sweeps = Vec::new();
     while sweeps.len() < 3 {
-        match next(&w.rx) {
+        match next(&w) {
             Event::SweepDone { result, .. } => sweeps.push(result),
             Event::Continuous(_) => panic!("a local worker does not announce continuous sweeping"),
             _ => {}
@@ -125,25 +125,24 @@ fn continuous_sweeping_goes_on_until_stop() {
     // the noise is new in every sweep, the antenna is the same
     assert_ne!(sweeps[0].s11, sweeps[1].s11);
     assert!((sweeps[0].s11[100] - sweeps[1].s11[100]).norm() < 0.02);
-    w.tx.send(Cmd::Stop).unwrap();
-    w.tx.send(Cmd::Battery).unwrap();
+    w.send(Cmd::Stop);
+    w.send(Cmd::Battery);
     // Commands are handled in order: once the battery answers, Stop has been
     // handled, and nothing but the next answer may follow.
-    until(&w.rx, |e| matches!(e, Event::Battery(_)));
-    w.tx.send(Cmd::Battery).unwrap();
-    assert!(matches!(next(&w.rx), Event::Battery(_)));
+    until(&w, |e| matches!(e, Event::Battery(_)));
+    w.send(Cmd::Battery);
+    assert!(matches!(next(&w), Event::Battery(_)));
 }
 
 #[test]
 fn a_display_sweep_cuts_a_running_one_short() {
     // 4001 points at 5000 points/s: 0.8 s, the first block after 51 ms.
     let w = connect("5000");
-    w.tx.send(sweep(vec![lin(1_000_000, 30_000_000, 4001)], Purpose::Display, false, 1))
-        .unwrap();
-    until(&w.rx, |e| matches!(e, Event::Progress { .. }));
+    w.send(sweep(vec![lin(1_000_000, 30_000_000, 4001)], Purpose::Display, false, 1));
+    until(&w, |e| matches!(e, Event::Progress { .. }));
     let short = vec![lin(7_000_000, 7_200_000, 21)];
-    w.tx.send(sweep(short.clone(), Purpose::Display, false, 1)).unwrap();
-    let events = until(&w.rx, is_done);
+    w.send(sweep(short.clone(), Purpose::Display, false, 1));
+    let events = until(&w, is_done);
     let cancelled = events
         .iter()
         .position(|e| matches!(e, Event::Cancelled { purpose: Purpose::Display }))
@@ -160,10 +159,10 @@ fn a_display_sweep_cuts_a_running_one_short() {
 fn a_standard_waits_for_the_running_sweep_and_is_ideal() {
     let w = connect("5000");
     let grid = vec![lin(1_000_000, 30_000_000, 1001)];
-    w.tx.send(sweep(grid.clone(), Purpose::Display, false, 1)).unwrap();
-    until(&w.rx, |e| matches!(e, Event::Progress { .. }));
-    w.tx.send(sweep(grid.clone(), Purpose::Standard(Standard::Open), false, 2)).unwrap();
-    let events = until(&w.rx, |e| {
+    w.send(sweep(grid.clone(), Purpose::Display, false, 1));
+    until(&w, |e| matches!(e, Event::Progress { .. }));
+    w.send(sweep(grid.clone(), Purpose::Standard(Standard::Open), false, 2));
+    let events = until(&w, |e| {
         matches!(
             e,
             Event::SweepDone {
@@ -194,8 +193,8 @@ fn every_standard_is_on_the_port_while_it_is_measured() {
     let w = connect("0");
     let grid = vec![lin(10_000_000, 20_000_000, 11)];
     let measure = |purpose| {
-        w.tx.send(sweep(grid.clone(), purpose, false, 1)).unwrap();
-        match until(&w.rx, is_done).pop() {
+        w.send(sweep(grid.clone(), purpose, false, 1));
+        match until(&w, is_done).pop() {
             Some(Event::SweepDone { result, .. }) => (result.s11[5], result.s21[5]),
             other => panic!("{other:?}"),
         }
@@ -215,14 +214,13 @@ fn every_standard_is_on_the_port_while_it_is_measured() {
 #[test]
 fn without_a_connection_a_sweep_fails_as_it_does_with_hardware() {
     let w = spawn(Arc::new(|| {}));
-    w.tx.send(sweep(vec![lin(1_000_000, 30_000_000, 11)], Purpose::Display, false, 1))
-        .unwrap();
-    match next(&w.rx) {
+    w.send(sweep(vec![lin(1_000_000, 30_000_000, 11)], Purpose::Display, false, 1));
+    match next(&w) {
         Event::Error { msg, stops_sweep } => assert_eq!((msg.as_str(), stops_sweep), ("sweep: not connected", true)),
         other => panic!("{other:?}"),
     }
-    w.tx.send(Cmd::Connect("sim:fast".into())).unwrap();
-    match next(&w.rx) {
+    w.send(Cmd::Connect("sim:fast".into()));
+    match next(&w) {
         Event::Error { msg, stops_sweep: true } => assert!(msg.starts_with("connecting to sim:fast: invalid argument"), "{msg}"),
         other => panic!("{other:?}"),
     }
@@ -230,36 +228,42 @@ fn without_a_connection_a_sweep_fails_as_it_does_with_hardware() {
 
 #[test]
 fn a_server_worker_announces_continuous_sweeping() {
-    let w = spawn_with(Arc::new(|| {}), Options { announce_continuous: true });
-    w.tx.send(Cmd::Connect(format!("{SIMULATOR}0"))).unwrap();
-    until(&w.rx, |e| matches!(e, Event::Connected { .. }));
+    let w = spawn_with(
+        Arc::new(|| {}),
+        Options {
+            announce_continuous: true,
+            ..Options::default()
+        },
+    );
+    w.send(Cmd::Connect(format!("{SIMULATOR}0")));
+    until(&w, |e| matches!(e, Event::Connected { .. }));
     let grid = vec![lin(1_000_000, 30_000_000, 101)];
-    w.tx.send(sweep(grid.clone(), Purpose::Display, true, 1)).unwrap();
+    w.send(sweep(grid.clone(), Purpose::Display, true, 1));
     // announced before the first sweep is done
-    let first = until(&w.rx, |e| matches!(e, Event::Continuous(_) | Event::SweepDone { .. }));
+    let first = until(&w, |e| matches!(e, Event::Continuous(_) | Event::SweepDone { .. }));
     assert!(matches!(first.last(), Some(Event::Continuous(true))), "{first:?}");
     // a single sweep in between and a new continuous sweep change nothing
-    w.tx.send(sweep(grid.clone(), Purpose::Display, false, 1)).unwrap();
-    w.tx.send(sweep(grid.clone(), Purpose::Display, true, 1)).unwrap();
-    w.tx.send(Cmd::Stop).unwrap();
-    let events = until(&w.rx, |e| matches!(e, Event::Continuous(_)));
+    w.send(sweep(grid.clone(), Purpose::Display, false, 1));
+    w.send(sweep(grid.clone(), Purpose::Display, true, 1));
+    w.send(Cmd::Stop);
+    let events = until(&w, |e| matches!(e, Event::Continuous(_)));
     assert!(matches!(events.last(), Some(Event::Continuous(false))), "{events:?}");
     // a failing sweep ends it too, and says so after the error
-    w.tx.send(sweep(grid, Purpose::Display, true, 1)).unwrap();
+    w.send(sweep(grid, Purpose::Display, true, 1));
     assert!(matches!(
-        until(&w.rx, |e| matches!(e, Event::Continuous(_))).pop(),
+        until(&w, |e| matches!(e, Event::Continuous(_))).pop(),
         Some(Event::Continuous(true))
     ));
     let empty = SweepConfig {
         points: 0,
         ..lin(1_000_000, 2_000_000, 2)
     };
-    w.tx.send(sweep(vec![empty], Purpose::Display, true, 1)).unwrap();
-    let events = until(&w.rx, |e| matches!(e, Event::Continuous(_)));
+    w.send(sweep(vec![empty], Purpose::Display, true, 1));
+    let events = until(&w, |e| matches!(e, Event::Continuous(_)));
     assert!(matches!(events.last(), Some(Event::Continuous(false))), "{events:?}");
     assert!(events.iter().any(|e| matches!(e, Event::Error { stops_sweep: true, .. })));
     // and nothing more about it until something changes
-    w.tx.send(Cmd::Battery).unwrap();
-    let rest = until(&w.rx, |e| matches!(e, Event::Battery(_)));
+    w.send(Cmd::Battery);
+    let rest = until(&w, |e| matches!(e, Event::Battery(_)));
     assert!(!rest.iter().any(|e| matches!(e, Event::Continuous(_))), "{rest:?}");
 }
