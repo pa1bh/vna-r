@@ -25,9 +25,11 @@ en de NanoVNA-F. Dat is evenveel als de Web Serial-schatting, maar met veel mind
 omdat het moeizaamst verworven deel (de oude FIFO-records, het herverbinden na USB-uitval,
 de aanloopscan van de NanoVNA-F) niet wordt aangeraakt.
 
-De grootste valkuil is geen Rust maar de browser: een pagina die over gewoon http van de
-Pi komt is geen veilige context, dus geen WebGPU. De terugval naar WebGL moet dan werken,
-en die is nooit gezien.
+De grootste valkuil is geen Rust maar de browser. WebGPU is er niet overal, ook niet op
+https, dus de terugval naar WebGL moet werken, en die is nooit gezien. En een pagina op
+https mag alleen in Chrome met een Pi over http praten. Daarom twee ingangen naast
+elkaar: de Pi serveert de pagina zelf, en dezelfde pagina staat op de eigen website. Zie
+"De browser: WebGL, https en twee ingangen".
 
 ## Hoe het nu zit: de knip bestaat al
 
@@ -101,8 +103,8 @@ Een vierde crate, `vna-server`, native, zonder GUI. Hij doet drie dingen:
    wasm zit) en geserveerd over http op dezelfde poort. Dan is één adres genoeg,
    `http://vna.local:8080`, en is er geen tweede webserver op de Pi.
 
-Dat de server de pagina zelf serveert is geen gemak maar een noodzaak, zie Veilige context
-hieronder.
+Dat de server de pagina zelf serveert is geen gemak maar een noodzaak, zie "De browser:
+WebGL, https en twee ingangen" hieronder.
 
 ### De client
 
@@ -114,8 +116,9 @@ WebSocket, het gewone programma heeft de lokale thread en de WebSocket naast elk
 
 `HAS_DEVICE` (nu een constante op `cfg`) wordt een eigenschap van de verbinding: er is
 een backend (lokale thread of server) of niet. Op native blijft hij altijd waar. In de
-browser is hij waar als de pagina van een server komt, en anders is het de viewer van
-docs/09. De poortkeuze wordt op een server een `Cmd::ListPorts` met een `Event::Ports`,
+browser is hij waar zodra er een server is: de server waar de pagina vandaan komt, of een
+server die de bezoeker op de gehoste pagina heeft toegevoegd. Zonder server is het de
+viewer van docs/09. De poortkeuze wordt op een server een `Cmd::ListPorts` met een `Event::Ports`,
 of valt weg als de server altijd met zijn ene apparaat verbindt (zie Besluiten).
 
 ### Een server is een poort
@@ -183,7 +186,7 @@ server praat, of omgekeerd.
 | 1 | De worker uit `vna-gui` naar een eigen crate (of in `litevna` achter een feature). Het repaint-verzoek wordt een callback of een `Fn()`; de GUI geeft `ctx.request_repaint` mee. Zuivere refactor, geen gedragsverandering; de bestaande tests van de worker gaan mee. | 1 dag |
 | 2 | Serde op `Cmd`, `Event`, `Purpose` en de typen die ze dragen. `Cmd::ListPorts`/`Event::Ports` erbij, en `refresh_ports` daarop. | halve dag |
 | 3 | `vna-server`: luisteren, één thread per verbinding, de drie bestanden ingebakken en geserveerd, begroeting met versie en de laatste toestand (zie Besluiten). | 1 à 2 dagen |
-| 4 | De client: `ewebsock` achter `WorkerHandle`, op wasm als enige backend en op native naast de lokale thread, gekozen op het adres. `HAS_DEVICE` naar runtime. Native: Device ▸ Add server… en de servers in de poortlijst. Browser: de pagina leest het adres van de server waar hij vandaan komt. | 2 dagen |
+| 4 | De client: `ewebsock` achter `WorkerHandle`, op wasm als enige backend en op native naast de lokale thread, gekozen op het adres. `HAS_DEVICE` naar runtime. Native: Device ▸ Add server… en de servers in de poortlijst. Browser: de pagina leest het adres van de server waar hij vandaan komt, en heeft hetzelfde adresveld voor de gehoste pagina. | 2 dagen |
 | 5 | De Pi: build, udev, systemd, QC met LiteVNA 67 en NanoVNA-F volgens docs/08, een hoofdstuk in beide handleidingen. | 1 à 2 dagen |
 
 Stap 1 en 2 staan op zichzelf: ze veranderen niets aan het gedrag, maken `vna-gui` kleiner
@@ -193,18 +196,8 @@ niet, dan heeft het project een schonere worker en verder niets verloren.
 
 ## Valkuilen en besluiten
 
-**Veilige context.** WebGPU werkt alleen over https of op localhost. Een pagina van
-`http://vna.local:8080` is dat niet en valt terug op WebGL. Die terugval zit in
-`egui-wgpu`, maar docs/09 meldt dat hij nooit is gezien. Twee wegen: de terugval testen
-en zo nodig voor de webbouw de `glow`-renderer (WebGL2) nemen, die kleiner en in
-browsers beproefder is; of https op de Pi met een zelfondertekend certificaat, wat elke
-bezoeker eerst een waarschuwing oplevert. De eerste weg is de bedoeling.
-
-**Mixed content.** Een browser laat een pagina die over https is geladen geen `ws://`
-openen. De viewer op de eigen website (https) kan dus niet met een Pi over http praten.
-Daarom serveert de server de pagina zelf: dan is alles http en consistent. Wie de viewer
-op de website wil laten verbinden met een Pi moet de Pi https geven; dat is geen doel voor
-de eerste versie.
+**De browser** heeft een eigen hoofdstuk hieronder: WebGL, https en waar de pagina
+vandaan komt.
 
 **Eén apparaat, geen poortkeuze.** Een Pi met één VNA heeft geen poortmenu nodig: de
 server verbindt met het ene apparaat dat hij vindt en meldt `Connected` aan elke client
@@ -244,6 +237,97 @@ statusvenster) hoort niet in de eerste versie.
 dit ontwerp is dat de kennis over de apparaten op één plek blijft en de server dezelfde
 code draait als het programma.
 
+## De browser: WebGL, https en twee ingangen
+
+Nagezocht op 16 november 2026 in de documentatie van de browsers; niets hiervan is
+getest. De bronnen staan onderaan dit hoofdstuk.
+
+### WebGL is geen keuze maar een eis
+
+De browserbouw tekent via wgpu. Dat kent in de browser twee wegen: WebGPU als de browser
+het heeft, anders WebGL2. Het omschakelen gebeurt vanzelf bij het starten. eframe 0.37
+bouwt standaard alleen wgpu mee (de eigen OpenGL-renderer `glow` zit er niet in), dus die
+terugval is al deel van de huidige build. Docs/09 meldt dat hij nooit is gezien.
+
+Voor vna-r maakt het in beeld en snelheid geen verschil: het programma tekent 2D (lijnen,
+tekst, een Smith-chart) en WebGPU levert pas iets op bij zwaar 3D-werk of rekenen op de
+videokaart.
+
+De terugval is op twee manieren nodig, en de tweede staat los van http of https:
+
+- **Geen veilige context.** WebGPU bestaat alleen over https of op localhost. Een pagina
+  van `http://vna.local:8080` krijgt het dus nooit.
+- **De browser heeft het niet.** Ook op https is WebGPU niet overal:
+
+| Browser | WebGPU | https-pagina naar `ws://` op het LAN |
+|---|---|---|
+| Chrome en Edge, desktop | ja; op Linux nog deels | ja, na een toestemmingsvraag (vanaf 147) |
+| Chrome op Android | vanaf Android 12 | niet nagegaan |
+| Safari, en alles op iPhone en iPad | vanaf Safari 26 | nee |
+| Firefox | Windows en Apple Silicon; niet Linux en Android | voor zover na te gaan nee |
+
+Een oudere iPad of een Linux-laptop met Firefox komt dus hoe dan ook bij WebGL uit, en de
+telefoon en de tablet in de tuin zijn juist waar dit ontwerp voor is.
+
+De keuze die wel bestaat is welke WebGL-weg: de terugval van wgpu, of voor de webbouw de
+`glow`-renderer van egui. Die tweede geeft naar verwachting een kleinere download (niet
+gemeten) en is in browsers de oudste weg van egui, maar het is een tweede renderer naast
+wgpu op native. Eerst de terugval proberen; werkt die goed, dan verandert er niets.
+
+### Een https-pagina en een Pi over http
+
+Een browser laat een pagina die over https is geladen in principe geen onversleutelde
+WebSocket (`ws://`) openen: mixed content. Chrome maakt daar een uitzondering op voor het
+eigen netwerk (Local Network Access): een IP-adres uit een privébereik, een naam op
+`.local` of `localhost`, nadat de gebruiker toestemming heeft gegeven. Voor WebSockets
+geldt dat vanaf Chrome 147. Safari en Firefox hebben die uitzondering niet, voor zover na
+te gaan; daar blijft het mixed content en dus geblokkeerd.
+
+Https op de Pi zelf (`wss://`) lost het voor alle browsers op, maar vraagt een certificaat
+voor een apparaat op het LAN. Zelfondertekend geeft elke bezoeker een waarschuwing, en bij
+een WebSocket niet eens een knop om door te gaan. Een echt certificaat kan met een eigen
+domeinnaam of via een dienst als Tailscale, maar dat is inrichting per gebruiker en geen
+doel voor de eerste versie.
+
+### Twee ingangen
+
+Bas host de viewer toch al op https (pa1bh.nl). Dat vervangt de pagina vanaf de Pi niet,
+het komt ernaast:
+
+| | Pagina vanaf de Pi (`http://vna.local:8080`) | Pagina op de website (https) |
+|---|---|---|
+| Browsers die kunnen meten | alle | Chrome en Edge, na toestemming |
+| Zonder internet (Pi bij de antenne) | ja | nee |
+| Renderer | WebGL | WebGPU waar het kan, anders WebGL |
+| Versie van de client | die van de server, past altijd | de nieuwste; de begroeting moet het verschil opvangen |
+| Adres van de server | de pagina weet waar hij vandaan komt | invullen, zoals Add server… op native |
+
+Wat hosten op https nog meer geeft:
+
+- **Altijd de nieuwste client**, zonder dat de Pi wordt bijgewerkt. De versiecontrole in
+  de begroeting wordt daardoor belangrijker: een nieuwe pagina moet met een oudere server
+  kunnen praten, of duidelijk zeggen dat het niet gaat.
+- **Web Serial blijft mogelijk.** Dat vraagt een veilige context; dezelfde pagina kan
+  later ook rechtstreeks met een VNA aan USB praten (docs/09).
+- **Installeren en offline.** Een pagina op https kan zich als app laten installeren en
+  zichzelf bewaren voor gebruik zonder internet (service worker). Niet gebouwd.
+- **De server op de eigen computer.** Een https-pagina mag met `localhost` praten. Wie
+  Firefox gebruikt en dus geen Web Serial heeft, kan `vna-server` lokaal draaien en de
+  gehoste pagina gebruiken. Voor Safari niet nagegaan.
+- **Eén link om te delen**, met de viewer en de voorbeeldmeting voor wie geen apparaat
+  heeft.
+
+De server blijft de pagina dus zelf serveren (stap 3), en de browserbouw krijgt hetzelfde
+adresveld als native voor het geval hij niet van een server komt. Dat is geen extra
+ontwerp: het is "Een server is een poort" in de browser.
+
+Bronnen:
+[Local Network Access (Chrome for Developers)](https://developer.chrome.com/docs/modern-web-guidance/guides/security/local-network-access),
+[de toestemmingsvraag (Chrome-blog)](https://developer.chrome.com/blog/local-network-access),
+[Intent to Ship voor WebSockets](https://groups.google.com/a/chromium.org/g/blink-dev/c/O6GMKt44Ups),
+[WebGPU in de grote browsers (web.dev)](https://web.dev/blog/webgpu-supported-major-browsers),
+[stand per browser (gpuweb-wiki)](https://github.com/gpuweb/gpuweb/wiki/implementation-status).
+
 ## Waar het voor is
 
 - De VNA aan het voedingspunt van de antenne, met een Pi Zero 2 W en een powerbank;
@@ -262,7 +346,7 @@ code draait als het programma.
 | Driver | async ombouwen, ~2650 regels geraakt | ongemoeid |
 | Browsers | alleen Chromium | alle |
 | Telefoon, tablet | Android met Chrome | alles met een browser |
-| Vereist | https of localhost, een klik per sessie | http volstaat (met WebGL) |
+| Vereist | https of localhost, een klik per sessie | http vanaf de Pi volstaat (met WebGL); vanaf een https-pagina alleen Chrome en Edge |
 | Meerdere kijkers | nee | ja |
 | Omvang | ~1 week, hoog risico in de overgang | ~1 week, laag risico |
 
@@ -289,8 +373,13 @@ kunnen als eigen release uit voordat de server bestaat.
 
 - Formaat van het protocol: postcard (compact) of JSON (leesbaar). Neiging: JSON voor de
   eerste versie, om de debugbaarheid; wisselen is later één regel per kant.
-- Werkt de WebGL-terugval van `egui-wgpu` goed genoeg, of wordt de webbouw `glow`?
-  Dit is het eerste om te proberen, nog voor stap 1: het beslist of de rest zin heeft.
+- Werkt de WebGL-terugval van wgpu goed genoeg, of wordt de webbouw `glow`? Dit is het
+  eerste om te proberen, nog voor stap 1: het beslist of de rest zin heeft. De proef is
+  klein: de bestaande build openen vanaf een andere computer over http op een LAN-adres,
+  of in Firefox op Linux.
+- Doet de uitzondering van Chrome wat de documentatie zegt, met een naam op `.local` en
+  met een IP-adres, ook op Android? En wat doen Safari en Firefox precies met `ws://`
+  naar `localhost` en naar het LAN? Proberen zodra er een server is.
 - Welke Pi ligt er, en welk OS? Een 64-bits systeem is nodig voor het bestaande
   aarch64-archief.
 - Of de server ook de CLI-taken moet kunnen (een sweep naar een bestand op de Pi, loggen
