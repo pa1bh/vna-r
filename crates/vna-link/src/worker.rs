@@ -19,6 +19,9 @@
 //!
 //! The browser build has no threads and no serial port: there [`spawn`] only
 //! hands out the channels and nothing answers.
+//!
+//! A port named [`SIMULATOR`](crate::SIMULATOR) opens a simulated device
+//! instead of a serial port; everything else here stays the same for it.
 
 #![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
 
@@ -32,6 +35,9 @@ use std::time::{Duration, Instant};
 use litevna::calibration::Standard;
 use litevna::{Screenshot, SweepConfig, SweepResult, Vna, VnaInfo};
 use serde::{Deserialize, Serialize};
+
+use crate::device::Device;
+use crate::sim;
 
 /// Why a sweep was requested; decides what the UI does with the result.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -237,15 +243,18 @@ fn retry_step(absent: Duration, present: Option<Duration>, settle: Duration) -> 
 }
 
 /// Open the device on `port` and read what the UI shows about it.
-fn open_device(port: &str) -> litevna::Result<(Vna, VnaInfo, Option<u16>)> {
+fn open_device(port: &str) -> litevna::Result<(Box<dyn Device>, VnaInfo, Option<u16>)> {
+    if sim::is_simulator(port) {
+        return sim::open(port);
+    }
     let mut d = Vna::open(port)?;
     let info = d.info()?;
     let battery_mv = d.battery_millivolts().ok();
-    Ok((d, info, battery_mv))
+    Ok((Box::new(d), info, battery_mv))
 }
 
 struct Worker {
-    dev: Option<Vna>,
+    dev: Option<Box<dyn Device>>,
     /// Path of the open port, to check whether it still exists; kept while
     /// the link is lost, as the port to wait for.
     port: Option<String>,
@@ -350,7 +359,11 @@ impl Worker {
     }
 
     /// The port we opened is no longer among the serial ports of the system.
+    /// The simulator has no port and never leaves.
     fn port_vanished(&self) -> bool {
+        if self.port.as_deref().is_some_and(sim::is_simulator) {
+            return false;
+        }
         match (&self.port, litevna::discovery::list_ports()) {
             (Some(path), Ok(ports)) => !ports.iter().any(|p| &p.path == path),
             _ => false,
@@ -582,6 +595,7 @@ impl Worker {
                     }
                     ControlFlow::Continue(())
                 };
+                d.measuring(purpose);
                 match d.sweep_with(cfg, false, &mut progress) {
                     Ok(r) => {
                         before += cfg.points as usize;
