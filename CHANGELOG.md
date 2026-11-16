@@ -14,6 +14,9 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Changed
 
+- Amateur bands, Region 2: 60 m ends at 5406.4 kHz, the edge 47 CFR 97.303(h)(3) names for
+  the band, not the 5406.3 kHz that 0.3.6 read off the ARRL chart. Steve Falco, AC2XM, dug
+  up the statute.
 - README and both manuals brought up to date with 0.3.0–0.3.6 after a check against the
   code: the README's feature list (bands, Band row, zoom, shared axis with reset view, sweep
   from calibration, log spacing, drop, S21 offset, Kaiser windows, reconnecting, the

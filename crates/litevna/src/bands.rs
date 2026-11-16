@@ -101,16 +101,17 @@ pub const REGION_1: &[Band] = &[
     band("6 cm", 5_650_000_000, 5_850_000_000),
 ];
 
-/// IARU Region 2 as the FCC allocates it (ARRL chart rev. 2026-01-16), sorted by
-/// frequency, non-overlapping. 60 m is four 2.8 kHz channels plus the 15 kHz WRC-15
-/// sub-band, given as the span they cover; 1.25 m (219–220 MHz is for fixed digital
-/// message forwarding only) and 13 cm are each in two pieces.
+/// IARU Region 2 as the FCC allocates it (47 CFR 97.303 and the ARRL chart rev.
+/// 2026-01-16), sorted by frequency, non-overlapping. 60 m is four 2.8 kHz channels plus
+/// the 15 kHz WRC-15 sub-band, given as the span 97.303(h)(3) names for the band;
+/// 1.25 m (219–220 MHz is for fixed digital message forwarding only) and 13 cm are each
+/// in two pieces.
 pub const REGION_2: &[Band] = &[
     band("2200 m", 135_700, 137_800),
     band("630 m", 472_000, 479_000),
     band("160 m", 1_800_000, 2_000_000),
     band("80 m", 3_500_000, 4_000_000),
-    band("60 m", 5_330_500, 5_406_300),
+    band("60 m", 5_330_500, 5_406_400),
     band("40 m", 7_000_000, 7_300_000),
     band("30 m", 10_100_000, 10_150_000),
     band("20 m", 14_000_000, 14_350_000),
@@ -162,7 +163,8 @@ mod tests {
         assert_eq!(forty(REGION_2), 7_300_000);
         let two_m = REGION_2.iter().find(|b| b.name == "2 m").unwrap();
         assert_eq!((two_m.start_hz, two_m.stop_hz), (144_000_000, 148_000_000));
-        // Checked against the ARRL chart of 2026-01-16 (Steve Falco, AC2XM, on groups.io).
+        // Checked against the ARRL chart of 2026-01-16 and 47 CFR 97.303(h)(3), which names
+        // the 60 m band as 5330.5-5406.4 kHz (Steve Falco, AC2XM, on groups.io).
         let edges = |name: &str| {
             REGION_2
                 .iter()
@@ -170,7 +172,7 @@ mod tests {
                 .map(|b| (b.start_hz, b.stop_hz))
                 .collect::<Vec<_>>()
         };
-        assert_eq!(edges("60 m"), vec![(5_330_500, 5_406_300)]);
+        assert_eq!(edges("60 m"), vec![(5_330_500, 5_406_400)]);
         assert_eq!(edges("1.25 m"), vec![(219_000_000, 220_000_000), (222_000_000, 225_000_000)]);
         assert_eq!(edges("9 cm"), vec![(3_300_000_000, 3_450_000_000)]);
     }
