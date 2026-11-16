@@ -12,6 +12,12 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Added
+
+- `docs/10-client-server.md` (Dutch): a design note for a server on a Raspberry Pi with the
+  browser build as its client over a WebSocket on the LAN. Nothing is built; it sizes the
+  work at about a week and finds that the device driver stays as it is.
+
 ### Changed
 
 - Amateur bands, Region 2: 60 m ends at 5406.4 kHz, the edge 47 CFR 97.303(h)(3) names for

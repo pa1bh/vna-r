@@ -185,7 +185,9 @@ its own.
 - **In the browser.** The same GUI builds to WebAssembly as a viewer for Touchstone files without a
   device: `scripts/build-web.sh` writes three static files to `target/web`, ready for any web
   server; the page opens with an example measurement and files stay in the browser. Not hosted
-  anywhere yet; notes in [docs/09-wasm-proef.md](docs/09-wasm-proef.md) (Dutch).
+  anywhere yet; notes in [docs/09-wasm-proef.md](docs/09-wasm-proef.md) (Dutch). A design note
+  for the next step, a server on a Raspberry Pi with this browser build as its client, is
+  [docs/10-client-server.md](docs/10-client-server.md) (Dutch, nothing built yet).
 - **Developer tools.** Off by default; **View ▸ Developer tools** adds a log window and
   **Copy diagnostics** for bug reports.
 

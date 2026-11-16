@@ -30,7 +30,7 @@ complete shell. No test needs a device.
 | `crates/vna-gui` | egui/eframe GUI. `app/` is the state and the panels (see below), `worker.rs` the device thread, `smith.rs` the Smith chart. |
 | `crates/build_git_rev.rs` | Build script shared by the two binaries (git revision for About and `--version`). |
 | `docs/manual`, `docs/handleiding` | The user manual, English and Dutch, chapter for chapter the same. |
-| `docs/01` … `docs/08` | Research notes, roadmap, analysis and QC procedure, in Dutch. |
+| `docs/01` … `docs/10` | Research notes, roadmap, analysis, QC procedure and design notes, in Dutch. |
 | `linux/70-litevna.rules` | udev rule, shipped in the Linux tarball and by the flake. |
 
 Inside the library, from the wire upwards:
