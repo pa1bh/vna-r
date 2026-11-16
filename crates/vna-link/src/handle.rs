@@ -41,17 +41,33 @@ pub fn spawn(notify: Notify) -> WorkerHandle {
 }
 
 /// `ewebsock` as a [`Socket`]; `wake` is called when it has news.
+///
+/// The event is queued first and `wake` called after. ewebsock's own receiver
+/// (`connect_with_wakeup`) does it the other way round, which suits a GUI that
+/// only looks at its next frame, but not a thread that looks the moment it
+/// is woken: it could find nothing yet and go back to sleep with the event
+/// lying there, until something else woke it. That left the result of a
+/// single sweep undelivered now and then.
 fn open_ws(url: &str, wake: impl Fn() + Send + Sync + 'static) -> Result<Box<dyn Socket>, String> {
-    struct Ws(ewebsock::WsSender, ewebsock::WsReceiver);
+    struct Ws(ewebsock::WsSender, std::sync::mpsc::Receiver<ewebsock::WsEvent>);
     impl Socket for Ws {
         fn send(&mut self, text: String) {
             self.0.send(ewebsock::WsMessage::Text(text));
         }
         fn try_recv(&mut self) -> Option<ewebsock::WsEvent> {
-            self.1.try_recv()
+            self.1.try_recv().ok()
         }
     }
-    let (tx, rx) = ewebsock::connect_with_wakeup(url, ewebsock::Options::default(), wake)?;
+    let (events, rx) = std::sync::mpsc::channel();
+    let on_event = move |event| {
+        if events.send(event).is_err() {
+            // The session let go of the socket.
+            return std::ops::ControlFlow::Break(());
+        }
+        wake();
+        std::ops::ControlFlow::Continue(())
+    };
+    let tx = ewebsock::ws_connect(url.to_string(), ewebsock::Options::default(), Box::new(on_event))?;
     Ok(Box::new(Ws(tx, rx)))
 }
 

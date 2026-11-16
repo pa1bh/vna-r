@@ -1696,6 +1696,19 @@ rest van deel C in het venster.
    bij een verbinding die al stond, zie 0.3.3), en na een reeks mislukte pogingen duurt
    het tot een minuut voordat een apparaat dat intussen blijft zitten wordt opgepakt.
    Nog niet veranderd: eerst zien hoe het gaat als de voeding in orde is.
+5. **Het resultaat van een losse sweep bleef soms liggen** (gevonden door de CI op de
+   pull request, 16 november: een test liep op de Linux-runner in een time-out). De
+   WebSocket-bibliotheek wekte de sessie van het programma vóórdat ze het bericht had
+   klaargelegd; keek de sessie net te vroeg, dan zag ze niets en sliep ze door tot de
+   volgende gebeurtenis, bijvoorbeeld de accumeting na een minuut. Alleen in het gewone
+   programma, niet in de browser, en ongeveer één keer op de driehonderd onder
+   belasting. Opgelost: het bericht wordt eerst klaargelegd en dan pas wordt er gewekt.
+   Een nieuwe test vraagt een reeks losse sweeps achter elkaar. Met driehonderd sweeps
+   en de processor onder druk faalde hij met de oude code in drie van de zes runs en met
+   de nieuwe in geen van de twaalf; de oorspronkelijke test liep met de nieuwe code
+   negenhonderd keer goed. In de CI staat de reeks op honderd, omdat elk antwoord tot
+   25 ms wacht op de verbindingsdraad van de server. Controle met een apparaat: Single
+   een aantal keer achter elkaar, elk resultaat komt meteen.
 
 ## Slotronde
 

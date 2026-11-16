@@ -60,10 +60,24 @@ fn next(h: &WorkerHandle) -> Event {
     h.recv_timeout(TIMEOUT).expect("an event within the timeout")
 }
 
+/// One line per event, short: a sweep's vectors would bury the rest.
+fn brief(e: &Event) -> String {
+    let text = format!("{e:?}");
+    match text.char_indices().nth(160) {
+        Some((i, _)) => format!("{}…", &text[..i]),
+        None => text,
+    }
+}
+
 fn until(h: &WorkerHandle, stop: impl Fn(&Event) -> bool) -> Vec<Event> {
     let mut seen = Vec::new();
     loop {
-        let e = next(h);
+        // A timeout says what did arrive: that is what tells a lost message
+        // from an answer that was something else.
+        let e = h.recv_timeout(TIMEOUT).unwrap_or_else(|_| {
+            let seen: Vec<String> = seen.iter().map(brief).collect();
+            panic!("no event within the timeout; before it came: {seen:#?}")
+        });
         let done = stop(&e);
         seen.push(e);
         if done {
@@ -131,6 +145,29 @@ fn connect_sweep_and_disconnect_through_the_handle() {
     // and after that, as with a serial port that is gone
     h.send(sweep(11, false));
     assert!(matches!(next(&h), Event::Error { stops_sweep: true, .. }));
+    s.shutdown();
+}
+
+/// Every single sweep gets its answer, also when nothing else follows it to
+/// stir the client: the result must not lie in the socket's queue until the
+/// next message. (It did, now and then: the socket woke the session before
+/// it had queued the message.)
+#[test]
+fn a_single_sweep_is_answered_every_time() {
+    let s = server(0.0);
+    let h = handle();
+    h.send(Cmd::Connect(url(s.local_addr())));
+    until(&h, |e| matches!(e, Event::Connected { .. }));
+    // A hundred, because the gap was narrow: about one sweep in three hundred
+    // on a busy machine. More would catch it more often, but every answer
+    // waits for the server's connection thread to look at its outbox, which
+    // it does every 25 ms.
+    for _ in 0..100 {
+        h.send(sweep(21, false));
+        until(&h, is_done);
+    }
+    h.send(Cmd::Disconnect);
+    until(&h, |e| matches!(e, Event::Disconnected));
     s.shutdown();
 }
 
