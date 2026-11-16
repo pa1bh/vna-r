@@ -1664,9 +1664,15 @@ twee banden: SWR 1,09 bij 152 MHz en 1,10 bij 462 MHz, met de markers en de kolo
 zoals bij een kabel. Dit is de eerste keer dat het venster van het programma met een
 server gezien is (C1 en C2, met een echte server in plaats van de simulator).
 
+**Twee kijkers tegelijk op de Pi, door PA1BH (deel F): in orde.** Het programma en een
+tweede client samen op de server. Het werkt; wat opvalt is dat elke kijker zijn eigen
+sweepinstellingen heeft, en dat het spoor dat je ziet van de sweep is die de ander
+startte: het klopt dan niet met wat er in je eigen velden Start en Stop staat. Besluit van
+PA1BH: geen probleem, en dat lossen we niet op. Het volgt uit "iedereen mag sturen".
+
 **Niet gedaan:** de NanoVNA-F met een doorverbinding tussen de poorten (of S21 boven
-280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, twee
-kijkers tegelijk met het programma erbij, en de rest van deel C in het venster.
+280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, en de
+rest van deel C in het venster.
 
 ## Bevindingen tijdens het bouwen
 
