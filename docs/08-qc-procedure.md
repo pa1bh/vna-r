@@ -1626,6 +1626,40 @@ aan de Mac hangen.
 De dienst staat nog aan op de Pi (`http://192.168.1.190:8080/`), zodat het vanzelf
 verdergaat zodra de LiteVNA blijft zitten.
 
+### 16 november, vervolg: de USB van de Pi en de NanoVNA-F
+
+**De over-current hoort bij de LiteVNA 64, niet bij de Pi.** PA1BH wisselde de officiële
+voeding (5,1 V, 3 A) voor een laptopvoeding: het bleef, nu in vlagen, en de Pi meldde er
+zelf onderspanning bij (`get_throttled` van 0x0 naar 0x50005), dus dat was eerder slechter
+dan beter. De accuspanning van de LiteVNA uitlezen lukte in twaalf pogingen niet, hij viel
+telkens weg. Daarna alleen een toetsenbord aan dezelfde poort: 0 over-current en 0 keer van
+de bus; de laatste melding viel op de seconde dat de LiteVNA eruit ging. De poorten zijn
+dus in orde. Het vermoeden: een LiteVNA die aanstaat en zijn accu laadt vraagt meer dan de
+1,2 A die de vier poorten van een Pi 4 samen mogen leveren. **Nog te proberen:** de LiteVNA
+eerst vol laden, of een hub met eigen voeding. Pas als dat bekend is komt het in hoofdstuk
+10 van de handleiding.
+
+**De NanoVNA-F 4.3 (fw 1.0.4) aan de Pi: in orde.** Hij blijft op de bus (0 over-current),
+en de dienst, die intussen gewoon doordraaide, vond hem zelf en verbond: `connected to
+NanoVNA-F 4.3  fw 1.0.4 by BH5HNU on /dev/ttyACM0`. De server stapt dus zonder herstart
+over van het ene soort analyzer op het andere. Door de Pi heen, vanaf de Mac, met de
+pagina van de Pi en een tweede WebSocket ernaast:
+
+| Wat | Uitkomst |
+|---|---|
+| De pagina | `NanoVNA-F 4.3  fw 1.0.4 by BH5HNU  via vna-r-server  4.20 V`; grenzen 10 kHz–1,5 GHz, 301 punten per scan |
+| 201 punten, 1–30 MHz | 1,4 s op het apparaat; 19 kB; bij beide verbindingen aangekomen |
+| 101 punten, 300–900 MHz (E6, boven 280 MHz) | 0,9 s; S21 heeft overal een waarde (ruis rond 10⁻³, er zat niets tussen de poorten), geen nullen |
+| 1001 punten, 1 MHz–1,5 GHz, Stop na 4 s | voortgang 301 van 1001; `Cancelled` 0,34 s na Stop; daarna geen sweep meer |
+| Doorvegen, 201 punten, 10 sweeps | 1401 ms per sweep op het apparaat, 1407 ms tussen aankomsten: 7 ms toeslag |
+| Schermafbeelding | 800×480, 1,0 MB, na 1,3 s; in de pagina leesbaar en met de goede kleuren |
+
+De dienst gebruikte daarbij 2,8 % van een kern en 13 MB; de Pi was 44 °C.
+
+**Niet gedaan:** de NanoVNA-F met een doorverbinding tussen de poorten (of S21 boven
+280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, en het
+programma zelf als client van de Pi.
+
 ## Bevindingen tijdens het bouwen
 
 1. **Het zijpaneel afgeknipt na het laden.** Op de pagina van de server, in een
