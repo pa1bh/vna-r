@@ -13,3 +13,9 @@ workspace = true
 [dependencies]
 litevna = { path = "../litevna" }
 log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64 = { workspace = true }
+
+[dev-dependencies]
+num-complex = { workspace = true }

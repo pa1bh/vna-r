@@ -6,6 +6,7 @@
 //! READ / READFIFO / INDICATE commands.
 
 use num_complex::Complex64;
+use serde::{Deserialize, Serialize};
 
 /// Command opcodes (byte 0 of every host-to-device command).
 pub mod cmd {
@@ -155,7 +156,7 @@ pub fn fifo_checksum(record: &[u8]) -> u8 {
 /// `fwd0` is the reference (outgoing) wave, `rev0` the wave coming back into
 /// port 1 (reflection), `rev1` the wave arriving at port 2 (transmission).
 /// All three have an arbitrary common phase, so only the ratios are meaningful.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FifoPoint {
     pub fwd0_re: i32,
     pub fwd0_im: i32,
@@ -189,6 +190,21 @@ impl FifoPoint {
             checksum,
             checksum_ok: fifo_checksum(record) == checksum,
         })
+    }
+
+    /// The 32-byte record this point was parsed from: [`parse`](Self::parse)
+    /// backwards, so a record can travel as the bytes the device sent.
+    /// `checksum_ok` is not stored in the record; `parse` derives it again.
+    pub fn to_bytes(&self) -> [u8; FIFO_POINT_SIZE] {
+        let mut r = [0u8; FIFO_POINT_SIZE];
+        let words = [self.fwd0_re, self.fwd0_im, self.rev0_re, self.rev0_im, self.rev1_re, self.rev1_im];
+        for (k, w) in words.iter().enumerate() {
+            r[4 * k..4 * k + 4].copy_from_slice(&w.to_le_bytes());
+        }
+        r[0x18..0x1A].copy_from_slice(&self.freq_index.to_le_bytes());
+        r[0x1A..0x1F].copy_from_slice(&self.reserved);
+        r[0x1F] = self.checksum;
+        r
     }
 
     pub fn fwd0(&self) -> Complex64 {
@@ -268,5 +284,18 @@ mod tests {
         r[0x1F] ^= 0xFF;
         assert!(!FifoPoint::parse(&r).unwrap().checksum_ok);
         assert!(FifoPoint::parse(&r[..10]).is_err());
+    }
+
+    #[test]
+    fn a_record_is_written_back_byte_for_byte() {
+        let mut r = sample_record();
+        r[0x1A..0x1F].copy_from_slice(&[1, 2, 3, 4, 5]);
+        r[0x1F] = fifo_checksum(&r);
+        assert_eq!(FifoPoint::parse(&r).unwrap().to_bytes(), r);
+        // a bad checksum stays bad
+        r[0x1F] ^= 0x5A;
+        let p = FifoPoint::parse(&r).unwrap();
+        assert_eq!(p.to_bytes(), r);
+        assert!(!FifoPoint::parse(&p.to_bytes()).unwrap().checksum_ok);
     }
 }

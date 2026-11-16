@@ -19,7 +19,13 @@ neg_cmp_op_on_partial_ord = "allow"
 serialport = "4.10"
 num-complex = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: without it serde_json may read a float back one unit in the
+# last place off. A sweep sent by vna-server must arrive as it was measured, and
+# a calibration file should read back as it was written. Here rather than in
+# vna-link alone, so that a build of one crate behaves like a build of all.
+serde_json = { version = "1", features = ["float_roundtrip"] }
+# Bytes inside JSON (the client/server wire of vna-link: FIFO records, screenshots).
+base64 = "0.22"
 rustfft = "6.4"
 thiserror = "2"
 anyhow = "1"

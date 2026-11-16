@@ -31,9 +31,11 @@ use std::time::{Duration, Instant};
 
 use litevna::calibration::Standard;
 use litevna::{Screenshot, SweepConfig, SweepResult, Vna, VnaInfo};
+use serde::{Deserialize, Serialize};
 
 /// Why a sweep was requested; decides what the UI does with the result.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Purpose {
     Display,
     Standard(Standard),
@@ -61,7 +63,11 @@ pub enum Cmd {
     Screenshot,
 }
 
-#[derive(Debug)]
+/// What the worker reports. The serde form is what a server sends its
+/// clients (see [`crate::wire`]); the sweep and the screenshot travel in a
+/// compact form of their own, which is why those two fields name a module.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Event {
     Connected {
         port: String,
@@ -81,6 +87,7 @@ pub enum Event {
     /// `repeat` sweeps.
     SweepDone {
         cfgs: Vec<SweepConfig>,
+        #[serde(with = "crate::wire::sweep")]
         result: SweepResult,
         purpose: Purpose,
         repeat: usize,
@@ -94,7 +101,7 @@ pub enum Event {
     Cancelled {
         purpose: Purpose,
     },
-    Screenshot(Screenshot),
+    Screenshot(#[serde(with = "crate::wire::screenshot")] Screenshot),
     /// The battery voltage, in answer to [`Cmd::Battery`].
     Battery(u16),
     /// Something failed. `stops_sweep` says whether continuous sweeping ended
@@ -104,6 +111,11 @@ pub enum Event {
         msg: String,
         stops_sweep: bool,
     },
+    /// Continuous sweeping started (`true`) or stopped (`false`), whichever
+    /// client asked for it. Only a server sends this, to all its clients, so
+    /// that every one of them knows the device is running and can stop it; a
+    /// local worker never does, its one UI knows what it asked for.
+    Continuous(bool),
 }
 
 /// Called by the worker after every event it sends, from the worker thread.

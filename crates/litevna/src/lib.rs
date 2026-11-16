@@ -32,6 +32,7 @@ pub mod error;
 #[cfg(test)]
 mod fakeport;
 pub mod freq;
+mod nonfinite;
 pub mod protocol;
 pub mod shell;
 pub mod timedomain;

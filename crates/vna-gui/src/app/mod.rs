@@ -615,6 +615,9 @@ impl App {
                     self.screenshot = Some((tex, shot));
                     self.show_screenshot = true;
                 }
+                // From a server: another client started or stopped continuous
+                // sweeping, so Run and Stop show what the device is doing.
+                Event::Continuous(on) => self.running = on,
                 Event::Error { msg, stops_sweep } => {
                     log::warn!("worker: {msg}");
                     self.log(format!("error: {msg}"));

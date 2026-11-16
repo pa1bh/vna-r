@@ -8,13 +8,15 @@
 //! averaging, bandwidth) stay on the concrete types behind [`Vna::as_lite_mut`]
 //! and [`Vna::as_shell_mut`].
 
+use serde::{Deserialize, Serialize};
+
 use crate::device::{DeviceInfo, LiteVna, Screenshot, SweepConfig, SweepProgress, SweepResult};
 use crate::discovery::{self, Kind};
 use crate::error::{Error, Result};
 use crate::shell::{NanoVnaShell, ShellInfo, MAX_SCAN_POINTS};
 
 /// What a device can do, for the UI to warn about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Limits {
     pub min_hz: u64,
     pub max_hz: u64,
@@ -25,7 +27,7 @@ pub struct Limits {
 }
 
 /// Identity of a connected device, protocol-independent.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VnaInfo {
     pub kind: Kind,
     /// `LiteVNA` or the model line of the shell, e.g. `NanoVNA-F 4.3`.

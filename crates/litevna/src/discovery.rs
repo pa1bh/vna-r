@@ -1,5 +1,6 @@
 //! Find serial ports that look like a VNA, and tell which protocol to expect.
 
+use serde::{Deserialize, Serialize};
 use serialport::{SerialPortType, UsbPortInfo};
 
 /// USB vendor/product id used by the NanoVNA V2 and LiteVNA firmware
@@ -12,7 +13,7 @@ pub const STM_VCP_VID: u16 = 0x0483;
 pub const STM_VCP_PID: u16 = 0x5740;
 
 /// Which protocol a port speaks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Kind {
     /// Binary register protocol: LiteVNA 62/64/67, NanoVNA V2.
     LiteVna,

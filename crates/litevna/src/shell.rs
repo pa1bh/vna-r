@@ -24,6 +24,7 @@ use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 
 use num_complex::Complex64;
+use serde::{Deserialize, Serialize};
 use serialport::{ClearBuffer, SerialPort};
 
 use crate::device::{Screenshot, SweepConfig, SweepProgress, SweepResult};
@@ -62,7 +63,7 @@ const MIN_SCAN_TIMEOUT: Duration = Duration::from_secs(5);
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// What `info` reports.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct ShellInfo {
     /// `Model:` line, e.g. `NanoVNA-F 4.3`.
     pub model: String,

@@ -4,13 +4,14 @@ use std::io::{self, Read, Write};
 use std::time::{Duration, Instant};
 
 use num_complex::Complex64;
+use serde::{Deserialize, Serialize};
 use serialport::{ClearBuffer, SerialPort};
 
 use crate::error::{Error, Result};
 use crate::protocol::{self as proto, reg, Channel, DataMode, FifoPoint, FIFO_MAX_CHUNK, FIFO_POINT_SIZE};
 
 /// Identity registers `0xF0..=0xF4`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeviceInfo {
     pub variant: u8,
     pub protocol_version: u8,
@@ -27,7 +28,7 @@ impl DeviceInfo {
 }
 
 /// Sweep parameters as the device wants them: start + step + points.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SweepConfig {
     pub start_hz: u64,
     pub step_hz: u64,
@@ -169,16 +170,23 @@ pub fn log_segment_edges(start_hz: u64, stop_hz: u64, segments: usize) -> Result
 pub type SweepProgress<'a> = &'a mut dyn FnMut(usize, usize) -> std::ops::ControlFlow<()>;
 
 /// A completed sweep, indexed by frequency point.
-#[derive(Debug, Clone)]
+///
+/// S11 and S21 can hold NaN (a record whose reference wave is zero) or an
+/// infinity; JSON has no such numbers, so in a text format they are written
+/// as the strings `"NaN"`, `"inf"` and `"-inf"` and read back as what they were.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SweepResult {
     pub freqs_hz: Vec<u64>,
+    #[serde(with = "crate::nonfinite::complex_vec")]
     pub s11: Vec<Complex64>,
+    #[serde(with = "crate::nonfinite::complex_vec")]
     pub s21: Vec<Complex64>,
     /// The raw LiteVNA FIFO records, one per frequency point (`None` where a
     /// point never arrived). **Empty** for a sweep without raw records: a
     /// NanoVNA shell sweep, a Touchstone file, an average. `missing_points`
     /// is then 0; only a vector as long as `freqs_hz` says something about
     /// completeness.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub points: Vec<Option<FifoPoint>>,
     pub checksum_ok: usize,
     pub checksum_bad: usize,
@@ -354,7 +362,7 @@ impl SweepResult {
 }
 
 /// Screen capture as sent by the device: RGB565 pixels.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Screenshot {
     pub width: u16,
     pub height: u16,
