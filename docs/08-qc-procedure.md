@@ -1656,9 +1656,17 @@ pagina van de Pi en een tweede WebSocket ernaast:
 
 De dienst gebruikte daarbij 2,8 % van een kern en 13 MB; de Pi was 44 °C.
 
+**Het programma als client van de Pi, door PA1BH: in orde.** `vna-gui` op de Mac, Device ▸
+Add server… met `192.168.1.190`, Connect. De poortlijst toont `server 192.168.1.190:8080`
+met rescan en Disconnect ernaast, de groene regel `NanoVNA-F 4.3  fw 1.0.4 by BH5HNU  via
+vna-r-server  4.15 V`. Een sweep van 100 tot 500 MHz, 201 punten, van een antenne voor
+twee banden: SWR 1,09 bij 152 MHz en 1,10 bij 462 MHz, met de markers en de kolom L / C
+zoals bij een kabel. Dit is de eerste keer dat het venster van het programma met een
+server gezien is (C1 en C2, met een echte server in plaats van de simulator).
+
 **Niet gedaan:** de NanoVNA-F met een doorverbinding tussen de poorten (of S21 boven
-280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, en het
-programma zelf als client van de Pi.
+280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, twee
+kijkers tegelijk met het programma erbij, en de rest van deel C in het venster.
 
 ## Bevindingen tijdens het bouwen
 
