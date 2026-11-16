@@ -1,7 +1,8 @@
 # vna-r
 
 Desktop software for the **LiteVNA 64/67** and the **NanoVNA-F** vector network analysers on macOS,
-Linux and Windows, written in Rust: a device library, a command line tool (`vna-cli`) and a GUI (`vna-gui`).
+Linux and Windows, written in Rust: a device library, a command line tool (`vna-cli`), a GUI (`vna-gui`)
+and a server (`vna-server`) for measuring over the network, from the program or from a browser.
 Sweeps, SOLT calibration with kit fit, Smith chart and seven trace views, markers, references with a
 difference trace, segments, time-domain reflectometry (TDR) with gating, and Touchstone import and
 export. Hobby project by Bas Hendriks, PA1BH.
@@ -15,7 +16,8 @@ Fedora, and Fedora Asahi Remix on an M1 with the `aarch64-linux` archive); the W
 ## Getting it
 
 **Download.** Every release on the [Releases page](https://github.com/pa1bh/vna-r/releases) carries
-an archive per platform with `vna-cli`, `vna-gui`, the manual (English and Dutch) and a checksum:
+an archive per platform with `vna-cli`, `vna-gui`, `vna-server`, the manual (English and Dutch) and a
+checksum; the Linux archives also hold the udev rule and a systemd unit for the server:
 
 | Archive | For |
 |---|---|
@@ -24,6 +26,7 @@ an archive per platform with `vna-cli`, `vna-gui`, the manual (English and Dutch
 | `…-x86_64-linux.tar.gz` | Linux on x86_64; needs `libudev` and, for the file dialogs, an `xdg-desktop-portal` (every desktop environment ships one; not NixOS, see below) |
 | `…-aarch64-linux.tar.gz` | Linux on arm64 (Asahi Linux on Apple Silicon, Raspberry Pi); same requirements as x86_64 |
 | `…-x86_64-windows.zip` | Windows 10 or 11 on x86_64 |
+| `…-web.zip` | the browser page on its own (three static files), for a website |
 
 Nothing is code-signed yet. **macOS** therefore refuses to start a binary that was downloaded with a
 browser and unpacked with the Finder ("cannot be opened because the developer cannot be verified").
@@ -50,8 +53,9 @@ NanoVNA-F use.
 nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
-The package also ships the udev rule (`services.udev.packages = [ vna-r ];`). The release tarballs
-do not run on NixOS; use the flake there.
+The package also ships the udev rule (`services.udev.packages = [ vna-r ];`), and `#vna-server`
+runs the server (without the browser page built in; `vna-gui` connects to it all the same). The
+release tarballs do not run on NixOS; use the flake there.
 
 **Build from source.** You need a Rust toolchain (stable, 1.95 or later). On Debian/Ubuntu also:
 
@@ -138,6 +142,17 @@ output for scripts, `--trace` prints each byte sent and received, `peek F0` read
 register. After a sweep the CLI hands the screen back to the device; `vna-cli release` does that on
 its own.
 
+## Measuring over the network
+
+Put the analyser on a small computer, a Raspberry Pi with a 64-bit Raspberry Pi OS for example, and
+run `vna-server` there (the `aarch64-linux` archive has a systemd unit for it). Then open
+`http://<that computer>:8080/` in any browser on the same network, or choose **Device ▸ Add server…**
+in `vna-gui` and pick the server in the port list. Several people can watch and steer one analyser;
+each calibrates in their own program or browser. There is no password yet, so use it on a network
+you trust. `vna-server --simulate` gives a simulated analyser to try it without one. The manual
+has the details: [chapter 10](docs/manual/10-network.md) (Dutch:
+[hoofdstuk 10](docs/handleiding/10-netwerk.md)).
+
 ## What it does
 
 - **Views.** Smith chart (S11) plus three plots that each pick their own view: log magnitude, linear
@@ -182,12 +197,15 @@ its own.
   also writes CSV (with impedance and group delay) and, with `--json`, machine-readable output.
 - **Connection.** When the device drops off the USB bus the GUI waits up to 30 s for it to come
   back and reconnects; a sweep that was running continues.
-- **In the browser.** The same GUI builds to WebAssembly as a viewer for Touchstone files without a
-  device: `scripts/build-web.sh` writes three static files to `target/web`, ready for any web
-  server; the page opens with an example measurement and files stay in the browser. Not hosted
-  anywhere yet; notes in [docs/09-wasm-proef.md](docs/09-wasm-proef.md) (Dutch). A design note
-  for the next step, a server on a Raspberry Pi with this browser build as its client, is
-  [docs/10-client-server.md](docs/10-client-server.md) (Dutch, nothing built yet).
+- **Over the network.** `vna-server` drives the analyser on a computer it is plugged into and serves
+  the interface to browsers on the network; `vna-gui` connects to it like to a port. When the network
+  or the server drops, the program waits for it and carries on. Design note:
+  [docs/10-client-server.md](docs/10-client-server.md) (Dutch).
+- **In the browser.** The same GUI builds to WebAssembly. Served by `vna-server` it measures; as a
+  page of its own it is a viewer for Touchstone files that opens with an example measurement, and
+  it measures too once a server is added. `scripts/build-web.sh` writes the three static files to
+  `target/web`; every release has them as `…-web.zip`. Files stay in the browser. Notes in
+  [docs/09-wasm-proef.md](docs/09-wasm-proef.md) (Dutch).
 - **Developer tools.** Off by default; **View ▸ Developer tools** adds a log window and
   **Copy diagnostics** for bug reports.
 
@@ -206,7 +224,8 @@ Two protocols behind one `Vna` handle, chosen by USB id:
 
 - **Manual**: [docs/manual](docs/manual/README.md) (English) or
   [docs/handleiding](docs/handleiding/README.md) (Dutch). What a VNA measures, installing, the GUI,
-  calibrating, TDR and gating, measurement recipes, files, the CLI, devices and troubleshooting.
+  calibrating, TDR and gating, measurement recipes, files, the CLI, devices and troubleshooting,
+  measuring over the network.
 - **Research notes** (Dutch): [docs/01-onderzoek-protocol.md](docs/01-onderzoek-protocol.md) (LiteVNA
   protocol as measured), [docs/06-nanovna-shell-protocol.md](docs/06-nanovna-shell-protocol.md)
   (NanoVNA-F shell), [docs/03-calibratie.md](docs/03-calibratie.md) (calibration model with
@@ -239,7 +258,7 @@ with clippy, checks that the two manuals have the same structure
 ## Versions and releases
 
 The version number lives once in `Cargo.toml` under `[workspace.package]` and applies to the library,
-`vna-cli`, `vna-gui` and the flake. The GUI shows it in the title bar and under **Help ▸ About vna-r** (with
+`vna-cli`, `vna-gui`, `vna-server` and the flake. The GUI shows it in the title bar and under **Help ▸ About vna-r** (with
 the git revision recorded by `build.rs`), the CLI with `vna-cli --version`.
 
 To cut a release:

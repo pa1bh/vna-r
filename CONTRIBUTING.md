@@ -86,6 +86,39 @@ rather than growing `mod.rs`.
 - Comments explain what the code cannot: the measurement that led to a constant, the
   reason for an odd order of operations. `docs/01` and `docs/06` hold the measurements.
 
+## Without a device: the simulator
+
+`vna-link` has a simulated analyser that the real worker drives, so everything above the
+driver (progress, cancelling, the backlog, continuous sweeping) runs as with hardware. It
+is the port `sim:` (`sim:<points per second>`, `sim:0` unpaced for tests): in the GUI
+**View ▸ Developer tools ▸ Developer ▸ Connect to simulator**, in a server `--simulate`.
+To run the whole chain on one machine:
+
+```bash
+scripts/build-web.sh && cargo run --release -p vna-server -- --simulate --listen 127.0.0.1:8080
+```
+
+and open <http://127.0.0.1:8080/>, or **Device ▸ Add server…** `127.0.0.1:8080` in the GUI.
+Without `scripts/build-web.sh` first the server serves a placeholder page (see
+`crates/vna-server/build.rs`); the GUI connects either way. The tests in
+`crates/vna-link/tests/simulator.rs` and `crates/vna-server/tests/` use the same simulator.
+
+## The wire format
+
+What a server and its clients send each other is defined in one place,
+`crates/vna-link/src/wire.rs`: JSON text messages, the serde form of `Event` and of
+`ClientMsg` (the remote subset of `Cmd`), a `Hello` first. Both ends are ours, but the
+page on a website can be newer than a server on a Pi, so:
+
+- An addition that an older reader can ignore (a new field with a serde default, as
+  `via` on `Connected`) needs no new version; give it a default on the reading side and a
+  round-trip test.
+- Anything else (a field removed or changing meaning, a new command a server must not
+  ignore, a new `Event` variant a client must understand) raises `PROTOCOL_VERSION`.
+- What comes from the network is checked before it reaches the GUI (`wire::sweep`,
+  `wire::screenshot`, `check`): add a check there for anything new the GUI takes for
+  granted.
+
 ## Adding or changing device support
 
 Start with `docs/01-onderzoek-protocol.md` (LiteVNA) or `docs/06-nanovna-shell-protocol.md`

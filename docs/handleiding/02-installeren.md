@@ -3,7 +3,7 @@
 ## Bouwen
 
 vna-r is geschreven in Rust. Je hebt een stabiele Rust-toolchain nodig, 1.95 of nieuwer
-([rustup](https://rustup.rs)). Haal de broncode op en bouw de drie onderdelen:
+([rustup](https://rustup.rs)). Haal de broncode op en bouw alles:
 
 ```bash
 git clone https://github.com/pa1bh/vna-r.git
@@ -17,8 +17,8 @@ Stopt cargo met `rustc 1.xx is not supported by the following packages`, dan geb
 een oudere Rust dan je denkt te hebben: een toolchain die rustup eerder installeerde gaat
 voor die van je distributie. `rustup update stable` werkt hem bij.
 
-De programma's staan daarna in `target/release/`: `vna-cli` en `vna-gui`. Starten kan ook
-rechtstreeks via cargo:
+De programma's staan daarna in `target/release/`: `vna-cli`, `vna-gui` en `vna-server`
+(hoofdstuk 10). Starten kan ook rechtstreeks via cargo:
 
 ```bash
 cargo run --release -p vna-gui
@@ -68,7 +68,9 @@ of geef het per aanroep mee. Zonder iets te installeren:
 nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
-(`#vna-cli` erachter voor de commandoregel.) Om zelf te bouwen en te ontwikkelen geeft
+(`#vna-cli` erachter voor de commandoregel, `#vna-server` voor de server van hoofdstuk 10;
+in de server uit de flake zit de browserpagina niet ingebouwd, zijn pagina zegt dat ook,
+maar het programma op een computer verbindt er gewoon mee.) Om zelf te bouwen en te ontwikkelen geeft
 `nix develop` een shell met Rust, pkg-config, udev en de grafische bibliotheken die
 de GUI tijdens het draaien laadt; daarin werkt `cargo run --release -p vna-gui` gewoon.
 Het pakket bevat de udev-regel, dus in de systeemconfiguratie volstaat
@@ -83,10 +85,12 @@ De flake is in CI gebouwd op x86_64-linux en op een NixOS-laptop gedraaid, CLI e
 ## Kant-en-klare binaries
 
 Bij elke tag `v*` bouwt GitHub Actions een archief per platform en hangt die aan een
-release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, de handleiding (Engels en
-Nederlands) en op Linux de udev-regel: `aarch64-macos` (Apple Silicon), `x86_64-macos`
+release onder *Releases* op GitHub, met `vna-cli`, `vna-gui`, `vna-server` (met de
+browserpagina ingebouwd), de handleiding (Engels en Nederlands) en op Linux de udev-regel
+en een systemd-unit voor de server: `aarch64-macos` (Apple Silicon), `x86_64-macos`
 (Intel-Mac), `x86_64-linux`, `aarch64-linux` (arm64: Asahi Linux op Apple Silicon,
-Raspberry Pi) en `x86_64-windows` (zip). Het zijn gewone dynamisch gelinkte binaries: op
+Raspberry Pi) en `x86_64-windows` (zip). Een apart archief `…-web.zip` bevat de drie
+bestanden van de browserpagina, om op een website te zetten. Het zijn gewone dynamisch gelinkte binaries: op
 Linux moeten `libudev` en een desktop-portal aanwezig zijn, en op NixOS werken ze niet
 (gebruik daar de flake). Tussen tags in is er alleen de CI-build, die niets
 publiceert; bouw dan zelf uit de bron.
@@ -164,12 +168,15 @@ geldt voor NanoVNA-Saver of een ander programma dat met het apparaat praat.
 
 ## In de browser, zonder apparaat
 
-Dezelfde GUI is ook als WebAssembly te bouwen: een viewer voor Touchstone-bestanden (.s1p,
-.s2p) in een browsertab, met de Smith-chart, de grafieken, markers, referenties, TDR en
-gate, maar zonder alles wat een apparaat nodig heeft: geen poort, sweep of calibratie. De
+Dezelfde GUI is ook als WebAssembly te bouwen. Komt de pagina van vna-server, dan meet
+hij, in elke browser (hoofdstuk 10). Als losse pagina is het een viewer voor
+Touchstone-bestanden (.s1p, .s2p) in een browsertab, met de Smith-chart, de grafieken,
+markers, referenties, TDR en gate, maar zonder alles wat een apparaat nodig heeft: geen
+poort, sweep of calibratie, tot je met **Device ▸ Add server…** een server toevoegt. De
 pagina opent met een voorbeeldmeting (de OCF-antenne uit hoofdstuk 6) en **Open as
-trace…** laadt je eigen bestand; dat blijft in de browser, er wordt niets geüpload. Hij
-staat nog nergens online; zelf bouwen vraagt eenmalig het Rust-doel en daarna één script:
+trace…** laadt je eigen bestand; dat blijft in de browser, er wordt niets geüpload. Elke
+release heeft de pagina als `…-web.zip`; zelf bouwen vraagt eenmalig het Rust-doel en
+daarna één script:
 
 ```bash
 rustup target add wasm32-unknown-unknown

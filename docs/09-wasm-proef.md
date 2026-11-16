@@ -239,6 +239,11 @@ en was groen, net als de builds voor Linux, macOS, Windows en Nix.
 
 ## Als we verder gaan: het apparaat
 
+*Aanvulling 16 november 2026: meten in de browser bestaat nu, maar via een server
+(`vna-server`, zie [docs/10](10-client-server.md) en hoofdstuk 10 van de handleiding):
+de pagina praat over een WebSocket met een computer waar de analyzer aan de USB zit. Web
+Serial, de route hieronder, is nog steeds niet gebouwd.*
+
 Dit is het echte werk, en de proef heeft er niets van gedaan. Web Serial bestaat alleen in
 Chromium-browsers (Chrome, Edge, Brave, Opera, ook op Android), niet in Firefox en Safari.
 Het vraagt https of localhost en een klik van de gebruiker; filteren op VID/PID kan.

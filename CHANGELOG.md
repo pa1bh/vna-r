@@ -14,12 +14,38 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Added
 
-- `docs/10-client-server.md` (Dutch): a design note for a server on a Raspberry Pi with the
-  browser build as its client over a WebSocket on the LAN. Nothing is built; it sizes the
-  work at about a week and finds that the device driver stays as it is.
+- Measuring over the network. `vna-server` runs on a computer with the analyser on its USB
+  port, a Raspberry Pi for example, and shares it on the network. It connects to the
+  analyser by itself, waits for it when it is unplugged, and lets go of it when it is
+  stopped, so that a LiteVNA gets its screen back. Every release archive has it; the Linux
+  archives also have a systemd unit (`vna-server.service`) to start it at boot. Manual
+  chapter 10.
+- Measuring in the browser. `vna-server` serves the vna-r page itself: open
+  `http://<server>:8080/` in any browser and the page connects to its server and measures,
+  calibration included. Files go through the browser's own dialogs.
+- **Device ▸ Add server…** in the program: a server is then listed in the port list under the
+  serial ports and connected to with **Connect**, also by **Connect at start**. The servers
+  are remembered. The browser page on its own (a website) has the same menu entry.
+- Several people on one analyser: everyone sees the sweeps and can steer, each calibrates
+  in their own program or browser, a calibration standard and a screenshot go only to the
+  one who asked, and sweeping stops when the last viewer leaves.
+- When the network or the server drops, the program waits up to two minutes and carries on
+  with Run once it is back; the top bar says whether it waits for the server, for an
+  analyser on the server, or for one that dropped off the server's USB.
+- A simulated analyser, for trying all this without one: `vna-server --simulate`, and in the
+  program **Developer ▸ Connect to simulator** (with **View ▸ Developer tools** on).
+- Every release also has the browser page on its own, `…-web.zip`, for putting it on a website.
+- `docs/10-client-server.md` (Dutch): the design note the server was built from.
 
 ### Changed
 
+- A calibration file now reads back exactly as it was written; before, a value could come
+  back one unit in its last decimal place off.
+- The log lines of the device thread (connecting, a lost link, reconnecting) now come from
+  `vna_link` instead of `vna_gui`; the program still shows them by default. For more detail
+  on the terminal use `RUST_LOG=vna_link=debug`.
+- The side panel is drawn again as soon as its width changes, so that it is not left cut off
+  at the right until the mouse moves (seen once on a browser page from the server).
 - Amateur bands, Region 2: 60 m ends at 5406.4 kHz, the edge 47 CFR 97.303(h)(3) names for
   the band, not the 5406.3 kHz that 0.3.6 read off the ARRL chart. Steve Falco, AC2XM, dug
   up the statute.

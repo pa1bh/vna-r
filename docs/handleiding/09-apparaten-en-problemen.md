@@ -104,7 +104,8 @@ die gemeten werd, wordt niet herhaald; meet hem opnieuw. Na 30 seconden zonder a
 staat de knop weer op **Connect**; met **Cancel** ben je daar meteen. Het programma merkt het ook op
 als er niets gemeten wordt.
 Gebeurt het vaak, probeer dan een andere kabel of poort en houd de kabel vrij van de
-connector waaraan je draait.
+connector waaraan je draait. Met een analyzer achter een server zegt de bovenbalk in
+andere woorden waarop hij wacht; hoofdstuk 10 legt ze een voor een uit.
 
 **De LiteVNA blijft in USB MODE**, of de NanoVNA-F blijft op het raster van de laatste
 meting staan. `vna-cli release`, of uit en aan.

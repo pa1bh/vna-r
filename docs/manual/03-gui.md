@@ -8,14 +8,15 @@ with four charts. The title bar shows the version number.
 
 - **File**: open Touchstone files as a trace or as a reference, save as Touchstone (.s2p,
   or .s1p for S11 only), load and save a calibration, quit. The same buttons are also in the left panel.
-- **Device**: Connect or Disconnect, rescan the ports, Run, Stop, a single sweep and a
-  screenshot of the device.
+- **Device**: Connect or Disconnect, rescan the ports, **Add server…** (a vna-server on
+  the network, chapter 10), Run, Stop, a single sweep and a screenshot of the device.
 - **View**: frequency domain or time domain (TDR), S11 and S21 on or off, **Amateur
   bands** (the amateur bands as a grey backdrop with their name in the three frequency
   charts, so you see at once whether a dip lies in the band; below it you pick IARU
   Region 1 or 2, which also sets the list behind **Band** in the sweep panel), **Zoom** (the
   size of the text and everything else, see below), **Connect at start** (connect by
-  itself when the program starts and a VNA is plugged in; off by default) and the
+  itself when the program starts and a VNA is plugged in, or to the selected server; off
+  by default) and the
   **Developer tools** toggle.
 - **Help**: the manual on GitHub in English and in Dutch, as published for your version,
   the issue tracker, and **About vna-r** with the version, build revision, author and the
@@ -25,7 +26,9 @@ with four charts. The title bar shows the version number.
 window (connections, errors, file operations and, as long as the window is open, every
 sweep with its number of points and duration) and **Copy diagnostics**: that puts the
 version, device, sweep settings, calibration, the last error and the log on the clipboard
-as text. Paste that into an issue report (chapter 9). The choice is remembered.
+as text. Paste that into an issue report (chapter 9). It also has **Connect to
+simulator**: a simulated analyser inside the program, to try everything without one
+(chapter 10). The choice is remembered.
 
 ### Larger or smaller text
 
@@ -41,7 +44,9 @@ or scroll in the left panel.
 
 1. Choose the port in the drop-down list; a VNA has a star and is selected automatically.
    The list is refreshed every two seconds as long as you are not connected, so a device
-   you plug in later appears by itself; **rescan** searches straight away.
+   you plug in later appears by itself; **rescan** searches straight away. Servers you
+   added with **Device ▸ Add server…** are listed under the serial ports, as
+   `server raspberrypi.local:8080` (chapter 10).
 2. **Connect**. The top bar shows the model, firmware and battery voltage. If the
    connection drops, the program waits for the device and reconnects by itself (chapter 9).
 3. **Run** starts continuous sweeping, **Single** does one sweep. While anything is
@@ -149,7 +154,8 @@ button to save it as PNG. Handy for documenting what the device itself was showi
 
 ## What is remembered
 
-On quitting, the following are saved: port, start, stop, points, average, sweep avg and
+On quitting, the following are saved: port (or server), the servers you added, start,
+stop, points, average, sweep avg and
 drop, segments, the calibration file and whether it is applied, the kit-fit settings, the
 port extension, the S21 offset, the view choices with the amateur bands and their region,
 the group delay aperture, TDR and gate settings, marker frequencies, the reference of the

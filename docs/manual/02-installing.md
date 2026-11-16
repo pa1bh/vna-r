@@ -3,7 +3,7 @@
 ## Building
 
 vna-r is written in Rust. You need a stable Rust toolchain, 1.95 or later
-([rustup](https://rustup.rs)). Fetch the source code and build the three parts:
+([rustup](https://rustup.rs)). Fetch the source code and build everything:
 
 ```bash
 git clone https://github.com/pa1bh/vna-r.git
@@ -18,8 +18,8 @@ an older Rust than the one you think you have: a toolchain that rustup installed
 takes precedence over the one from your distribution. `rustup update stable` brings it up
 to date.
 
-The programs are then in `target/release/`: `vna-cli` and `vna-gui`. You can also start them
-directly through cargo:
+The programs are then in `target/release/`: `vna-cli`, `vna-gui` and `vna-server` (chapter
+10). You can also start them directly through cargo:
 
 ```bash
 cargo run --release -p vna-gui
@@ -69,7 +69,9 @@ or pass it with each invocation. Without installing anything:
 nix --extra-experimental-features 'nix-command flakes' run github:pa1bh/vna-r
 ```
 
-(Append `#vna-cli` for the command line.) To build and develop yourself,
+(Append `#vna-cli` for the command line, `#vna-server` for the server of chapter 10; the
+server from the flake has no browser page built in, its page says so, but the program on a
+computer connects to it all the same.) To build and develop yourself,
 `nix develop` gives a shell with Rust, pkg-config, udev and the graphics libraries that
 the GUI loads at run time; in it `cargo run --release -p vna-gui` simply works.
 The package includes the udev rule, so in the system configuration
@@ -84,10 +86,12 @@ The flake has been built in CI on x86_64-linux and run on a NixOS laptop, CLI an
 ## Ready-made binaries
 
 On every tag `v*`, GitHub Actions builds one archive per platform and attaches them to a
-release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, the manual (English and
-Dutch) and on Linux the udev rule: `aarch64-macos` (Apple Silicon), `x86_64-macos` (Intel
+release under *Releases* on GitHub, with `vna-cli`, `vna-gui`, `vna-server` (with the
+browser page built in), the manual (English and Dutch) and on Linux the udev rule and a
+systemd unit for the server: `aarch64-macos` (Apple Silicon), `x86_64-macos` (Intel
 Mac), `x86_64-linux`, `aarch64-linux` (arm64: Asahi Linux on Apple Silicon, Raspberry Pi)
-and `x86_64-windows` (zip). They are ordinary dynamically linked binaries: on Linux the
+and `x86_64-windows` (zip). A separate archive `…-web.zip` holds the three files of the
+browser page, for putting it on a website. They are ordinary dynamically linked binaries: on Linux the
 distribution's `libudev` and a desktop portal must be present, and on NixOS they do not
 work (use the flake there). Between tags there is only the CI build, which
 publishes nothing; build from source yourself in that case.
@@ -163,12 +167,14 @@ applies to NanoVNA-Saver or any other program that talks to the device.
 
 ## In the browser, without a device
 
-The same GUI also builds to WebAssembly: a viewer for Touchstone files (.s1p, .s2p) in a
+The same GUI also builds to WebAssembly. Served by vna-server it measures, in any browser
+(chapter 10). As a page of its own it is a viewer for Touchstone files (.s1p, .s2p) in a
 browser tab, with the Smith chart, the plots, markers, references, TDR and gate, but
-without anything that needs a device: no port, sweep or calibration. The page opens with
-an example measurement (the OCF antenna of chapter 6) and **Open as trace…** loads your
-own file; it stays in the browser, nothing is uploaded. It is not hosted anywhere yet;
-building it yourself needs the Rust target once and then one script:
+without anything that needs a device: no port, sweep or calibration, until you add a
+server with **Device ▸ Add server…**. The page opens with an example measurement (the OCF
+antenna of chapter 6) and **Open as trace…** loads your own file; it stays in the browser,
+nothing is uploaded. Every release carries the page as `…-web.zip`; building it yourself
+needs the Rust target once and then one script:
 
 ```bash
 rustup target add wasm32-unknown-unknown

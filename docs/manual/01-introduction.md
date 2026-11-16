@@ -73,7 +73,7 @@ anything connected at all.
 
 ## How vna-r is put together
 
-vna-r consists of three parts:
+vna-r consists of four parts:
 
 - **litevna**, the library: the USB protocol, sweeps, calibration, time domain, derived
   quantities, Touchstone files. No user interface; everything that computes lives here,
@@ -82,7 +82,12 @@ vna-r consists of three parts:
   scripts, quick checks and for those who prefer typing.
 - **vna-gui**, the window: live traces, calibration panel, markers, TDR, references,
   files.
+- **vna-server**, for measuring over the network: it runs on a small computer with the
+  analyser on its USB port (a Raspberry Pi, for instance), and the window connects to it
+  from another computer or from a browser (chapter 10).
 
 Calibrations, measurements and settings are stored on the computer, not in the
 device. The calibration shown on the LiteVNA's own screen plays no role for vna-r:
 the program asks the device for raw measurements and applies the correction itself.
+Behind a server that is no different: the server only passes on raw measurements, and
+every viewer calibrates in its own program or browser.

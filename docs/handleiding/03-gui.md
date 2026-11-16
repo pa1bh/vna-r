@@ -8,14 +8,16 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
 
 - **File**: Touchstone-bestanden openen als trace of referentie, opslaan als Touchstone
   (.s2p, of .s1p voor alleen S11), calibratie laden en opslaan, afsluiten. Dezelfde knoppen staan ook in het linkerpaneel.
-- **Device**: Connect of Disconnect, poorten opnieuw zoeken, Run, Stop, een enkele sweep
-  en een schermafbeelding van het apparaat.
+- **Device**: Connect of Disconnect, poorten opnieuw zoeken, **Add server…** (een
+  vna-server op het netwerk, hoofdstuk 10), Run, Stop, een enkele sweep en een
+  schermafbeelding van het apparaat.
 - **View**: frequentiedomein of tijddomein (TDR), S11 en S21 aan of uit, **Amateur
   bands** (de amateurbanden als grijze achtergrond met hun naam in de drie
   frequentiegrafieken, zodat je direct ziet of een dip in de band ligt; eronder kies je
   IARU-regio 1 of 2, wat ook de lijst achter **Band** in het sweeppaneel bepaalt), **Zoom** (de
   grootte van de tekst en al het andere, zie hieronder), **Connect at start** (vanzelf
-  verbinden als het programma start en er een VNA aangesloten is; standaard uit) en de
+  verbinden als het programma start en er een VNA aangesloten is, of met de gekozen
+  server; standaard uit) en de
   schakelaar **Developer tools**.
 - **Help**: de handleiding op GitHub in het Engels en het Nederlands, zoals die bij jouw
   versie hoort, de probleemmelder, en **About vna-r** met versie, build-revisie, auteur en
@@ -25,7 +27,9 @@ hoofdgebied met vier grafieken. De titelbalk toont het versienummer.
 logvenster (verbindingen, fouten, bestandsbewerkingen en, zolang het venster open is,
 elke sweep met puntenaantal en duur) en **Copy diagnostics**: dat zet versie, apparaat,
 sweep-instellingen, calibratie, de laatste fout en het log als tekst op het klembord. Plak
-dat in een probleemmelding (hoofdstuk 9). De keuze wordt bewaard.
+dat in een probleemmelding (hoofdstuk 9). Er staat ook **Connect to simulator** in: een
+nagebootste analyzer binnen het programma, om alles te proberen zonder er een te hebben
+(hoofdstuk 10). De keuze wordt bewaard.
 
 ### Grotere of kleinere tekst
 
@@ -41,7 +45,9 @@ grafieken; maak het venster groter of scrol in het linkerpaneel.
 
 1. Kies de poort in de keuzelijst; een VNA heeft een ster en wordt vanzelf gekozen. De
    lijst wordt elke twee seconden ververst zolang je niet verbonden bent, dus een
-   apparaat dat je later aansluit verschijnt vanzelf; **rescan** zoekt direct.
+   apparaat dat je later aansluit verschijnt vanzelf; **rescan** zoekt direct. Servers die
+   je met **Device ▸ Add server…** hebt toegevoegd staan onder de seriële poorten, als
+   `server raspberrypi.local:8080` (hoofdstuk 10).
 2. **Connect**. De bovenbalk toont model, firmware en batterijspanning. Valt de
    verbinding weg, dan wacht het programma op het apparaat en verbindt het zelf opnieuw
    (hoofdstuk 9).
@@ -154,7 +160,8 @@ apparaat zelf liet zien.
 
 ## Wat bewaard blijft
 
-Bij afsluiten worden bewaard: poort, start, stop, punten, average, sweep avg en drop,
+Bij afsluiten worden bewaard: poort (of server), de servers die je toevoegde, start,
+stop, punten, average, sweep avg en drop,
 segmenten, het calibratiebestand en of het toegepast wordt, de kit-fit-instellingen, de
 poortverlenging, de S21-offset, de weergavekeuzes met de amateurbanden en hun regio, de
 apertuur van de groepsvertraging, TDR- en gate-instellingen, markerfrequenties, de

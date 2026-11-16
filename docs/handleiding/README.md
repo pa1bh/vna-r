@@ -4,7 +4,7 @@
 
 Een vectornetwerkanalyzer (VNA) meet hoe een antenne, kabel, filter of ander
 RF-onderdeel zich gedraagt per frequentie. vna-r is een programma voor macOS, Linux
-en Windows dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, de metingen zelf calibreert en
+en Windows dat een LiteVNA 64 of 67 of een NanoVNA-F via USB aanstuurt, of via het netwerk met een kleine server, de metingen zelf calibreert en
 ze toont, met markers, tijddomein (TDR), gating, referenties en export. Deze handleiding
 legt uit wat je meet, hoe je het programma bedient en waar de valkuilen zitten.
 
@@ -13,7 +13,7 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
 1. [Inleiding: wat een VNA meet](01-inleiding.md). S11, S21, reflectiecoëfficiënt, SWR,
    impedantie, dB en fase, de Smith-chart, en hoe vna-r in elkaar zit.
 2. [Installeren en aansluiten](02-installeren.md). Bouwen op macOS en Linux, de USB-poort,
-   het eerste contact, wat het scherm van het apparaat doet tijdens een meting, de viewer
+   het eerste contact, wat het scherm van het apparaat doet tijdens een meting, de pagina
    in de browser.
 3. [De GUI](03-gui.md). Menubalk, sweep, segmenten, weergaven, markers, middelen,
    instellingen die bewaard blijven.
@@ -30,10 +30,14 @@ De hoofdstukken bouwen op elkaar voort, maar zijn ook los te lezen:
 9. [Apparaten, platform en problemen oplossen](09-apparaten-en-problemen.md). LiteVNA 64
    en 67 en de NanoVNA-F naast elkaar, Linux-rechten, veelvoorkomende foutmeldingen, een
    probleem melden, wat je kunt vertrouwen.
+10. [Meten via het netwerk](10-netwerk.md). vna-server op een Raspberry Pi of een andere
+    computer, de pagina in de browser, **Add server…** in het programma, met meer mensen
+    op één analyzer, de wachtregels, proberen zonder analyzer, wat deze versie nog mist.
 
-Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/09` de onderzoeks- en
+Wie de achtergrond wil, vindt in `docs/01` tot en met `docs/10` de onderzoeks- en
 ontwikkelnotities: de USB-protocollen, het calibratiemodel met metingen, de TDR-wiskunde,
-de roadmap, de doorlichting en testprocedure van versie 0.3, en de browserbouw.
+de roadmap, de doorlichting en testprocedure van versie 0.3, de browserbouw en het
+ontwerp van de server.
 
 ## Conventies
 

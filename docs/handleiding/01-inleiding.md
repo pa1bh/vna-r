@@ -73,7 +73,7 @@ hier uitgebreid op in. Het korte advies: meet nooit zonder, behalve om te kijken
 
 ## Hoe vna-r in elkaar zit
 
-vna-r bestaat uit drie delen:
+vna-r bestaat uit vier delen:
 
 - **litevna**, de bibliotheek: het USB-protocol, sweeps, calibratie, tijddomein, afgeleide
   grootheden, Touchstone-bestanden. Geen gebruikersinterface; alles wat rekent zit hier,
@@ -82,7 +82,12 @@ vna-r bestaat uit drie delen:
   scripts, snelle controles en voor wie liever typt.
 - **vna-gui**, het venster: live traces, calibratiepaneel, markers, TDR, referenties,
   bestanden.
+- **vna-server**, om via het netwerk te meten: draait op een kleine computer met de
+  analyzer aan de USB-poort (een Raspberry Pi bijvoorbeeld), en het venster verbindt
+  ermee vanaf een andere computer of vanuit een browser (hoofdstuk 10).
 
 Calibraties, metingen en instellingen worden op de computer bewaard, niet in het
 apparaat. De calibratie die op het scherm van de LiteVNA zelf staat, speelt voor vna-r
 geen rol: het programma vraagt het apparaat om ruwe metingen en corrigeert zelf.
+Achter een server is dat niet anders: de server geeft alleen ruwe metingen door, en
+iedereen die kijkt calibreert in zijn eigen programma of browser.

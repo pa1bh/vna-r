@@ -4,7 +4,7 @@
 
 A vector network analyser (VNA) measures how an antenna, cable, filter or other
 RF component behaves as a function of frequency. vna-r is a program for the macOS, Linux
-and Windows desktop that drives a LiteVNA 64 or 67 or a NanoVNA-F over USB, calibrates the measurements itself and
+and Windows desktop that drives a LiteVNA 64 or 67 or a NanoVNA-F over USB, or over the network through a small server, calibrates the measurements itself and
 displays them, with markers, time domain (TDR), gating, references and export. This manual
 explains what you are measuring, how to operate the program and where the pitfalls are.
 
@@ -13,7 +13,7 @@ The chapters build on one another, but can also be read on their own:
 1. [Introduction: what a VNA measures](01-introduction.md). S11, S21, reflection coefficient, SWR,
    impedance, dB and phase, the Smith chart, and how vna-r is put together.
 2. [Installing and connecting](02-installing.md). Building on macOS and Linux, the USB port,
-   first contact, what the device's screen does during a measurement, the browser viewer.
+   first contact, what the device's screen does during a measurement, the browser page.
 3. [The GUI](03-gui.md). Menu bar, sweep, segments, views, markers, averaging,
    settings that are remembered.
 4. [Calibrating](04-calibrating.md). Why it is necessary, open/short/load/through step by step,
@@ -29,11 +29,14 @@ The chapters build on one another, but can also be read on their own:
 9. [Devices, platform and troubleshooting](09-devices-and-troubleshooting.md). LiteVNA 64
    and 67 and the NanoVNA-F side by side, Linux permissions, common error messages,
    reporting a problem, what you can trust.
+10. [Measuring over the network](10-network.md). vna-server on a Raspberry Pi or any
+    computer, the page in a browser, **Add server…** in the program, several people on one
+    analyser, the waiting lines, trying it without an analyser, what this version lacks.
 
 Those who want the background will find the research and development notes in `docs/01`
-to `docs/09` (Dutch): the USB protocols, the calibration model with measurements, the TDR
-mathematics, the roadmap, the review and test procedure of version 0.3, and the browser
-build.
+to `docs/10` (Dutch): the USB protocols, the calibration model with measurements, the TDR
+mathematics, the roadmap, the review and test procedure of version 0.3, the browser
+build, and the design of the server.
 
 ## Conventions
 
