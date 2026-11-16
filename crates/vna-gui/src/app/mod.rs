@@ -284,6 +284,8 @@ pub struct App {
     /// Graphics backend and adapter wgpu picked (Vulkan, Metal, GL + driver), for About and bug reports.
     renderer: String,
     show_about: bool,
+    /// The side panel's width in the last pass, see `ui`.
+    side_width: f32,
     /// Developer menu visible (View ▸ Developer tools).
     dev_tools: bool,
     /// Connect at start when a VNA is plugged in (View ▸ Connect at start).
@@ -386,6 +388,7 @@ impl App {
             notice: None,
             renderer: renderer_description(cc),
             show_about: false,
+            side_width: 0.0,
             dev_tools: false,
             auto_connect: false,
             auto_connect_tried: false,
@@ -1442,10 +1445,22 @@ impl eframe::App for App {
         }
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui));
         egui::Panel::top("top").show(ui, |ui| self.top_bar(ui));
-        egui::Panel::left("side")
+        let side = egui::Panel::left("side")
             .resizable(true)
             .default_size(300.0)
             .show(ui, |ui| self.side_panel(ui));
+        // egui lays a panel out at the width it had in the previous pass and
+        // only then learns how wide its content is. When the content is
+        // wider (the first frame of a page: new grids are measured in an
+        // invisible pass first), this frame draws the panel clipped at the
+        // old width, and nothing else asks for the next frame that would
+        // draw it right: with the page left alone, it stays clipped until
+        // input comes. So when the width changed, draw once more.
+        let width = side.response.rect.width();
+        if (width - self.side_width).abs() > 0.5 {
+            self.side_width = width;
+            ctx.request_repaint();
+        }
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.plot_reset = false;
         self.screenshot_window(&ctx);
