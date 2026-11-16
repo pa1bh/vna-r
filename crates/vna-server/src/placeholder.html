@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- What vna-server shows when it was built without the web client
+     (scripts/build-web.sh had not been run). See crates/vna-server/build.rs. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>vna-server</title>
+    <style>
+        body { margin: 0 auto; max-width: 40em; padding: 2em 16px; background: #1b1b1b; color: #d0d0d0;
+               font: 16px/1.5 system-ui, sans-serif; }
+        code { color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h1>vna-server</h1>
+    <p>This server runs, but it was built without the web client, so there is no page to show here.</p>
+    <p>To build it in: run <code>scripts/build-web.sh</code> in the vna-r source tree, then build
+       <code>vna-server</code> again. Or start the server with <code>--web &lt;dir&gt;</code>, pointing at
+       a folder with <code>index.html</code>, <code>vna-gui.js</code> and <code>vna-gui_bg.wasm</code>.</p>
+    <p>The vna-r program on a computer can connect to this server without the page.</p>
+</body>
+</html>

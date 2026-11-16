@@ -118,9 +118,11 @@ pub enum Event {
         stops_sweep: bool,
     },
     /// Continuous sweeping started (`true`) or stopped (`false`), whichever
-    /// client asked for it. Only a server sends this, to all its clients, so
-    /// that every one of them knows the device is running and can stop it; a
-    /// local worker never does, its one UI knows what it asked for.
+    /// client asked for it; `true` also while a lost link is waited for and
+    /// sweeping will resume. Only a worker spawned with
+    /// [`Options::announce_continuous`] sends it, which a server does so that
+    /// all its clients know the device is running and can stop it; a local
+    /// UI knows what it asked for.
     Continuous(bool),
 }
 
@@ -133,13 +135,28 @@ pub struct WorkerHandle {
     pub rx: Receiver<Event>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+/// What a worker does beyond what one UI on the same machine needs.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Options {
+    /// Send [`Event::Continuous`] whenever it changes whether continuous
+    /// sweeping is on (or will resume when a lost link is back). A server
+    /// sets this, so that all its clients know; a local UI knows what it
+    /// asked for and leaves it off.
+    pub announce_continuous: bool,
+}
+
+/// The worker for a local UI: [`spawn_with`] with the default [`Options`].
 pub fn spawn(notify: Notify) -> WorkerHandle {
+    spawn_with(notify, Options::default())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn spawn_with(notify: Notify, options: Options) -> WorkerHandle {
     let (cmd_tx, cmd_rx) = channel::<Cmd>();
     let (evt_tx, evt_rx) = channel::<Event>();
     thread::Builder::new()
         .name("litevna-worker".into())
-        .spawn(move || run(cmd_rx, evt_tx, notify))
+        .spawn(move || run(cmd_rx, evt_tx, notify, options))
         .expect("spawn worker thread");
     WorkerHandle { tx: cmd_tx, rx: evt_rx }
 }
@@ -147,7 +164,7 @@ pub fn spawn(notify: Notify) -> WorkerHandle {
 /// The browser build: a handle nobody listens to. Commands are dropped and no
 /// event ever arrives, so the program stays "not connected".
 #[cfg(target_arch = "wasm32")]
-pub fn spawn(_notify: Notify) -> WorkerHandle {
+pub fn spawn_with(_notify: Notify, _options: Options) -> WorkerHandle {
     let (cmd_tx, _) = channel::<Cmd>();
     let (_, evt_rx) = channel::<Event>();
     WorkerHandle { tx: cmd_tx, rx: evt_rx }
@@ -270,6 +287,9 @@ struct Worker {
     backlog: VecDeque<Cmd>,
     events: Sender<Event>,
     notify: Notify,
+    options: Options,
+    /// What [`Event::Continuous`] said last.
+    announced: bool,
 }
 
 /// A command after which the result of a running sweep is no longer wanted.
@@ -289,7 +309,7 @@ fn interrupts(cmd: &Cmd) -> bool {
     )
 }
 
-fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify) {
+fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify, options: Options) {
     let mut w = Worker {
         dev: None,
         port: None,
@@ -301,6 +321,8 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify) {
         backlog: VecDeque::new(),
         events,
         notify,
+        options,
+        announced: false,
     };
     loop {
         // First what arrived during the last sweep. Then: only peek when
@@ -339,6 +361,7 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify) {
                 }
             }
         }
+        w.announce_continuous();
     }
     // Dropping the device hands the screen back to the on-device UI.
 }
@@ -347,6 +370,21 @@ impl Worker {
     fn emit(&self, e: Event) {
         let _ = self.events.send(e);
         (self.notify)();
+    }
+
+    /// One look per turn of the loop, rather than an event in every place
+    /// that starts or ends continuous sweeping: whatever a command, a failure
+    /// or a lost link did to it, this sees the outcome.
+    fn announce_continuous(&mut self) {
+        if !self.options.announce_continuous {
+            return;
+        }
+        let resumes = self.lost.as_ref().is_some_and(|l| matches!(l.resume, Resume::Continuous(..)));
+        let on = self.continuous.is_some() || resumes;
+        if on != self.announced {
+            self.announced = on;
+            self.emit(Event::Continuous(on));
+        }
     }
 
     /// A failure that ends continuous sweeping (sweep, connect).

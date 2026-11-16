@@ -1,0 +1,34 @@
+[package]
+name = "vna-server"
+version.workspace = true
+description = "Headless server for a LiteVNA or NanoVNA-F on USB: the vna-r GUI connects to it over a WebSocket"
+build = "build.rs"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "vna-server"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+litevna = { path = "../litevna" }
+vna-link = { path = "../vna-link" }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true }
+tungstenite = { workspace = true }
+httparse = { workspace = true }
+flate2 = { workspace = true }
+ctrlc = { workspace = true }
+gethostname = { workspace = true }
+
+[build-dependencies]
+flate2 = { workspace = true }

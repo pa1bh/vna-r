@@ -12,4 +12,4 @@ pub mod wire;
 mod worker;
 
 pub use sim::{DEFAULT_RATE as SIMULATOR_RATE, SIMULATOR};
-pub use worker::{spawn, Cmd, Event, Notify, Purpose, WorkerHandle, RECONNECT_FOR};
+pub use worker::{spawn, spawn_with, Cmd, Event, Notify, Options, Purpose, WorkerHandle, RECONNECT_FOR};

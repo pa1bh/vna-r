@@ -1,4 +1,5 @@
-// Shared build script of vna-cli and vna-gui (each `build.rs` includes this file).
+// Shared by the build scripts of vna-cli, vna-gui and vna-server: each `build.rs`
+// includes this file and calls `record_git_rev` from its `main`.
 //
 // Records the git revision at build time as `VNA_R_GIT_REV` (shown in About
 // and `--version`). A source tarball or a Nix build has no `.git`; those set
@@ -7,7 +8,7 @@
 use std::path::Path;
 use std::process::Command;
 
-fn main() {
+fn record_git_rev() {
     println!("cargo:rerun-if-env-changed=VNA_R_GIT_REV");
     // Re-run when the revision can have changed. `HEAD` itself only changes on
     // a branch switch; a new commit moves the branch ref it points at (or

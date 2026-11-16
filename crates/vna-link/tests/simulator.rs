@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use litevna::calibration::Standard;
 use litevna::SweepConfig;
-use vna_link::{spawn, Cmd, Event, Purpose, WorkerHandle, SIMULATOR};
+use vna_link::{spawn, spawn_with, Cmd, Event, Options, Purpose, WorkerHandle, SIMULATOR};
 
 fn connect(rate: &str) -> WorkerHandle {
     let w = spawn(Arc::new(|| {}));
@@ -116,8 +116,10 @@ fn continuous_sweeping_goes_on_until_stop() {
         .unwrap();
     let mut sweeps = Vec::new();
     while sweeps.len() < 3 {
-        if let Event::SweepDone { result, .. } = next(&w.rx) {
-            sweeps.push(result);
+        match next(&w.rx) {
+            Event::SweepDone { result, .. } => sweeps.push(result),
+            Event::Continuous(_) => panic!("a local worker does not announce continuous sweeping"),
+            _ => {}
         }
     }
     // the noise is new in every sweep, the antenna is the same
@@ -224,4 +226,40 @@ fn without_a_connection_a_sweep_fails_as_it_does_with_hardware() {
         Event::Error { msg, stops_sweep: true } => assert!(msg.starts_with("connecting to sim:fast: invalid argument"), "{msg}"),
         other => panic!("{other:?}"),
     }
+}
+
+#[test]
+fn a_server_worker_announces_continuous_sweeping() {
+    let w = spawn_with(Arc::new(|| {}), Options { announce_continuous: true });
+    w.tx.send(Cmd::Connect(format!("{SIMULATOR}0"))).unwrap();
+    until(&w.rx, |e| matches!(e, Event::Connected { .. }));
+    let grid = vec![lin(1_000_000, 30_000_000, 101)];
+    w.tx.send(sweep(grid.clone(), Purpose::Display, true, 1)).unwrap();
+    // announced before the first sweep is done
+    let first = until(&w.rx, |e| matches!(e, Event::Continuous(_) | Event::SweepDone { .. }));
+    assert!(matches!(first.last(), Some(Event::Continuous(true))), "{first:?}");
+    // a single sweep in between and a new continuous sweep change nothing
+    w.tx.send(sweep(grid.clone(), Purpose::Display, false, 1)).unwrap();
+    w.tx.send(sweep(grid.clone(), Purpose::Display, true, 1)).unwrap();
+    w.tx.send(Cmd::Stop).unwrap();
+    let events = until(&w.rx, |e| matches!(e, Event::Continuous(_)));
+    assert!(matches!(events.last(), Some(Event::Continuous(false))), "{events:?}");
+    // a failing sweep ends it too, and says so after the error
+    w.tx.send(sweep(grid, Purpose::Display, true, 1)).unwrap();
+    assert!(matches!(
+        until(&w.rx, |e| matches!(e, Event::Continuous(_))).pop(),
+        Some(Event::Continuous(true))
+    ));
+    let empty = SweepConfig {
+        points: 0,
+        ..lin(1_000_000, 2_000_000, 2)
+    };
+    w.tx.send(sweep(vec![empty], Purpose::Display, true, 1)).unwrap();
+    let events = until(&w.rx, |e| matches!(e, Event::Continuous(_)));
+    assert!(matches!(events.last(), Some(Event::Continuous(false))), "{events:?}");
+    assert!(events.iter().any(|e| matches!(e, Event::Error { stops_sweep: true, .. })));
+    // and nothing more about it until something changes
+    w.tx.send(Cmd::Battery).unwrap();
+    let rest = until(&w.rx, |e| matches!(e, Event::Battery(_)));
+    assert!(!rest.iter().any(|e| matches!(e, Event::Continuous(_))), "{rest:?}");
 }
