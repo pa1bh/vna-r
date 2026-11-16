@@ -1670,9 +1670,24 @@ sweepinstellingen heeft, en dat het spoor dat je ziet van de sweep is die de and
 startte: het klopt dan niet met wat er in je eigen velden Start en Stop staat. Besluit van
 PA1BH: geen probleem, en dat lossen we niet op. Het volgt uit "iedereen mag sturen".
 
-**Niet gedaan:** de NanoVNA-F met een doorverbinding tussen de poorten (of S21 boven
-280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel lostrekken, en de
-rest van deel C in het venster.
+**De kabel los, door PA1BH (A1 en A2 met de LiteVNA 67 aan de Mac): in orde.** Dit was
+het punt waar het in deze ronde om ging: de draad die het apparaat bedient is verhuisd.
+
+- `hardware_session` met `VNA_R_EXPECT_DROP=1`: verbonden na 0,1 s; kabel los, na 7,9 s
+  `LINK LOST on /dev/cu.usbmodemv1_01: sweep: I/O error: Broken pipe`; kabel terug, na
+  16,1 s weer verbonden; twee sweeps na het herverbinden; Stop geeft `Cancelled`; na de
+  rust een losse sweep van 801 punten. Slot: "5 sweeps, 1 lost links, 2 connects, 2 sweeps
+  after a reconnect", test geslaagd.
+- In het programma: tijdens het doorvegen de kabel losgetrokken. Eerst de melding, na het
+  terugsteken kwam de verbinding terug en ging het vegen verder.
+
+PA1BH deed daarnaast een aantal gewone proeven, lokaal en met de CLI op de Pi: geen
+bijzonderheden.
+
+**Niet gedaan:** de NanoVNA-F rechtstreeks aan de Mac en met een doorverbinding tussen de
+poorten (of S21 boven 280 MHz ook de goede waarde heeft, niet alleen een waarde), de kabel
+van een analyzer uit de server trekken (E4), de pagina die meet in Safari, Firefox en op
+een telefoon, en de rest van deel C in het venster.
 
 ## Bevindingen tijdens het bouwen
 
