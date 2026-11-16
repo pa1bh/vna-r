@@ -21,6 +21,9 @@ use vna_link::{Cmd, Event, Options, Purpose, SIMULATOR};
 use crate::{Config, DeviceChoice, PortCheck, VERSION};
 
 /// What the hub is told.
+// One at a time through a channel, each handled at once: boxing the event
+// would only cost an allocation per message.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ToHub {
     Join {
         id: u64,
@@ -370,7 +373,7 @@ impl Hub {
                 self.last_failure = None;
                 self.said_searching = false;
             }
-            Event::LinkLost { port, msg } => {
+            Event::LinkLost { port, msg, .. } => {
                 log::warn!("lost the device on {port} ({msg}); waiting for it to come back");
                 self.state = DeviceState::Lost(port.clone());
             }
@@ -392,7 +395,14 @@ impl Hub {
             _ => {}
         }
         let (kind, only) = match &e {
-            Event::Progress { .. } => (Kind::Progress, None),
+            Event::Progress {
+                purpose: Purpose::Display, ..
+            } => (Kind::Progress, None),
+            // Like the result: another client would wait for an end it never hears of.
+            Event::Progress {
+                purpose: Purpose::Standard(_),
+                ..
+            } => (Kind::Progress, Some(self.standard_asker)),
             Event::SweepDone {
                 purpose: Purpose::Display, ..
             } => (Kind::Display, None),
@@ -415,7 +425,7 @@ impl Hub {
             self.last_sweep = Some(text.clone());
         }
         match only {
-            Some(asker) => self.send_to(asker, text),
+            Some(asker) => self.send_kind_to(asker, kind, text),
             None => self.broadcast(kind, text),
         }
     }
@@ -433,10 +443,14 @@ impl Hub {
     }
 
     fn send_to(&mut self, id: Option<u64>, text: Arc<str>) {
+        self.send_kind_to(id, Kind::Other, text);
+    }
+
+    fn send_kind_to(&mut self, id: Option<u64>, kind: Kind, text: Arc<str>) {
         let Some(c) = id.and_then(|id| self.clients.iter().find(|c| c.id == id)) else {
             return;
         };
-        if !c.outbox.push(Kind::Other, text) {
+        if !c.outbox.push(kind, text) {
             let id = c.id;
             self.drop_client(id);
         }

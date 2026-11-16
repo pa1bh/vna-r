@@ -65,6 +65,9 @@ impl Hello {
 }
 
 /// A message from a server to a client.
+// Made, sent or taken apart at once, never kept in numbers: boxing the event
+// would only cost an allocation per message.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ServerMsg {
@@ -586,16 +589,28 @@ mod tests {
                 port: "/dev/ttyACM0".into(),
                 info: lite_info(),
                 battery_mv: Some(4012),
+                via: None,
             },
             Event::Connected {
                 port: "/dev/ttyACM1".into(),
                 info: shell_info(),
                 battery_mv: None,
+                via: Some(crate::Via {
+                    server: "shack".into(),
+                    version: "0.4.0".into(),
+                    device_port: "/dev/ttyACM1".into(),
+                }),
             },
             Event::Disconnected,
             Event::LinkLost {
                 port: "/dev/ttyACM0".into(),
                 msg: "sweep: I/O error: Broken pipe".into(),
+                what: crate::Loss::Device,
+            },
+            Event::LinkLost {
+                port: "ws://vna.local:8080/ws".into(),
+                msg: "read: Connection reset by peer".into(),
+                what: crate::Loss::Server,
             },
             Event::SweepDone {
                 cfgs: cfgs(),
@@ -609,7 +624,16 @@ mod tests {
                 purpose: Purpose::Standard(Standard::LineShort),
                 repeat: 4,
             },
-            Event::Progress { done: 255, total: 1001 },
+            Event::Progress {
+                done: 255,
+                total: 1001,
+                purpose: Purpose::Display,
+            },
+            Event::Progress {
+                done: 7,
+                total: 101,
+                purpose: Purpose::Standard(Standard::Short),
+            },
             Event::Cancelled {
                 purpose: Purpose::Standard(Standard::Through),
             },

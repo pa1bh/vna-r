@@ -21,8 +21,21 @@ pub(super) fn compact_hz(hz: u64) -> String {
     format!("{number}{unit}")
 }
 
+/// A device screenshot as a PNG file.
+fn screenshot_png(shot: &Screenshot) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let rgb = shot.to_rgb888();
+    let mut out = Vec::new();
+    let mut enc = png::Encoder::new(&mut out, shot.width as u32, shot.height as u32);
+    enc.set_color(png::ColorType::Rgb);
+    enc.set_depth(png::BitDepth::Eight);
+    let mut w = enc.write_header()?;
+    w.write_image_data(&rgb)?;
+    w.finish()?;
+    Ok(out)
+}
+
 /// Ask for a calibration file for one sweep segment. Those are kept by path,
-/// which a browser does not give (and without a device there are no segments to sweep).
+/// which a browser does not give: there the control is not shown.
 pub(super) fn pick_cal_path() -> Option<PathBuf> {
     #[cfg(not(target_arch = "wasm32"))]
     return rfd::FileDialog::new().add_filter("calibration", &["json"]).pick_file();
@@ -215,9 +228,15 @@ impl App {
         }
     }
 
-    /// A screenshot comes from a device, which the browser build does not have.
+    /// A browser saves by downloading under the proposed name.
     #[cfg(target_arch = "wasm32")]
-    pub(super) fn save_screenshot(&mut self) {}
+    pub(super) fn save_screenshot(&mut self) {
+        let Some((_, shot)) = &self.screenshot else { return };
+        match screenshot_png(shot) {
+            Ok(png) => self.web.save("screenshot.png".into(), png),
+            Err(e) => self.error = Some(format!("saving screenshot: {e}")),
+        }
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn save_screenshot(&mut self) {
@@ -229,17 +248,7 @@ impl App {
         else {
             return;
         };
-        let rgb = shot.to_rgb888();
-        let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-            let file = std::io::BufWriter::new(std::fs::File::create(&path)?);
-            let mut enc = png::Encoder::new(file, shot.width as u32, shot.height as u32);
-            enc.set_color(png::ColorType::Rgb);
-            enc.set_depth(png::BitDepth::Eight);
-            let mut w = enc.write_header()?;
-            w.write_image_data(&rgb)?;
-            w.finish()?;
-            Ok(())
-        })();
+        let result = screenshot_png(shot).and_then(|png| std::fs::write(&path, png).map_err(|e| e.into()));
         if let Err(e) = result {
             self.error = Some(format!("saving screenshot: {e}"));
         }

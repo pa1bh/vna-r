@@ -16,6 +16,15 @@ pub fn is_server_address(port: &str) -> bool {
     starts(b"ws://") || starts(b"wss://")
 }
 
+/// A server address as the interface shows it: `vna.local:8080` for
+/// `ws://vna.local:8080/ws`; anything else that is not of that form, whole.
+pub fn server_label(url: &str) -> String {
+    match url.strip_prefix("ws://").and_then(|r| r.strip_suffix("/ws")) {
+        Some(hostport) if !hostport.contains('/') => hostport.to_string(),
+        _ => url.to_string(),
+    }
+}
+
 /// What a user typed, as the address of the server's WebSocket:
 /// `vna.local`, `vna.local:9000`, `192.168.1.5`, `[fe80::1]`, `ws://…` or
 /// `http://vna.local:8080/` all become `ws://host:port/ws` (port
@@ -142,6 +151,14 @@ mod tests {
         ] {
             assert_eq!(server_url(typed), None, "{typed:?}");
         }
+    }
+
+    #[test]
+    fn a_server_reads_short_in_the_interface() {
+        assert_eq!(server_label("ws://vna.local:8080/ws"), "vna.local:8080");
+        assert_eq!(server_label("ws://[::1]:8080/ws"), "[::1]:8080");
+        assert_eq!(server_label("wss://vna.example.org/shack/ws"), "wss://vna.example.org/shack/ws");
+        assert_eq!(server_label("/dev/ttyACM0"), "/dev/ttyACM0");
     }
 
     #[test]

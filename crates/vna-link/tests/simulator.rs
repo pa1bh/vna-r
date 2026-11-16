@@ -87,7 +87,7 @@ fn a_single_sweep_comes_back_on_the_grid_asked_for() {
     let progress: Vec<(usize, usize)> = events
         .iter()
         .filter_map(|e| match e {
-            Event::Progress { done, total } => Some((*done, *total)),
+            Event::Progress { done, total, .. } => Some((*done, *total)),
             _ => None,
         })
         .collect();

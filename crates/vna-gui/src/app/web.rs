@@ -89,6 +89,29 @@ impl WebFiles {
     }
 }
 
+/// The address of the vna-server this page came from, if it came from one:
+/// such a server puts `<meta name="vna-r-server" content="/ws">` in the page,
+/// with the path of its WebSocket. The scheme follows the page (`wss` for a
+/// server behind https), and so does the port, written out so that the
+/// address is not given the default port of a server.
+pub(super) fn served_by() -> Option<String> {
+    let window = eframe::web_sys::window()?;
+    let meta = window.document()?.query_selector("meta[name=\"vna-r-server\"]").ok()??;
+    let path = meta.get_attribute("content")?;
+    let path = if path.starts_with('/') { path } else { format!("/{path}") };
+    let location = window.location();
+    let https = location.protocol().ok()? == "https:";
+    let host = location.hostname().ok()?;
+    let port = location.port().ok().filter(|p| !p.is_empty());
+    let url = match (https, port) {
+        (true, Some(p)) => format!("wss://{host}:{p}{path}"),
+        (true, None) => format!("wss://{host}{path}"),
+        (false, p) => format!("ws://{host}:{}{path}", p.as_deref().unwrap_or("80")),
+    };
+    // What the handle accepts; a page whose tag says something else is a viewer.
+    server_url(&url)
+}
+
 impl App {
     /// Take over the files the browser dialogs delivered since the last frame.
     pub(super) fn handle_picked(&mut self) {

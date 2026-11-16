@@ -16,10 +16,10 @@ mod sim;
 pub mod wire;
 mod worker;
 
-pub use address::{is_server_address, server_url, DEFAULT_SERVER_PORT};
+pub use address::{is_server_address, server_label, server_url, DEFAULT_SERVER_PORT};
 #[cfg(not(target_arch = "wasm32"))]
 pub use handle::spawn_worker;
 pub use handle::{spawn, spawn_with, Notify, Options, WorkerHandle};
 pub use remote::RemoteTiming;
 pub use sim::{DEFAULT_RATE as SIMULATOR_RATE, SIMULATOR};
-pub use worker::{Cmd, Event, Purpose, RECONNECT_FOR};
+pub use worker::{Cmd, Event, Loss, Purpose, Via, RECONNECT_FOR};

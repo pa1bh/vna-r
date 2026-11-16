@@ -11,12 +11,12 @@
 //!
 //! | Situation | Events for the GUI |
 //! |---|---|
-//! | socket open, hello, the server's analyser | `Connected` (port: the address the GUI gave; the server in `info.detail`) |
+//! | socket open, hello, the server's analyser | `Connected` (port: the address the GUI gave; the server in `via`) |
 //! | the server speaks another protocol | `Error` (stops the sweep), `Disconnected` |
 //! | the first socket fails, or no hello comes | `Error` "connecting to …", as a failed serial port |
-//! | the server has no analyser (yet) | `LinkLost`, then `Connected` when it has one |
-//! | the server's analyser drops off USB | `LinkLost`, then `Connected` |
-//! | the socket drops | `LinkLost`, reconnect with a growing pause; `Disconnected` and `Error` after [`RemoteTiming::give_up_after`] |
+//! | the server has no analyser (yet) | `LinkLost` (`NoAnalyser`, or `AnalyserGone` live), then `Connected` when it has one |
+//! | the server's analyser drops off USB | `LinkLost` (`AnalyserLost`), then `Connected` |
+//! | the socket drops | `LinkLost` (`Server`), reconnect with a growing pause; `Disconnected` and `Error` after [`RemoteTiming::give_up_after`] |
 //! | `Cmd::Disconnect`, also while waiting | `Disconnected` |
 //!
 //! While the GUI is told the link is lost, commands are kept rather than
@@ -30,7 +30,7 @@ use std::collections::VecDeque;
 use web_time::{Duration, Instant};
 
 use crate::wire::{self, ClientMsg, Hello, ServerMsg};
-use crate::{Cmd, Event, Purpose};
+use crate::{server_label, Cmd, Event, Loss, Purpose, Via};
 
 /// How a session with a server waits. The defaults are for a Raspberry Pi
 /// that restarts (about a minute); tests make them short.
@@ -127,6 +127,8 @@ pub(crate) struct Session {
     /// The messages after a hello are the server's catch-up until its
     /// `Continuous`, which says whether it is sweeping.
     catching_up: bool,
+    /// The server's notice that it has no analyser comes next in the catch-up.
+    skip_notice: bool,
     /// Continuous sweeping the GUI asked for and did not stop.
     continuous: Option<ClientMsg>,
     /// A single display sweep that was sent and has not been answered.
@@ -155,6 +157,7 @@ impl Session {
             hello: None,
             analyser: Analyser::Unknown,
             catching_up: false,
+            skip_notice: false,
             continuous: None,
             in_flight: None,
             once: None,
@@ -331,7 +334,10 @@ impl Session {
 
     fn not_a_server(&mut self, why: &str) {
         self.error(
-            format!("connecting to {}: the answer is not that of a vna-server ({why})", self.port),
+            format!(
+                "connecting to {}: the answer is not that of a vna-server ({why})",
+                server_label(&self.port)
+            ),
             true,
         );
         self.end();
@@ -350,18 +356,21 @@ impl Session {
     fn on_event(&mut self, e: Event) {
         match e {
             Event::Connected {
-                port,
-                mut info,
-                battery_mv,
+                port, info, battery_mv, ..
             } => {
                 let was = self.analyser;
                 self.analyser = Analyser::There;
                 self.lost_since = None;
-                info.detail = self.with_server(&info.detail, &port);
+                let via = self.hello.as_ref().map(|h| Via {
+                    server: h.name.clone(),
+                    version: h.server.clone(),
+                    device_port: port,
+                });
                 self.out.push_back(Event::Connected {
                     port: self.port.clone(),
                     info,
                     battery_mv,
+                    via,
                 });
                 // After the catch-up its `Continuous` decides; live, only an
                 // analyser that was not there at all needs it (a server
@@ -370,12 +379,13 @@ impl Session {
                     self.resume();
                 }
             }
-            Event::LinkLost { port, msg } => {
+            Event::LinkLost { port, msg, .. } => {
                 self.analyser = Analyser::Lost;
                 self.lost_since = None;
                 self.out.push_back(Event::LinkLost {
                     port: self.port.clone(),
-                    msg: format!("the analyser of the server ({port}): {msg}"),
+                    msg: format!("{port}: {msg}"),
+                    what: Loss::AnalyserLost,
                 });
             }
             Event::Disconnected => {
@@ -384,15 +394,22 @@ impl Session {
                 if self.once.is_none() {
                     self.once = self.in_flight.take();
                 }
-                let msg = if self.catching_up {
-                    "the server has no analyser connected yet"
+                let (msg, what) = if self.catching_up {
+                    // The server's own notice about it follows; the waiting
+                    // state says it already, without the red of an error.
+                    self.skip_notice = true;
+                    ("the server has no analyser connected yet", Loss::NoAnalyser)
                 } else {
-                    "the server lost its analyser"
+                    ("the server lost its analyser", Loss::AnalyserGone)
                 };
                 self.out.push_back(Event::LinkLost {
                     port: self.port.clone(),
                     msg: msg.into(),
+                    what,
                 });
+            }
+            Event::Error { stops_sweep: false, .. } if self.catching_up && self.skip_notice => {
+                self.skip_notice = false;
             }
             Event::Continuous(on) if self.catching_up => {
                 self.catching_up = false;
@@ -448,19 +465,6 @@ impl Session {
         }
     }
 
-    /// The device's detail, with where it is: "hw 2, via shack (vna-server 0.4.0, /dev/ttyACM0)".
-    fn with_server(&self, detail: &str, device_port: &str) -> String {
-        let via = match &self.hello {
-            Some(h) => format!("via {} (vna-server {}, {device_port})", h.name, h.server),
-            None => format!("via a vna-server ({device_port})"),
-        };
-        if detail.is_empty() {
-            via
-        } else {
-            format!("{detail}, {via}")
-        }
-    }
-
     fn socket_down(&mut self, reason: &str, now: Instant) {
         self.socket = None;
         self.greeted = false;
@@ -469,7 +473,7 @@ impl Session {
         }
         if !self.ever_greeted {
             let hint = self.hint.clone().unwrap_or_default();
-            self.error(format!("connecting to {}: {reason}{hint}", self.port), true);
+            self.error(format!("connecting to {}: {reason}{hint}", server_label(&self.port)), true);
             self.link = Link::Over;
             return;
         }
@@ -477,7 +481,8 @@ impl Session {
             // First failure of this loss: tell the GUI.
             self.out.push_back(Event::LinkLost {
                 port: self.port.clone(),
-                msg: format!("the connection to the server dropped ({reason})"),
+                msg: reason.to_string(),
+                what: Loss::Server,
             });
             now
         });
@@ -489,8 +494,8 @@ impl Session {
             self.out.push_back(Event::Disconnected);
             self.error(
                 format!(
-                    "the server at {} did not come back within {} s",
-                    self.port,
+                    "the server {} did not come back within {} s",
+                    server_label(&self.port),
                     self.timing.give_up_after.as_secs()
                 ),
                 true,
@@ -658,6 +663,7 @@ mod tests {
                 shell: None,
             },
             battery_mv: Some(4000),
+            via: None,
         }
     }
 
@@ -679,11 +685,25 @@ mod tests {
         let mut b = Bench::new();
         let got = b.greet();
         assert_eq!(got.len(), 2, "{got:?}");
-        let Event::Connected { port, info, battery_mv } = &got[0] else {
+        let Event::Connected {
+            port,
+            info,
+            battery_mv,
+            via,
+        } = &got[0]
+        else {
             panic!("{got:?}")
         };
         assert_eq!(port, "vna.local:8080");
-        assert_eq!(info.detail, "hw 2, via shack (vna-server 0.4.0, /dev/ttyACM0)");
+        assert_eq!(info.detail, "hw 2");
+        assert_eq!(
+            via.as_ref(),
+            Some(&Via {
+                server: "shack".into(),
+                version: "0.4.0".into(),
+                device_port: "/dev/ttyACM0".into()
+            })
+        );
         assert_eq!(*battery_mv, Some(4000));
         assert!(matches!(got[1], Event::Continuous(false)));
         b.cmd(sweep(false, Purpose::Display));
@@ -744,7 +764,7 @@ mod tests {
         b.event(Event::Continuous(false));
         let got = b.run();
         assert!(
-            matches!(&got[0], Event::LinkLost { port, msg } if port == "vna.local:8080" && msg.contains("no analyser")),
+            matches!(&got[..], [Event::LinkLost { port, what: Loss::NoAnalyser, .. }, Event::Continuous(false)] if port == "vna.local:8080"),
             "{got:?}"
         );
         // Run is kept, not sent: there is nothing to sweep with
@@ -756,8 +776,15 @@ mod tests {
         assert!(matches!(&got[..], [Event::Connected { .. }]), "{got:?}");
         assert_eq!(b.sent(), [msg(sweep(true, Purpose::Display))]);
         // Cancel while waiting ends it at once
+        // live, it is the analyser that went
         b.event(Event::Disconnected);
-        b.run();
+        assert!(matches!(
+            &b.run()[..],
+            [Event::LinkLost {
+                what: Loss::AnalyserGone,
+                ..
+            }]
+        ));
         assert!(matches!(&b.cmd(Cmd::Disconnect)[..], [Event::Disconnected]));
         assert!(b.wire().borrow().closed);
     }
@@ -770,10 +797,11 @@ mod tests {
         b.event(Event::LinkLost {
             port: "/dev/ttyACM0".into(),
             msg: "sweep: I/O error: Broken pipe".into(),
+            what: Loss::Device,
         });
         let got = b.run();
         assert!(
-            matches!(&got[..], [Event::LinkLost { port, msg }] if port == "vna.local:8080" && msg.contains("/dev/ttyACM0")),
+            matches!(&got[..], [Event::LinkLost { port, msg, what: Loss::AnalyserLost }] if port == "vna.local:8080" && msg.contains("/dev/ttyACM0")),
             "{got:?}"
         );
         // the server's worker resumes by itself: nothing is sent again
@@ -792,7 +820,7 @@ mod tests {
         b.drop_socket();
         let got = b.run();
         assert!(
-            matches!(&got[..], [Event::LinkLost { msg, .. }] if msg.contains("connection to the server dropped")),
+            matches!(&got[..], [Event::LinkLost { msg, what: Loss::Server, .. }] if msg.contains("reset by peer")),
             "{got:?}"
         );
         assert_eq!(b.sockets.borrow().len(), 1);

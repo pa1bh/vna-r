@@ -55,16 +55,28 @@ impl App {
         ));
         out.push_str(&format!("renderer: {}{}\n", self.renderer, display_server()));
         match &self.connection {
-            Connection::Connected { port, info, battery_mv } => {
+            Connection::Connected {
+                port,
+                info,
+                battery_mv,
+                via,
+            } => {
                 out.push_str(&format!("device: {} on {port}", info.summary()));
                 if let Some(mv) = battery_mv {
                     out.push_str(&format!(", battery {:.2} V", *mv as f64 / 1000.0));
                 }
                 out.push_str(&format!("\n{}\n", info.detail));
+                if let Some(v) = via {
+                    out.push_str(&format!(
+                        "via vna-server {} \"{}\", the analyser on {} there\n",
+                        v.version, v.server, v.device_port
+                    ));
+                }
             }
             Connection::Connecting(p) => out.push_str(&format!("device: connecting to {p}\n")),
-            Connection::Reconnecting { port, since } => out.push_str(&format!(
-                "device: connection dropped {:.0} s ago, waiting for {port}\n",
+            Connection::Reconnecting { port, since, what } => out.push_str(&format!(
+                "device: {} {:.0} s ({what:?}, {port})\n",
+                lost_texts(port, "", *what).waiting,
                 since.elapsed().as_secs_f32()
             )),
             Connection::Disconnected => out.push_str("device: not connected\n"),
@@ -134,9 +146,13 @@ impl App {
                     ui.add_space(10.0);
                     ui.label("Desktop software for LiteVNA and NanoVNA vector network analysers:");
                     ui.label("sweeps, calibration, Smith chart, TDR, gating, references and Touchstone files.");
-                    if !HAS_DEVICE {
+                    if !NATIVE {
                         ui.add_space(6.0);
-                        ui.label("This is the browser build: a viewer for Touchstone files, without a device.");
+                        ui.label(if self.has_device() {
+                            "This is the browser build: it measures through a vna-server."
+                        } else {
+                            "This is the browser build: a viewer for Touchstone files, without a device."
+                        });
                     }
                     ui.add_space(10.0);
                     ui.label(RichText::new("Bas Hendriks, PA1BH").strong());

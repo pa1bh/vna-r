@@ -24,7 +24,7 @@ use litevna::traces::{
 use litevna::{Limits, Screenshot, SweepConfig, SweepResult, VnaInfo};
 use num_complex::Complex64;
 use serde::{Deserialize, Serialize};
-use vna_link::{Cmd, Event, Purpose, WorkerHandle};
+use vna_link::{is_server_address, server_label, server_url, Cmd, Event, Loss, Purpose, Via, WorkerHandle};
 
 use crate::smith::SmithChart;
 
@@ -32,6 +32,7 @@ mod calibration;
 mod diagnostics;
 mod files;
 mod plots;
+mod servers;
 mod settings;
 mod sweep;
 mod tdr;
@@ -43,6 +44,7 @@ use self::calibration::*;
 use self::diagnostics::*;
 use self::files::*;
 use self::plots::*;
+use self::servers::*;
 use self::settings::*;
 use self::tdr::*;
 
@@ -57,12 +59,12 @@ const REPO_URL: &str = "https://github.com/pa1bh/vna-r";
 /// Where the program that measures is to be had (the browser build points there).
 const RELEASES_URL: &str = "https://github.com/pa1bh/vna-r/releases/latest";
 
-/// Whether this build can talk to a device. The browser build cannot: it is a
-/// viewer for Touchstone files and leaves out what needs a device (port,
-/// Connect, Run, the sweep settings, calibration). A constant rather than
-/// `#[cfg]`, so that both variants of the interface are compiled and checked
-/// in every build.
-const HAS_DEVICE: bool = cfg!(not(target_arch = "wasm32"));
+/// The program on a computer rather than the browser build: serial ports,
+/// files by path, a window to quit. A constant rather than `#[cfg]`, so that
+/// both variants of the interface are compiled and checked in every build.
+/// Whether there is a device to talk to is a question at run time, see
+/// [`App::has_device`].
+const NATIVE: bool = cfg!(not(target_arch = "wasm32"));
 
 /// The manual as published for this version: `docs/manual` (English) or
 /// `docs/handleiding` (Dutch) at the release tag, so the text matches the
@@ -103,11 +105,9 @@ fn zoom_menu(ui: &mut egui::Ui) {
 }
 
 /// What an empty chart says: how to get a trace on it.
-#[cfg(not(target_arch = "wasm32"))]
 const EMPTY_HINT: &str = "Connect and press Run";
-/// The browser build has no device: a trace can only come from a file or the built-in example.
-#[cfg(target_arch = "wasm32")]
-const EMPTY_HINT: &str = "Open a Touchstone file (File ▸ Open as trace…) or the example (File ▸ Open example)";
+/// The viewer has no device: a trace can only come from a file or the built-in example.
+const EMPTY_HINT_VIEWER: &str = "Open a Touchstone file (File ▸ Open as trace…) or the example (File ▸ Open example)";
 
 /// Lines kept in the developer log.
 const LOG_LINES: usize = 400;
@@ -158,11 +158,15 @@ enum Connection {
         port: String,
         info: VnaInfo,
         battery_mv: Option<u16>,
+        /// The server the device is behind, if it is.
+        via: Option<Via>,
     },
-    /// The link dropped; the worker waits for the port to come back.
+    /// The link dropped, or a server has no analyser yet; the worker or the
+    /// session waits for it to come back.
     Reconnecting {
         port: String,
         since: Instant,
+        what: Loss,
     },
 }
 
@@ -174,6 +178,14 @@ pub struct App {
     last_port_scan: f64,
     selected_port: Option<String>,
     connection: Connection,
+    /// The servers known (Device ▸ Add server…), as `ws://host:port/ws`;
+    /// they are listed in the port combo box under the serial ports.
+    servers: Vec<String>,
+    show_add_server: bool,
+    server_input: String,
+    server_input_error: Option<String>,
+    /// The browser build served by a vna-server: that server, the one device there is.
+    served_by: Option<String>,
 
     start: String,
     stop: String,
@@ -191,6 +203,10 @@ pub struct App {
     /// calibration file each used (None = the calibration panel).
     last_plan: Vec<SweepConfig>,
     last_plan_cals: Vec<Option<PathBuf>>,
+    /// The segments of the last display sweep this program asked for, and
+    /// the calibration file of each: a server also delivers the sweeps of
+    /// other clients, which must not get these files.
+    sent_plan: Vec<SweepConfig>,
     sent_plan_cals: Vec<Option<PathBuf>>,
     /// Primary segment of the last applied sweep: the grid the display runs
     /// on and the grid calibration standards are measured on.
@@ -302,6 +318,11 @@ impl App {
             last_port_scan: f64::NEG_INFINITY,
             selected_port: None,
             connection: Connection::Disconnected,
+            servers: Vec::new(),
+            show_add_server: false,
+            server_input: String::new(),
+            server_input_error: None,
+            served_by: None,
             start: "1M".into(),
             stop: "30M".into(),
             points: 201,
@@ -313,6 +334,7 @@ impl App {
             shown: None,
             last_plan: Vec::new(),
             last_plan_cals: Vec::new(),
+            sent_plan: Vec::new(),
             sent_plan_cals: Vec::new(),
             applied_primary: None,
             extra_segments: Vec::new(),
@@ -387,11 +409,35 @@ impl App {
                 app.apply_settings(settings);
             }
         }
-        if !HAS_DEVICE {
+        #[cfg(target_arch = "wasm32")]
+        {
+            app.served_by = web::served_by();
+        }
+        if let Some(server) = app.served_by.clone() {
+            // The page of a vna-server measures with that server's analyser, always.
+            app.log(format!("served by {}", port_label(&server)));
+            app.selected_port = Some(server);
+            app.connect_selected();
+        } else if !NATIVE {
             // A first visitor has no file at hand: start with something to look at.
             app.open_example();
         }
         app
+    }
+
+    /// Whether there is a device to measure with, or there can be: always in
+    /// the program on a computer; in a browser when the page came from a
+    /// vna-server or a server is known.
+    fn has_device(&self) -> bool {
+        NATIVE || self.served_by.is_some() || !self.servers.is_empty()
+    }
+
+    fn empty_hint(&self) -> &'static str {
+        if self.has_device() {
+            EMPTY_HINT
+        } else {
+            EMPTY_HINT_VIEWER
+        }
     }
 
     /// Connect to the selected port, if there is one and nothing is connected yet.
@@ -414,7 +460,7 @@ impl App {
             let selected_is_vna = self
                 .selected_port
                 .as_ref()
-                .is_some_and(|sel| self.ports.iter().any(|p| &p.path == sel && p.looks_like_vna()));
+                .is_some_and(|sel| is_server_address(sel) || self.ports.iter().any(|p| &p.path == sel && p.looks_like_vna()));
             if self.auto_connect && selected_is_vna {
                 self.connect_selected();
             }
@@ -470,9 +516,15 @@ impl App {
 
     fn refresh_ports(&mut self) {
         self.ports = discovery::list_ports().unwrap_or_default();
-        // Forget a selection whose port is gone, then default to a VNA if there is one.
+        // Forget a selection whose port is gone, then default to a VNA if
+        // there is one. A server is not a port that comes and goes.
         if let Some(sel) = &self.selected_port {
-            if !self.ports.iter().any(|p| &p.path == sel) {
+            let known = if is_server_address(sel) {
+                self.servers.contains(sel) || self.served_by.as_ref() == Some(sel)
+            } else {
+                self.ports.iter().any(|p| &p.path == sel)
+            };
+            if !known {
                 self.selected_port = None;
             }
         }
@@ -504,20 +556,37 @@ impl App {
     fn handle_events(&mut self, ctx: &egui::Context) {
         while let Some(evt) = self.worker.try_recv() {
             match evt {
-                Event::Connected { port, info, battery_mv } => {
-                    if let Connection::Reconnecting { since, .. } = &self.connection {
-                        let text = format!("reconnected after {:.0} s", since.elapsed().as_secs_f32().max(1.0));
+                Event::Connected {
+                    port,
+                    info,
+                    battery_mv,
+                    via,
+                } => {
+                    if let Connection::Reconnecting { since, what, .. } = &self.connection {
+                        let text = match what {
+                            Loss::NoAnalyser => "the server has an analyser now".to_string(),
+                            _ => format!("reconnected after {:.0} s", since.elapsed().as_secs_f32().max(1.0)),
+                        };
                         self.log(text.clone());
                         self.notify(text);
                     }
-                    self.log(format!("connected: {} on {port}", info.summary()));
-                    self.connection = Connection::Connected { port, info, battery_mv };
+                    let there = via
+                        .as_ref()
+                        .map(|v| format!(" (vna-server {} \"{}\", {} there)", v.version, v.server, v.device_port))
+                        .unwrap_or_default();
+                    self.log(format!("connected: {} on {}{there}", info.summary(), port_label(&port)));
+                    self.connection = Connection::Connected {
+                        port,
+                        info,
+                        battery_mv,
+                        via,
+                    };
                     self.last_battery_poll = ctx.input(|i| i.time);
                     self.error = None;
                     // Never average sweeps of this device with those of the previous one.
                     self.avg_buf.clear();
                 }
-                Event::Progress { done, total } => {
+                Event::Progress { done, total, .. } => {
                     // A lower count than before means a new sweep began.
                     let since = match self.progress {
                         Some((prev, _, since)) if done >= prev => since,
@@ -532,17 +601,16 @@ impl App {
                         self.cal.message = Some(format!("measuring {} was stopped", std.name()));
                     }
                 }
-                Event::LinkLost { port, msg } => {
-                    // The worker waits for the port and reconnects; `running`
+                Event::LinkLost { port, msg, what } => {
+                    // The worker or the session waits and reconnects; `running`
                     // stays as it is, a continuous sweep resumes by itself.
-                    self.log(format!("connection dropped ({msg}); waiting for {port}"));
-                    self.error = Some(format!(
-                        "the connection to the device dropped ({msg}): the cable or connector moved, or the device \
-                         restarted. Waiting for it to come back."
-                    ));
+                    let texts = lost_texts(&port, &msg, what);
+                    self.log(texts.log);
+                    self.error = texts.error;
                     self.connection = Connection::Reconnecting {
                         port,
                         since: Instant::now(),
+                        what,
                     };
                     self.progress = None;
                     if let Some(std) = self.cal.pending.take() {
@@ -568,11 +636,7 @@ impl App {
                     self.progress = None;
                     match purpose {
                         Purpose::Display => {
-                            self.last_plan_cals = if self.sent_plan_cals.len() == cfgs.len() {
-                                self.sent_plan_cals.clone()
-                            } else {
-                                vec![None; cfgs.len()]
-                            };
+                            self.last_plan_cals = plan_cals(&cfgs, &self.sent_plan, &self.sent_plan_cals);
                             self.last_plan = cfgs;
                             self.file_trace = None;
                             self.sweep_count += 1;
@@ -652,7 +716,7 @@ impl App {
 
     fn top_bar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if HAS_DEVICE {
+            if self.has_device() {
                 self.device_controls(ui);
             } else {
                 self.viewer_controls(ui);
@@ -683,7 +747,7 @@ impl App {
     fn device_controls(&mut self, ui: &mut egui::Ui) {
         const PORT_SCAN_INTERVAL: f64 = 2.0;
         let connected = self.connected();
-        if !connected && !matches!(self.connection, Connection::Connecting(_)) {
+        if NATIVE && !connected && !matches!(self.connection, Connection::Connecting(_)) {
             let now = ui.input(|i| i.time);
             if now - self.last_port_scan > PORT_SCAN_INTERVAL {
                 self.last_port_scan = now;
@@ -692,33 +756,43 @@ impl App {
                     .request_repaint_after(std::time::Duration::from_secs_f64(PORT_SCAN_INTERVAL));
             }
         }
-        ui.add_enabled_ui(!connected, |ui| {
-            let selected_text = self.selected_port.clone().unwrap_or_else(|| "select port".into());
-            egui::ComboBox::from_id_salt("port")
-                .selected_text(selected_text)
-                .width(260.0)
-                .show_ui(ui, |ui| {
-                    for p in &self.ports {
-                        let label = match &p.usb {
-                            Some(u) => format!(
-                                "{} {} {}",
-                                if p.looks_like_vna() { "*" } else { " " },
-                                p.path,
-                                u.product.clone().unwrap_or_default()
-                            ),
-                            None => format!("  {}", p.path),
-                        };
-                        ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
-                    }
-                });
-            if ui
-                .button("rescan")
-                .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
-                .clicked()
-            {
-                self.refresh_ports();
-            }
-        });
+        if let Some(server) = &self.served_by {
+            // The page of a server has that one device: nothing to choose.
+            ui.label(port_label(server)).on_hover_text("the vna-server this page came from");
+        } else {
+            ui.add_enabled_ui(!connected, |ui| {
+                let selected_text = self.selected_port.as_deref().map_or_else(|| "select port".into(), port_label);
+                egui::ComboBox::from_id_salt("port")
+                    .selected_text(selected_text)
+                    .width(260.0)
+                    .show_ui(ui, |ui| {
+                        for p in &self.ports {
+                            let label = match &p.usb {
+                                Some(u) => format!(
+                                    "{} {} {}",
+                                    if p.looks_like_vna() { "*" } else { " " },
+                                    p.path,
+                                    u.product.clone().unwrap_or_default()
+                                ),
+                                None => format!("  {}", p.path),
+                            };
+                            ui.selectable_value(&mut self.selected_port, Some(p.path.clone()), label);
+                        }
+                        for s in &self.servers {
+                            ui.selectable_value(&mut self.selected_port, Some(s.clone()), format!("  {}", port_label(s)))
+                                .on_hover_text(s);
+                        }
+                    });
+                if NATIVE
+                    && ui
+                        .button("rescan")
+                        .on_hover_text("rescan ports (also happens every 2 s while disconnected)")
+                        .clicked()
+                {
+                    self.refresh_ports();
+                }
+            });
+        }
         match &self.connection {
             Connection::Disconnected => {
                 if ui.add_enabled(self.selected_port.is_some(), egui::Button::new("Connect")).clicked() {
@@ -727,41 +801,55 @@ impl App {
             }
             Connection::Connecting(p) => {
                 ui.spinner();
-                ui.label(format!("connecting {p}…"));
+                if is_server_address(p) {
+                    ui.label(format!("connecting to the server {}…", server_label(p)));
+                } else {
+                    ui.label(format!("connecting {p}…"));
+                }
             }
-            Connection::Reconnecting { port, since } => {
-                let cancel = ui
-                    .button("Cancel")
-                    .on_hover_text("stop waiting for the device and disconnect")
-                    .clicked();
+            Connection::Reconnecting { port, since, what } => {
+                let texts = lost_texts(port, "", *what);
+                let cancel = ui.button("Cancel").on_hover_text(texts.cancel_hover).clicked();
                 ui.spinner();
-                ui.label(
-                    RichText::new(format!(
-                        "connection dropped, waiting for {port}… {:.0} s",
-                        since.elapsed().as_secs_f32()
-                    ))
-                    .color(Color32::from_rgb(255, 150, 80)),
-                );
+                let colour = if texts.trouble {
+                    Color32::from_rgb(255, 150, 80)
+                } else {
+                    Color32::from_rgb(200, 200, 120)
+                };
+                ui.label(RichText::new(format!("{} {:.0} s", texts.waiting, since.elapsed().as_secs_f32())).color(colour));
                 ui.ctx().request_repaint_after(Duration::from_millis(500));
                 if cancel {
                     self.running = false;
                     self.send(Cmd::Disconnect);
                 }
             }
-            Connection::Connected { port, info, battery_mv } => {
+            Connection::Connected {
+                port,
+                info,
+                battery_mv,
+                via,
+            } => {
                 if ui.button("Disconnect").clicked() {
                     self.running = false;
                     self.send(Cmd::Disconnect);
                 }
-                ui.label(
-                    RichText::new(format!(
-                        "{}  {}",
-                        info.summary(),
-                        battery_mv.map(|mv| format!("{:.2} V", mv as f64 / 1000.0)).unwrap_or_default()
-                    ))
-                    .color(Color32::from_rgb(120, 200, 120)),
-                )
-                .on_hover_text(port);
+                let battery = battery_mv.map(|mv| format!("{:.2} V", mv as f64 / 1000.0)).unwrap_or_default();
+                // Behind a server: the line stays short, where and what is in the hover.
+                let (line, hover) = match via {
+                    Some(v) => (
+                        format!("{}  fw {}  via {}  {battery}", info.model, info.firmware, v.server),
+                        format!(
+                            "{port}\nvna-server {} \"{}\"; the analyser is on {} there\n{}",
+                            v.version,
+                            v.server,
+                            v.device_port,
+                            info.summary()
+                        ),
+                    ),
+                    None => (format!("{}  {battery}", info.summary()), port.clone()),
+                };
+                ui.label(RichText::new(line).color(Color32::from_rgb(120, 200, 120)))
+                    .on_hover_text(hover);
             }
         }
         ui.separator();
@@ -838,33 +926,36 @@ impl App {
                     ui.close();
                     self.save_s2p();
                 }
-                if !HAS_DEVICE {
-                    if ui.button("Open example").on_hover_text(EXAMPLE_ABOUT).clicked() {
+                if !NATIVE && ui.button("Open example").on_hover_text(EXAMPLE_ABOUT).clicked() {
+                    ui.close();
+                    self.open_example();
+                }
+                // A calibration is for measuring (in a browser through its file
+                // dialogs), and a browser tab is not quit from a menu.
+                if self.has_device() {
+                    ui.separator();
+                    if ui.button("Load calibration…").clicked() {
                         ui.close();
-                        self.open_example();
+                        self.load_cal();
                     }
-                    // A calibration is for measuring, and a browser tab is not quit from a menu.
-                    return;
+                    if ui
+                        .add_enabled(self.cal.set.is_some(), egui::Button::new("Save calibration…"))
+                        .clicked()
+                    {
+                        ui.close();
+                        self.save_cal();
+                    }
                 }
-                ui.separator();
-                if ui.button("Load calibration…").clicked() {
-                    ui.close();
-                    self.load_cal();
-                }
-                if ui
-                    .add_enabled(self.cal.set.is_some(), egui::Button::new("Save calibration…"))
-                    .clicked()
-                {
-                    ui.close();
-                    self.save_cal();
-                }
-                ui.separator();
-                if ui.button("Quit").clicked() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                if NATIVE {
+                    ui.separator();
+                    if ui.button("Quit").clicked() {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
                 }
             });
-            if HAS_DEVICE {
-                ui.menu_button("Device", |ui| {
+            ui.menu_button("Device", |ui| {
+                let has_device = self.has_device();
+                if has_device {
                     if connected {
                         if ui.button("Disconnect").clicked() {
                             ui.close();
@@ -881,33 +972,47 @@ impl App {
                         ui.close();
                         self.connect_selected();
                     }
-                    if ui.button("Rescan ports").clicked() {
+                    if NATIVE && ui.button("Rescan ports").clicked() {
                         ui.close();
                         self.refresh_ports();
                     }
-                    ui.separator();
-                    ui.add_enabled_ui(connected, |ui| {
-                        let sweeping = self.sweeping();
-                        if sweeping {
-                            if ui.button("Stop").clicked() {
-                                ui.close();
-                                self.stop_sweep();
-                            }
-                        } else if ui.button("Run").clicked() {
+                }
+                // The page a server serves has its server; elsewhere one is added here.
+                if self.served_by.is_none()
+                    && ui
+                        .button("Add server…")
+                        .on_hover_text("a computer on the network with the analyser on its USB, running vna-server")
+                        .clicked()
+                {
+                    ui.close();
+                    self.server_input_error = None;
+                    self.show_add_server = true;
+                }
+                if !has_device {
+                    return;
+                }
+                ui.separator();
+                ui.add_enabled_ui(connected, |ui| {
+                    let sweeping = self.sweeping();
+                    if sweeping {
+                        if ui.button("Stop").clicked() {
                             ui.close();
-                            self.start_sweep(true);
+                            self.stop_sweep();
                         }
-                        if ui.add_enabled(!sweeping, egui::Button::new("Single sweep")).clicked() {
-                            ui.close();
-                            self.start_sweep(false);
-                        }
-                        if ui.button("Device screenshot").clicked() {
-                            ui.close();
-                            self.send(Cmd::Screenshot);
-                        }
-                    });
+                    } else if ui.button("Run").clicked() {
+                        ui.close();
+                        self.start_sweep(true);
+                    }
+                    if ui.add_enabled(!sweeping, egui::Button::new("Single sweep")).clicked() {
+                        ui.close();
+                        self.start_sweep(false);
+                    }
+                    if ui.button("Device screenshot").clicked() {
+                        ui.close();
+                        self.send(Cmd::Screenshot);
+                    }
                 });
-            }
+            });
             ui.menu_button("View", |ui| {
                 if ui.radio(self.view == View::Frequency, "Frequency domain").clicked() {
                     self.view = View::Frequency;
@@ -929,9 +1034,11 @@ impl App {
                 ui.separator();
                 zoom_menu(ui);
                 ui.separator();
-                if HAS_DEVICE {
-                    ui.checkbox(&mut self.auto_connect, "Connect at start")
-                        .on_hover_text("connect by itself when the program starts and a VNA is plugged in");
+                // The page of a server connects at start anyway.
+                if self.has_device() && self.served_by.is_none() {
+                    ui.checkbox(&mut self.auto_connect, "Connect at start").on_hover_text(
+                        "connect by itself when the program starts: to the selected VNA when it is plugged in, or to the selected server",
+                    );
                 }
                 if ui
                     .checkbox(&mut self.dev_tools, "Developer tools")
@@ -956,6 +1063,20 @@ impl App {
                     }
                     if ui.button("Clear log").clicked() {
                         self.log.clear();
+                    }
+                    if NATIVE
+                        && ui
+                            .add_enabled(
+                                matches!(self.connection, Connection::Disconnected),
+                                egui::Button::new("Connect to simulator"),
+                            )
+                            .on_hover_text("a simulated analyser inside this program, to try it without one")
+                            .on_disabled_hover_text("disconnect first")
+                            .clicked()
+                    {
+                        ui.close();
+                        self.connection = Connection::Connecting(vna_link::SIMULATOR.into());
+                        self.send(Cmd::Connect(vna_link::SIMULATOR.into()));
                     }
                 });
             }
@@ -1122,7 +1243,7 @@ impl App {
 
     fn side_panel(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
-            if HAS_DEVICE {
+            if self.has_device() {
                 self.measuring_panels(ui);
             }
 
@@ -1155,7 +1276,7 @@ impl App {
                 ui.add(egui::DragValue::new(&mut self.gd_aperture).range(1..=50).suffix(" pts"));
             });
             ui.small("Pick what each plot shows in its header. Group delay = −dφ/dω over ±aperture points.");
-            if !HAS_DEVICE {
+            if !self.has_device() {
                 // Of the calibration panel, which is left out, the one setting that also works on a file.
                 self.port_extension_row(ui);
             }
@@ -1213,7 +1334,7 @@ impl App {
                             format_hz(stop as u64)
                         ),
                     );
-                    if HAS_DEVICE && ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
+                    if self.has_device() && ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
                         self.start = "50k".into();
                         self.stop = format_hz(stop as u64).replace(' ', "");
                         self.points = 1001;
@@ -1274,7 +1395,7 @@ impl App {
                 self.save_s2p();
             }
             ui.horizontal(|ui| {
-                let hint = if HAS_DEVICE {
+                let hint = if self.has_device() {
                     "show an .s1p/.s2p file instead of the device; the next sweep replaces it"
                 } else {
                     "show an .s1p/.s2p file from your computer"
@@ -1328,6 +1449,7 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ui, |ui| self.central(ui));
         self.plot_reset = false;
         self.screenshot_window(&ctx);
+        self.add_server_window(&ctx);
         self.about_window(&ctx);
         self.log_window(&ctx);
         #[cfg(target_arch = "wasm32")]

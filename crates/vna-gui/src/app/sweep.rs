@@ -60,7 +60,8 @@ impl App {
             // that came from the Sweep panel; `segment_plan` sorts, so find it.
             self.applied_primary = self.current_config();
             self.sent_plan_cals = plan.iter().map(|(_, c)| c.clone()).collect();
-            let cfgs = plan.into_iter().map(|(c, _)| c).collect();
+            let cfgs: Vec<SweepConfig> = plan.into_iter().map(|(c, _)| c).collect();
+            self.sent_plan = cfgs.clone();
             self.send(Cmd::Sweep {
                 cfgs,
                 purpose: Purpose::Display,
@@ -132,7 +133,9 @@ impl App {
                         remove = Some(k);
                     }
                 });
-                ui.horizontal(|ui| {
+                // A segment's own calibration file is kept by its path, which a
+                // browser does not give: there every segment uses the panel's.
+                if NATIVE { ui.horizontal(|ui| {
                     ui.add_space(18.0);
                     let name = self.extra_segments[k].cal_file.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().into_owned());
                     let label = match &name {
@@ -148,7 +151,7 @@ impl App {
                     if self.extra_segments[k].cal_file.is_some() && ui.small_button("none").clicked() {
                         self.extra_segments[k].cal_file = None;
                     }
-                });
+                }); }
                 if let Some(e) = self.extra_segments[k].cal_file.as_ref().and_then(|p| self.seg_cals.get(p)).and_then(|c| c.error.as_ref()) {
                     ui.small(RichText::new(format!("⚠ {e}")).color(Color32::from_rgb(255, 150, 80)));
                 }

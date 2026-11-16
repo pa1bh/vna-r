@@ -44,7 +44,10 @@ where
 pub(super) struct Settings {
     /// 0 (absent) for settings stored before 0.3.
     pub(super) version: u32,
+    /// A serial port, or a server (`ws://host:port/ws`, one of `servers`).
     pub(super) port: Option<String>,
+    /// The servers added under Device ▸ Add server…, in the order they were added.
+    pub(super) servers: Vec<String>,
     pub(super) start: String,
     pub(super) stop: String,
     pub(super) points: u16,
@@ -122,6 +125,7 @@ impl Default for Settings {
             // current one.
             version: 0,
             port: None,
+            servers: Vec::new(),
             start: "1M".into(),
             stop: "30M".into(),
             points: 201,
@@ -172,10 +176,16 @@ impl Settings {
 impl App {
     pub(super) fn apply_settings(&mut self, s: Settings) {
         let s = s.migrated();
-        if let Some(p) = &s.port {
-            if self.ports.iter().any(|c| &c.path == p) {
-                self.selected_port = Some(p.clone());
+        // Written in the canonical form by this program; a hand-edited entry
+        // that is not an address is dropped rather than shown.
+        self.servers.clear();
+        for url in s.servers.iter().filter_map(|u| server_url(u)) {
+            if !self.servers.contains(&url) {
+                self.servers.push(url);
             }
+        }
+        if let Some(p) = restored_port(s.port.as_deref(), &self.ports, &self.servers) {
+            self.selected_port = Some(p);
         }
         self.start = s.start;
         self.stop = s.stop;
@@ -242,7 +252,9 @@ impl App {
         }
         Settings {
             version: SETTINGS_VERSION,
-            port: self.selected_port.clone(),
+            // The page of a server always has its own; that is not a choice to remember.
+            port: self.selected_port.clone().filter(|p| self.served_by.as_ref() != Some(p)),
+            servers: self.servers.clone(),
             start: self.start.clone(),
             stop: self.stop.clone(),
             points: self.points,
@@ -303,6 +315,34 @@ mod tests {
         assert_eq!(s.marker_freqs, vec![Some(6_111_001_500), None, None, None]);
         assert_eq!(s.plot_kinds, vec!["logmag", "swr", "phase"]);
         assert_eq!(s.migrated().version, SETTINGS_VERSION);
+    }
+
+    /// The settings as vna-r 0.3.6 stored them, before there were servers.
+    const SETTINGS_0_3_6: &str = r#"(version:1,port:Some("/dev/cu.usbmodemv1_01"),start:"1M",stop:"30M",points:201,average:1,cal_file:None,cal_apply:true,show_s11:true,show_s21:true,show_bands:true,band_region:2,view_tdr:false,tdr_vf:0.7,tdr_window:"hann",tdr_max_m:2.0,marker_freqs:[None,None,None,None],fit_f_min:"300M",fit_as_delay:false,plot_kinds:["logmag","swr","phase"],gd_aperture:2,gate_on:false,gate_start_m:-0.1,gate_stop_m:0.5,gate_notch:false,port_ext_ps:0.0,s21_offset_db:0.0,sweep_avg:1,avg_drop:0,extra_segments:[],dev_tools:false,auto_connect:true,references:[],diff_ref:None)"#;
+
+    #[test]
+    fn settings_from_before_servers_load_without_any() {
+        let s: Settings = ron::from_str(SETTINGS_0_3_6).expect("0.3.6 settings must stay readable");
+        assert!(s.servers.is_empty());
+        assert_eq!(s.port.as_deref(), Some("/dev/cu.usbmodemv1_01"));
+        assert!(s.auto_connect);
+        assert_eq!(s.band_region, 2);
+    }
+
+    #[test]
+    fn servers_and_a_server_port_survive_a_round_trip() {
+        let s = Settings {
+            port: Some("ws://vna.local:8080/ws".into()),
+            servers: vec!["ws://vna.local:8080/ws".into(), "ws://[fe80::1]:8081/ws".into()],
+            auto_connect: true,
+            ..Default::default()
+        };
+        let text = ron::to_string(&s).unwrap();
+        let back: Settings = ron::from_str(&text).unwrap();
+        assert_eq!(back, s);
+        // and the port is selected again at start, as a known server
+        let restored = restored_port(back.port.as_deref(), &[], &back.servers);
+        assert_eq!(restored.as_deref(), Some("ws://vna.local:8080/ws"));
     }
 
     #[test]

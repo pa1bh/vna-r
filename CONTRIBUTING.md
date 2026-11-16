@@ -62,6 +62,7 @@ submodules by subject, each seeing the parent through `use super::*`:
 | `tdr` | time-domain view and the gate |
 | `files` | Touchstone open and save, device screenshot |
 | `diagnostics` | About, developer log, diagnostics text |
+| `servers` | Device ▸ Add server…, how a port or server reads, the texts for a lost link |
 
 A method that another module calls is `pub(super)`; a new panel gets its own module
 rather than growing `mod.rs`.

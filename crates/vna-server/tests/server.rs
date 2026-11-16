@@ -208,6 +208,21 @@ fn standards_and_screenshots_go_only_to_who_asked() {
         "{seen:?}"
     );
     assert!(!seen.iter().any(|e| matches!(e, Event::Screenshot(_))));
+    // nor its progress, whose end b would never hear of
+    assert!(!seen.iter().any(|e| matches!(
+        e,
+        Event::Progress {
+            purpose: Purpose::Standard(_),
+            ..
+        }
+    )));
+    assert!(got.iter().any(|e| matches!(
+        e,
+        Event::Progress {
+            purpose: Purpose::Standard(_),
+            ..
+        }
+    )));
     s.shutdown();
 }
 

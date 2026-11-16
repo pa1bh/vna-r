@@ -47,6 +47,13 @@ pub enum Purpose {
     Standard(Standard),
 }
 
+impl Purpose {
+    /// What a message that does not say is about.
+    fn display() -> Purpose {
+        Purpose::Display
+    }
+}
+
 #[derive(Debug)]
 pub enum Cmd {
     Connect(String),
@@ -69,6 +76,41 @@ pub enum Cmd {
     Screenshot,
 }
 
+/// Where a device is when it is behind a server: set by the client's session
+/// from the server's hello, never sent by a server or a local worker.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Via {
+    /// What the server calls itself.
+    pub server: String,
+    /// The server's program version.
+    pub version: String,
+    /// The device's port on the server, e.g. `/dev/ttyACM0`.
+    pub device_port: String,
+}
+
+/// What a lost link is, so that the GUI can say it in the right words.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Loss {
+    /// The device left the USB bus; the worker waits for it.
+    #[default]
+    Device,
+    /// The connection to the server dropped; the session reconnects.
+    Server,
+    /// The server has no analyser yet; it connects to one when it is plugged in.
+    NoAnalyser,
+    /// The server's analyser left and did not come back.
+    AnalyserGone,
+    /// The server's analyser left its USB bus; the server waits for it.
+    AnalyserLost,
+}
+
+impl Loss {
+    fn is_device(&self) -> bool {
+        *self == Loss::Device
+    }
+}
+
 /// What the worker reports. The serde form is what a server sends its
 /// clients (see [`crate::wire`]); the sweep and the screenshot travel in a
 /// compact form of their own, which is why those two fields name a module.
@@ -79,6 +121,9 @@ pub enum Event {
         port: String,
         info: VnaInfo,
         battery_mv: Option<u16>,
+        /// The server the device is behind, if it is.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        via: Option<Via>,
     },
     Disconnected,
     /// The link to the device dropped. The worker waits for `port` to come
@@ -88,6 +133,9 @@ pub enum Event {
     LinkLost {
         port: String,
         msg: String,
+        /// What it is that dropped; a worker's own loss is always `Device`.
+        #[serde(default, skip_serializing_if = "Loss::is_device")]
+        what: Loss,
     },
     /// `result` is the concatenation of the segments in `cfgs`, averaged over
     /// `repeat` sweeps.
@@ -98,10 +146,14 @@ pub enum Event {
         purpose: Purpose,
         repeat: usize,
     },
-    /// A sweep is under way: `done` of `total` points, over all segments and repeats.
+    /// A sweep is under way: `done` of `total` points, over all segments and
+    /// repeats. `purpose` lets a server send the progress of a calibration
+    /// standard only to the client that measures it, like its result.
     Progress {
         done: usize,
         total: usize,
+        #[serde(default = "Purpose::display")]
+        purpose: Purpose,
     },
     /// A sweep was cut short by a later command (Stop, Disconnect, a new sweep); no result follows.
     Cancelled {
@@ -400,7 +452,11 @@ impl Worker {
             present_since: None,
             resume,
         });
-        self.emit(Event::LinkLost { port, msg });
+        self.emit(Event::LinkLost {
+            port,
+            msg,
+            what: Loss::Device,
+        });
     }
 
     /// One look at a lost link: reconnect when the port has stayed for
@@ -436,7 +492,12 @@ impl Worker {
                     let resume = self.lost.take().map(|l| l.resume).unwrap_or(Resume::Nothing);
                     self.dev = Some(d);
                     self.linked_at = Some(Instant::now());
-                    self.emit(Event::Connected { port, info, battery_mv });
+                    self.emit(Event::Connected {
+                        port,
+                        info,
+                        battery_mv,
+                        via: None,
+                    });
                     match resume {
                         Resume::Nothing => {}
                         Resume::Continuous(cfgs, purpose, repeat) => self.continuous = Some((cfgs, purpose, repeat)),
@@ -473,7 +534,12 @@ impl Worker {
                         self.dev = Some(d);
                         self.linked_at = Some(Instant::now());
                         self.port = Some(port.clone());
-                        self.emit(Event::Connected { port, info, battery_mv });
+                        self.emit(Event::Connected {
+                            port,
+                            info,
+                            battery_mv,
+                            via: None,
+                        });
                     }
                     Err(e) => self.fail(&format!("connecting to {port}"), e),
                 }
@@ -591,6 +657,7 @@ impl Worker {
                     let _ = events.send(Event::Progress {
                         done: before + done,
                         total,
+                        purpose,
                     });
                     notify();
                     while let Ok(c) = cmds.try_recv() {
@@ -724,7 +791,7 @@ mod tests {
                     connects += 1;
                     println!("{} connected: {}", stamp(t0), info.summary());
                 }
-                Ok(Event::LinkLost { port, msg }) => {
+                Ok(Event::LinkLost { port, msg, .. }) => {
                     lost += 1;
                     println!("{} LINK LOST on {port}: {msg}", stamp(t0));
                 }

@@ -230,7 +230,7 @@ impl App {
         let avail = ui.available_size();
         let h = ((avail.y - 10.0) / 2.0).max(150.0);
         let Some(sweep) = sweep else {
-            ui.centered_and_justified(|ui| ui.label(EMPTY_HINT));
+            ui.centered_and_justified(|ui| ui.label(self.empty_hint()));
             return;
         };
         // Grey lines where a gated trace stops being trustworthy.

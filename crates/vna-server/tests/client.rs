@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use litevna::SweepConfig;
 use tungstenite::Message;
 use vna_link::wire::{Hello, ServerMsg};
-use vna_link::{spawn_with, Cmd, Event, Options, Purpose, RemoteTiming, WorkerHandle};
+use vna_link::{spawn_with, Cmd, Event, Loss, Options, Purpose, RemoteTiming, Via, WorkerHandle};
 use vna_server::{Config, DeviceChoice, Server};
 
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -105,14 +105,16 @@ fn connect_sweep_and_disconnect_through_the_handle() {
     let port = url(s.local_addr());
     h.send(Cmd::Connect(port.clone()));
     match until(&h, |e| matches!(e, Event::Connected { .. })).pop() {
-        Some(Event::Connected { port: p, info, .. }) => {
+        Some(Event::Connected { port: p, info, via, .. }) => {
             assert_eq!(p, port);
             assert_eq!(info.model, "vna-r simulator");
-            assert!(
-                info.detail
-                    .contains(&format!("via test bench (vna-server {}, sim:0)", vna_server::VERSION)),
-                "{}",
-                info.detail
+            assert_eq!(
+                via,
+                Some(Via {
+                    server: "test bench".into(),
+                    version: vna_server::VERSION.into(),
+                    device_port: "sim:0".into()
+                })
             );
         }
         other => panic!("{other:?}"),
@@ -144,10 +146,7 @@ fn a_server_that_restarts_is_reconnected_and_sweeping_resumes() {
     until(&h, is_done);
 
     s.shutdown();
-    let lost = until(
-        &h,
-        |e| matches!(e, Event::LinkLost { msg, .. } if msg.contains("connection to the server dropped")),
-    );
+    let lost = until(&h, |e| matches!(e, Event::LinkLost { what: Loss::Server, .. }));
     assert!(
         lost.iter().all(|e| !matches!(e, Event::Disconnected | Event::Error { .. })),
         "{lost:?}"
@@ -218,7 +217,7 @@ fn what_cannot_be_reached_is_a_failed_connect() {
     // nothing listens on port 1
     h.send(Cmd::Connect("ws://127.0.0.1:1/ws".into()));
     match next(&h) {
-        Event::Error { msg, stops_sweep: true } => assert!(msg.starts_with("connecting to ws://127.0.0.1:1/ws"), "{msg}"),
+        Event::Error { msg, stops_sweep: true } => assert!(msg.starts_with("connecting to 127.0.0.1:1:"), "{msg}"),
         other => panic!("{other:?}"),
     }
     h.send(Cmd::Connect("wss://vna.example.org/ws".into()));
