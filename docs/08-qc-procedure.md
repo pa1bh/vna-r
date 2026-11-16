@@ -1566,6 +1566,66 @@ G4. `sudo systemctl stop vna-server`: de analyzer krijgt zijn scherm terug.
 G5. Een Pi Zero 2 W, als die er is: het tempo bij doorvegen met 1001 punten, en of de
 pagina (3,6 MB) vlot laadt over wifi.
 
+## Logboek van deze ronde
+
+### 16 november, eerste keer met apparaten (door mij, zonder dat er een kabel bewogen is)
+
+PA1BH zette een Raspberry Pi 4 B (4 GB, Raspberry Pi OS op Debian 13 "trixie", 64-bits,
+vers geïnstalleerd) op het netwerk met een LiteVNA 64 aan de USB, en liet de LiteVNA 67
+aan de Mac hangen.
+
+**Op de Mac, met de LiteVNA 67 (fw 2.2, hw 2):**
+
+- **A1 zonder kabel: in orde.** `hardware_session` uit `vna-link`: verbonden, 8 sweeps van
+  801 punten in 20 s, Stop geeft `Cancelled`, vijf seconden rust, een losse sweep, 0
+  verloren verbindingen. De verhuisde worker bedient een echt apparaat zoals voorheen. De
+  variant met `VNA_R_EXPECT_DROP=1` is niet gedaan: daarvoor moet de kabel los.
+- **E1: in orde.** `vna-server` zonder `--port` vond de LiteVNA zelf (`/dev/cu.usbmodemv1_01`)
+  en sloeg de andere seriële poorten over, waaronder die van een LG-monitor. De pagina
+  verbond en toonde `LiteVNA  fw 2.2  via mac-67  4.13 V`.
+- **E3, het tempo:** 801 punten over 50 kHz–6,3 GHz, doorvegen, 11 sweeps. Het apparaat
+  deed 2214 ms over een sweep; bij de client kwamen ze 2261 ms na elkaar aan. De server en
+  het netwerk voegen dus ongeveer 50 ms per sweep toe, 2 %. Alle 801 records met een goede
+  controlesom, geen ontbrekend punt, 114 kB per bericht. Rechtstreeks was het 8 sweeps in
+  20 s (met het verbinden erbij).
+- Een tweede verbinding startte het doorvegen; de pagina toonde daarop Stop en het
+  lopende spoor (F1, met één browser en een losse WebSocket).
+- Na het stoppen van de server was het apparaat weer vrij (`vna-cli info` antwoordde). Of
+  het scherm van de LiteVNA terugkwam is niet gezien.
+
+**Op de Pi:**
+
+- **Bouwen op de Pi zelf:** `cargo build --release -p vna-server` in ongeveer vier
+  minuten, met de pagina erin (`VNA_R_WEB_DIR` naar de map die van de Mac gekopieerd is).
+  Rust kwam van rustup; `libudev-dev` is nodig (hier zonder sudo uit het pakket in de
+  thuismap uitgepakt, gewoon is `sudo apt install libudev-dev`). Het programma is 7,5 MB.
+  Zonder git-map zegt `--version` "(unknown)" als revisie.
+- **G1, installeren volgens hoofdstuk 10: in orde.** `systemd-analyze verify` heeft niets
+  aan te merken op de unit. De dienst is actief, draait als een door systemd gemaakte
+  gebruiker (uid 64353) met `dialout` als extra groep, en mag `/dev/ttyACM0` openen: de
+  fout die volgde was "Broken pipe" en niet "Permission denied". `systemd-analyze
+  security` geeft 3,4 ("OK"). Het log leest goed in `journalctl`.
+- **G2, de pagina vanaf de Pi op de Mac: in orde tot aan het apparaat.** De pagina
+  (3,65 MB met gzip) kwam in 0,4 s over, tekent met WebGL (http op het LAN), het zijpaneel
+  staat zonder muisbeweging op volle breedte, en de bovenbalk zegt `192.168.1.190:8080: no
+  analyser on the server yet, waiting for one… N s` in gedempt geel, met Cancel en zonder
+  rode regel.
+- **Geblokkeerd: de LiteVNA 64 blijft niet op de USB van de Pi.** De kernel meldt
+  doorlopend `over-current change` op alle USB-poorten (honderden keren, ook zonder dat er
+  een server draait) en de LiteVNA valt elke paar seconden van de bus en meldt zich
+  opnieuw aan; het apparaatnummer liep in twee minuten op tot 105. `vcgencmd
+  get_throttled` geeft 0x0, dus de Pi zelf ziet geen onderspanning. Dat is voeding of
+  kabel, geen software: de vier poorten van een Pi 4 delen één stroombegrenzer, en een
+  LiteVNA die zijn accu laadt kan daar overheen gaan. Te proberen: een andere kabel, de
+  officiële voeding van 3 A, een hub met eigen voeding, of de LiteVNA eerst elders
+  opladen.
+- **Hoe de server zich daaronder houdt: goed.** Hij crasht niet, schrijft 14 regels in
+  drie minuten, gebruikt 0,9 % van een kern en 8 MB, en probeert het opnieuw met een
+  oplopende pauze tot 60 s. De clients zien de wachtregel. Zie bevinding 4.
+
+De dienst staat nog aan op de Pi (`http://192.168.1.190:8080/`), zodat het vanzelf
+verdergaat zodra de LiteVNA blijft zitten.
+
 ## Bevindingen tijdens het bouwen
 
 1. **Het zijpaneel afgeknipt na het laden.** Op de pagina van de server, in een
@@ -1581,6 +1641,13 @@ pagina (3,6 MB) vlot laadt over wifi.
 3. **JSON las een getal soms één stap in het laatste cijfer anders terug.** Opgelost voor
    het hele project (`float_roundtrip`); een calibratiebestand leest daardoor nu exact
    terug zoals het geschreven is. Het bestandsformaat is niet veranderd.
+4. **Een analyzer die komt en gaat aan de server** (gezien op de Pi, 16 november). De
+   server meldt dan alleen `connecting to /dev/ttyACM0: I/O error: Broken pipe` en
+   probeert het opnieuw met een pauze die oploopt tot 60 s. Twee dingen kunnen beter:
+   de melding zegt niet dat het apparaat steeds van de USB valt (de worker weet dat wel
+   bij een verbinding die al stond, zie 0.3.3), en na een reeks mislukte pogingen duurt
+   het tot een minuut voordat een apparaat dat intussen blijft zitten wordt opgepakt.
+   Nog niet veranderd: eerst zien hoe het gaat als de voeding in orde is.
 
 ## Slotronde
 
