@@ -254,7 +254,8 @@ terugval is al deel van de huidige build.
 Getest): dezelfde build over http op een LAN-adres, dus zonder veilige context. De
 renderer is dan `Gl` op WebGL 2.0 in plaats van `BrowserWebGpu`; de voorbeeldmeting,
 markers, TDR, zoomen en slepen werken en het beeld is gelijk aan dat met WebGPU. Dat was
-in Chromium op een Mac. Firefox, Safari en een echte telefoon of tablet zijn niet gezien.
+in Chromium op een Mac. Bas heeft dezelfde testserver daarna geprobeerd op een iPhone, in
+Safari en in Firefox: geen problemen. Android en een tablet zijn niet gezien.
 
 Voor vna-r maakt het in beeld en snelheid geen verschil: het programma tekent 2D (lijnen,
 tekst, een Smith-chart) en WebGPU levert pas iets op bij zwaar 3D-werk of rekenen op de
@@ -381,14 +382,14 @@ kunnen als eigen release uit voordat de server bestaat.
 - Formaat van het protocol: postcard (compact) of JSON (leesbaar). Neiging: JSON voor de
   eerste versie, om de debugbaarheid; wisselen is later één regel per kant.
 - ~~Werkt de WebGL-terugval van wgpu goed genoeg, of wordt de webbouw `glow`?~~ Ja,
-  geprobeerd op 16 november in Chromium op een Mac; de webbouw blijft op wgpu. Nog te
-  doen: dezelfde pagina op een echte telefoon en tablet (Safari op iOS, Chrome op Android)
-  en in Firefox.
+  geprobeerd op 16 november in Chromium op een Mac, en door Bas op een iPhone, in Safari
+  en in Firefox; de webbouw blijft op wgpu. Niet gezien: Chrome op Android en een tablet.
 - De indeling op een telefoon. Rechtop (375 punten breed) vult het zijpaneel het hele
   scherm en zijn de grafieken niet te zien; dwars is het krap. Voor "afregelen vanaf een
   telefoon in de tuin" moet het zijpaneel op een smal scherm kunnen inklappen of onder de
   grafieken komen. Dat staat los van de server en van de renderer, en het raakt de
-  interface van het programma: een eigen besluit.
+  interface van het programma: een eigen besluit. Op de iPhone van Bas bevestigd; besloten
+  op 16 november om daar nu niet aan te beginnen.
 - Doet de uitzondering van Chrome wat de documentatie zegt, met een naam op `.local` en
   met een IP-adres, ook op Android? En wat doen Safari en Firefox precies met `ws://`
   naar `localhost` en naar het LAN? Proberen zodra er een server is.

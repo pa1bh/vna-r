@@ -205,9 +205,12 @@ punten breed) vult het zijpaneel het hele scherm en zijn de grafieken niet te zi
 (812×375) staan de Smith-chart en één grafiek er, krap. De indeling is voor een telefoon
 dus nog niet bruikbaar.
 
-**Niet getest:** Edge, Firefox en Safari (dus ook WebGL in die browsers en op een echte
-telefoon of tablet); opslaan in een gewone browser (de download zelf); Windows en
-Linux; aanraken op een echt aanraakscherm; een echte
+Dezelfde dag door Bas, op dezelfde testserver: op een **iPhone**, in **Safari** en in
+**Firefox**. Geen problemen. Op de iPhone is het scherm te klein voor de indeling, zoals
+hierboven; daar wordt nu niets aan gedaan. Versies van de browsers zijn niet genoteerd.
+
+**Niet getest:** Edge; een Android-telefoon en een tablet; opslaan in een gewone browser
+(de download zelf); Windows en Linux; een echte
 webserver met https en compressie. Het native programma is na het verhuizen van de balk
 en het zijpaneel gebouwd, getest en met clippy nagekeken, maar niet opnieuw bekeken met
 een apparaat eraan.
