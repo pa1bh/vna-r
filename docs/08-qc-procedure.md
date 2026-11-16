@@ -12,7 +12,8 @@ het logboek. **0.3.0** kwam na de release candidates 0.3.0-rc.1
 (vóór de QC, om het testen op andere platforms makkelijker te maken) en 0.3.0-rc.2 (na
 het eerste deel van de QC op macOS met de LiteVNA 67), en na een ronde met de NanoVNA-F
 op NixOS en macOS. Wat getest is, wat gevonden is en wat nog openstaat, staat in het
-logboek hieronder. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
+logboek hieronder. Op 16 november kwam daar het meten via het netwerk bij (punt 72), gebouwd op een
+branch en nog niet met een apparaat nagelopen: zie "Ronde client/server" onderaan. Per werklijstpunt (nummers uit [docs/05-roadmap.md](05-roadmap.md), codes uit
 [docs/07-analyse-en-aanbevelingen.md](07-analyse-en-aanbevelingen.md)): wat er veranderd
 is, hoe je het controleert en wat je moet zien.
 
@@ -1317,6 +1318,278 @@ sweeppaneel niet, de regiokeuze en de achtergrond wel.
 4. Sluit af, start opnieuw: Amateur bands, offset, drop, venster en VF staan zoals je ze
    achterliet.
 5. Na 13 november erbij: 69 (zonder apparaat) en 70 (met apparaat).
+
+---
+
+# Ronde client/server (punt 72, 16 november 2026)
+
+Meten via het netwerk: `vna-server`, de pagina in de browser die meet, en **Device ▸ Add
+server…** in het programma. Het ontwerp en wat er gebouwd is staan in
+[docs/10-client-server.md](10-client-server.md), de gebruikerskant in hoofdstuk 10 van de
+handleiding. Gebouwd op 16 november op de branch `feature/client-server`, een commit per
+onderdeel, nog niet in `main` en niet uitgebracht.
+
+Wat ik zelf gecontroleerd heb: `cargo fmt`, `cargo clippy -D warnings` op native en op
+wasm32, alle tests (103 in de library, 10 in de GUI, 39 in `vna-link`, 23 in
+`vna-server`) en `check-manuals.sh` na elk onderdeel. Met het gesimuleerde apparaat, in
+de ingebouwde browser op macOS: de pagina van de server, calibreren door de server heen,
+de schermafbeelding, de losse pagina met Add server…, twee clients tegelijk en een server
+die herstart onder een lopende sweep. Het programma is gestart met een server als bewaarde
+poort en verbond vanzelf. **Niet gecontroleerd**: alles met een analyzer, het venster van
+het programma (alleen de browserbouw is bekeken), een Raspberry Pi met de systemd-unit,
+Linux, Windows, de release-workflow, de flake, en Safari, Firefox en een telefoon met de
+pagina die meet.
+
+Het belangrijkste van deze ronde is **deel A**: de draad die het apparaat bedient is
+verhuisd naar een eigen crate en houdt zijn apparaat nu achter een kleine tussenlaag. De
+code is niet herschreven, maar het is het deel met het herverbinden na USB-uitval, en dat
+is alleen met hardware te zien.
+
+## Voorbereiding
+
+```bash
+git switch feature/client-server
+scripts/build-web.sh
+cargo build --workspace --release
+export PATH="$PWD/target/release:$PATH"
+cp ~/Library/Application\ Support/vna-r/app.ron /tmp/app.ron.0.3.6
+```
+
+De volgorde telt: `build-web.sh` vóór `cargo build`, want de server bakt de pagina in die
+er op dat moment staat. Zonder die stap serveert hij een pagina die zegt dat de
+browserbouw ontbreekt. De laatste regel bewaart je instellingen van 0.3.6.
+
+```bash
+cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace && ./scripts/check-manuals.sh
+```
+
+Verwacht: geen uitvoer van fmt en clippy, alle tests groen, "manuals in step: 11 files
+each".
+
+## Deel A — Het programma zoals het was (met apparaat)
+
+**Veranderd.** `worker.rs` staat in `crates/vna-link`; de worker krijgt een functie mee in
+plaats van een egui-context, en bedient zijn apparaat via een trait. Voor een analyzer
+zijn de aanroepen en hun volgorde gelijk gebleven.
+
+A1. De sessietest, met de LiteVNA 67 en daarna met de NanoVNA-F:
+
+```bash
+VNA_R_TEST_PORT=/dev/cu.usbmodem… cargo test -p vna-link --release -- --ignored --nocapture hardware_session
+```
+
+Verwacht: verbonden, sweeps gedurende twintig seconden, Stop, vijf seconden rust, één
+losse sweep, geen `LinkLost`. Daarna met de kabel:
+
+```bash
+VNA_R_EXPECT_DROP=1 VNA_R_TEST_PORT=/dev/cu.usbmodem… cargo test -p vna-link --release -- --ignored --nocapture hardware_session
+```
+
+Trek tijdens het lopen de kabel los en steek hem terug. Verwacht: `LinkLost`, na het
+terugsteken `Connected`, en de sweeps gaan verder.
+
+A2. Het programma, met je bestaande instellingen: `vna-gui`. Verwacht: alles zoals in
+0.3.6. Het enige nieuwe is **Device ▸ Add server…** onder Rescan ports. Dan met de
+LiteVNA: Connect, Run, Stop, Single, een calibratiestandaard meten, Device screenshot.
+Trek tijdens Run de kabel los: de oranje regel "connection dropped, waiting for …" met
+Cancel, en na terugsteken "reconnected after N s" en het vegen gaat verder. Disconnect:
+de LiteVNA krijgt zijn scherm terug. Kort hetzelfde met de NanoVNA-F, met een sweep boven
+280 MHz (de aanloopscan).
+
+A3. Het log: start `vna-gui` vanuit een terminal. Verwacht: de regels over verbinden en
+herverbinden komen nu van `vna_link::worker` in plaats van `vna_gui::worker`, en staan er
+nog steeds zonder dat je `RUST_LOG` zet.
+
+## Deel B — De simulator in het programma (zonder apparaat)
+
+**Veranderd.** Een poort `sim:` opent een apparaat in software. In het programma alleen
+bereikbaar via het ontwikkelaarsmenu.
+
+**View ▸ Developer tools**, dan **Developer ▸ Connect to simulator**. Verwacht: de groene
+regel `vna-r simulator  fw 0.3.6  no hardware, 625 points/s  3.95 V`. Run: S11 met dips
+bij 3,65, 7,1, 14,2, 21,25 en 28,6 MHz, S21 een doorlaatband rond 14,2 MHz, met lichte
+ruis die per sweep verschilt. Open, short en load meten: "ready for S11", en het spoor
+blijft de antenne. Screenshot: acht kleurbalken boven een grijsverloop. Zet Developer
+tools weer uit: het menu en de simulator zijn weg, de poortlijst toont hem nergens.
+
+## Deel C — Een server met de simulator, en het programma
+
+**Veranderd.** `vna-server`; in het programma Device ▸ Add server…, servers in de
+poortlijst, nieuwe teksten bij wachten.
+
+In een eigen terminal:
+
+```bash
+vna-server --simulate --listen 0.0.0.0:8099
+```
+
+Verwacht in het log: het adres waarop hij luistert, "web client built in" en "connected
+to vna-r simulator".
+
+C1. **Device ▸ Add server…**: typ `vna local`, Add. Verwacht: één rode regel met een
+voorbeeld. Typ `127.0.0.1:8099`, Add: het venster sluit, rechtsboven "server
+127.0.0.1:8099 added: Connect connects to it", en de poortlijst toont `server
+127.0.0.1:8099`. Open de lijst: eerst de seriële poorten, daaronder de server.
+
+C2. Connect. Verwacht: "connecting to the server 127.0.0.1:8099…", dan groen `vna-r
+simulator  fw 0.3.6  via <naam van je Mac>  3.95 V`. Wijs de regel aan: het adres, de
+versie van de server en "the analyser is on sim: there". In het log van de server: een
+client met "Origin none".
+
+C3. Run, Stop, Single, Screenshot, een calibratie: zoals in deel B, maar nu door de
+server heen.
+
+C4. Ctrl-C op de server terwijl Run aan staat. Verwacht: de oranje regel "connection to
+the server dropped, waiting for 127.0.0.1:8099… N s" en een rode regel over het netwerk.
+Start de server opnieuw: groen, "reconnected after N s", en het vegen gaat vanzelf
+verder. Laat hem een keer langer dan twee minuten uit: "did not come back within 120 s"
+en het programma is niet meer verbonden.
+
+C5. Start de server zonder analyzer: `vna-server --port /dev/bestaat-niet --listen
+0.0.0.0:8099`, en Connect. Verwacht: een gedempt gele regel "no analyser on the server
+yet, waiting for one…", geen rode regel, en Cancel werkt.
+
+C6. Sluit het programma en start het opnieuw: de server staat weer gekozen. Met **View ▸
+Connect at start** aan verbindt het vanzelf.
+
+C7. Add server… terwijl je verbonden bent: **remove** is grijs bij de server in gebruik.
+Verbreek de verbinding en verwijder hem: de poortlijst is weer zoals in 0.3.6.
+
+C8. Developer tools aan, verbonden met de server, **Copy diagnostics**: er staat een
+regel "via vna-server …".
+
+## Deel D — De browser
+
+**Veranderd.** De browserbouw meet als er een server is. Een pagina die van een server
+komt verbindt vanzelf; de losse pagina is de viewer met Add server… erbij.
+
+D1. De pagina van de server: `http://<IP van je Mac>:8099/` in Safari, Chrome en Firefox,
+met de server uit deel C. Verwacht: geen voorbeeldmeting; waar de poortlijst zou staan
+`server <adres>:8099`; hij verbindt vanzelf en de groene regel verschijnt. **Raak de muis
+niet aan na het laden**: het zijpaneel moet meteen op volle breedte staan, niet rechts
+afgeknipt (zie bevinding 1 hieronder).
+
+D2. Run, Stop, Single. Screenshot en **Save PNG…**: een download `screenshot.png`.
+Calibratie meten, **Save…**: een download `….cal.json`; **Load…** neemt hem terug.
+Voeg een segment toe: er staat geen regel "cal:" onder.
+
+D3. Menu Device: Connect of Disconnect, Run, Single, Device screenshot; geen Rescan en
+geen Add server…. View heeft geen Connect at start. Disconnect en dan Connect: verbindt
+weer. Help ▸ About: "This is the browser build: it measures through a vna-server."
+
+D4. Herstart de server terwijl de pagina open staat: de pagina wacht en verbindt zelf
+weer.
+
+D5. De losse pagina, zoals op een website:
+
+```bash
+python3 -m http.server -d target/web 8098
+```
+
+`http://localhost:8098/`. Verwacht: de viewer zoals in 0.3.6 met de voorbeeldmeting,
+plus een menu **Device** met alleen Add server…. Voeg `localhost:8099` toe: de
+apparaatdelen verschijnen, Connect meet door de server. Herlaad: de server is er nog.
+Verwijder hem: de viewer is weer precies zoals hij was.
+
+D6. Op een iPhone of iPad op hetzelfde wifi-netwerk: `http://<IP van je Mac>:8099/`.
+Verwacht: het werkt; op de iPhone rechtop is het scherm te smal (bekend, zie docs/10).
+
+## Deel E — De server met een echte analyzer
+
+Dit is waar het om gaat. Met de LiteVNA 67 aan de Mac:
+
+```bash
+vna-server --listen 0.0.0.0:8099
+```
+
+E1. Verwacht in het log: hij vindt de poort zelf en meldt het model en de firmware. In
+het programma (Add server… `127.0.0.1:8099`) of op de pagina: de groene regel met het
+echte model en "via".
+
+E2. Dezelfde meting twee keer: eerst rechtstreeks over USB in het programma (server uit),
+een spoor vasthouden met **Hold**, dan via de server. Verwacht: de twee sporen vallen
+samen. Een calibratie met de N-kit door de server heen: het resultaat is wat je van USB
+kent.
+
+E3. Het tempo: Developer tools aan, in het log "sweep #n: N points in X ms". Vergelijk
+rechtstreeks met via de server, bij 1001 punten. Verwacht: nagenoeg gelijk; de server
+voegt per sweep enkele milliseconden toe.
+
+E4. Trek tijdens Run de USB-kabel uit de computer van de server. Verwacht op de client:
+"the analyser dropped off the server, waiting…", en na terugsteken gaat het vegen verder.
+Laat hem een keer langer dan dertig seconden los: "the server lost its analyser, waiting
+for one…"; steek hem terug: de server vindt hem en de client is weer groen.
+
+E5. Ctrl-C op de server. Verwacht: "shutting down: letting go of the device", en de
+LiteVNA verlaat de USB-modus en toont zijn eigen scherm. Hetzelfde als de laatste client
+de pagina sluit terwijl Run aan stond: het apparaat stopt.
+
+E6. Dezelfde ronde kort met de NanoVNA-F, met een sweep boven 280 MHz en een lange sweep
+van 1001 punten (ongeveer negen seconden): de voortgangsbalk loopt, en Stop halverwege
+werkt.
+
+## Deel F — Twee kijkers
+
+Het programma en een browser (of twee browsers) op dezelfde server.
+
+F1. Run in de ene: de andere toont Stop en hetzelfde spoor. Stop in de andere: beide
+stoppen.
+
+F2. Meet in de ene een calibratiestandaard. Verwacht in de andere: geen voortgangsbalk
+die blijft staan, geen standaard in het calibratiepaneel.
+
+F3. Device screenshot in de ene: alleen daar verschijnt het venster.
+
+F4. Elk een eigen calibratie: calibreer in de ene, niet in de andere. Verwacht: de ene
+toont CAL, de andere RAW, op dezelfde sweeps.
+
+## Deel G — De Raspberry Pi
+
+Hiervoor is een build voor aarch64-linux nodig. Twee wegen: een release candidate taggen,
+dan bouwt de release-workflow alle archieven (en is die workflow meteen getest), of op de
+Pi zelf bouwen (`cargo build --release -p vna-server`, daarna de map `target/web` van de
+Mac kopiëren en starten met `--web`). Welke Pi en welk OS: noteer het hier.
+
+G1. Installeren volgens hoofdstuk 10 van de handleiding, met de service. Verwacht:
+`systemctl status vna-server` actief, `journalctl -u vna-server -f` toont het adres en de
+analyzer. De dienst draait als een gebruiker die systemd zelf aanmaakt, in de groep
+`dialout`: als hij de poort niet mag openen, staat dat in het log.
+
+G2. `http://raspberrypi.local:8080/` (of het IP-adres) op de laptop en op de telefoon.
+Meten, calibreren.
+
+G3. Herstart de Pi terwijl Run aan staat (`sudo reboot`). Verwacht: de client wacht en
+gaat verder zodra de Pi terug is, binnen de twee minuten.
+
+G4. `sudo systemctl stop vna-server`: de analyzer krijgt zijn scherm terug.
+
+G5. Een Pi Zero 2 W, als die er is: het tempo bij doorvegen met 1001 punten, en of de
+pagina (3,6 MB) vlot laadt over wifi.
+
+## Bevindingen tijdens het bouwen
+
+1. **Het zijpaneel afgeknipt na het laden.** Op de pagina van de server, in een
+   browserpaneel dat tot ongeveer acht beelden per seconde was afgeknepen en geen
+   muisbeweging kreeg, stond het zijpaneel rechts afgeknipt tot de eerste muisbeweging.
+   Oorzaak: egui tekent een paneel op de breedte van de vorige doorgang en vraagt niet om
+   een volgend beeld als de inhoud breder blijkt. Opgelost door één keer opnieuw te
+   tekenen als de breedte verandert; daarna in hetzelfde afgeknepen paneel goed. Nog te
+   zien in een gewone browser: D1.
+2. **De voortgang van andermans calibratiemeting** bleef bij andere kijkers staan, met
+   een Stop-knop die niet meer wegging. De voortgang van een standaard gaat nu alleen
+   naar wie erom vroeg. Controle: F2.
+3. **JSON las een getal soms één stap in het laatste cijfer anders terug.** Opgelost voor
+   het hele project (`float_roundtrip`); een calibratiebestand leest daardoor nu exact
+   terug zoals het geschreven is. Het bestandsformaat is niet veranderd.
+
+## Slotronde
+
+1. Start het programma met de instellingen van 0.3.6 (`/tmp/app.ron.0.3.6` terugzetten
+   als je wilt vergelijken): ze laden, er zijn geen servers.
+2. Deel A met beide apparaten. Is daar iets mis, dan eerst dat.
+3. Deel B, C en D zonder apparaat.
+4. Deel E en F met de LiteVNA, E6 met de NanoVNA-F.
+5. Deel G als de rest goed is.
 
 ---
 

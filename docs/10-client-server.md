@@ -1,15 +1,117 @@
 # Client en server: een VNA aan een Raspberry Pi, de GUI in de browser
 
-Stand: 16 november 2026. Dit is een ontwerpnotitie; er is niets van gebouwd. De vraag was
-hoeveel werk een client/server-model is en of het haalbaar is: een "server" op een
-Raspberry Pi met de VNA aan de USB-poort, en de bestaande browserbouw van de GUI
+Stand: 16 november 2026. Dit begon die dag als ontwerpnotitie en is dezelfde dag gebouwd,
+op de branch `feature/client-server` (werklijstpunt 72). Het ontwerp hieronder staat er
+zoals het geschreven is; wat er gebouwd is en waar dat van het ontwerp afwijkt staat in
+het hoofdstuk "Gebouwd" direct hierna. Getest met een gesimuleerd apparaat; de QC met een
+LiteVNA en een NanoVNA-F staat in [docs/08](08-qc-procedure.md) onder "Ronde
+client/server" en is nog niet gedaan.
+
+De vraag was hoeveel werk een client/server-model is en of het haalbaar is: een "server"
+op een Raspberry Pi met de VNA aan de USB-poort, en de bestaande browserbouw van de GUI
 ([docs/09](09-wasm-proef.md)) als client die daar over het LAN mee praat, bijvoorbeeld
-over WebSockets. De inschattingen hieronder komen uit het lezen van de code, niet uit
-meten; wat er nog te beslissen valt staat onderaan.
+over WebSockets. De inschattingen in het ontwerp komen uit het lezen van de code, niet
+uit meten.
 
 Besloten op dezelfde dag: het gewone programma (macOS, Linux, Windows) mag vanaf de eerste
 versie ook met een server verbinden, op voorwaarde dat de interface er nauwelijks door
 verandert. Hoe dat past staat onder "Een server is een poort".
+
+## Gebouwd
+
+Op de branch `feature/client-server`, een commit per onderdeel, in de volgorde van de
+stappen uit "Werk, in stappen". Voor de gebruiker staat het in hoofdstuk 10 van de handleiding
+([Nederlands](handleiding/10-netwerk.md), [Engels](manual/10-network.md)).
+
+| Onderdeel | Waar | Wat |
+|---|---|---|
+| De worker | `crates/vna-link/src/worker.rs` | verhuisd uit `vna-gui`, ongewijzigd op de meldfunctie na (een callback in plaats van een egui-context) |
+| Het protocol | `crates/vna-link/src/wire.rs` | JSON, één bericht per WebSocket-frame; een hello met de protocolversie, daarna gewone gebeurtenissen |
+| Het gesimuleerde apparaat | `crates/vna-link/src/sim.rs` | een poort `sim:` opent een apparaat in software, onder de echte worker |
+| De server | `crates/vna-server` | worker, hub, WebSocket op `/ws` en de pagina op dezelfde TCP-poort |
+| De verbinding van een client | `crates/vna-link/src/{handle,remote,address}.rs` | één handle voor de `App`; een adres met `ws://` opent een sessie met een server |
+| De interface | `crates/vna-gui/src/app/servers.rs` en `mod.rs` | Device ▸ Add server…, servers in de poortlijst; in de browser een vraag tijdens het draaien in plaats van `HAS_DEVICE` |
+| Het pakket | `linux/vna-server.service`, `release.yml`, `flake.nix` | systemd-unit, de server en de pagina in elk release-archief |
+
+### Waar het van het ontwerp afwijkt
+
+- **De gedeelde crate heet `vna-link`** en bevat meer dan de worker: ook het protocol, de
+  sessie van een client en het gesimuleerde apparaat. De server en de GUI gebruiken
+  hetzelfde.
+- **Een gesimuleerd apparaat**, niet voorzien in het ontwerp. Zonder analyzer aan de
+  machine waarop gebouwd werd was er anders niets te testen: niet in de CI en niet met de
+  hand. Het hangt onder de echte worker (die zijn apparaat daarvoor achter een kleine
+  trait houdt), zodat onderbreken, wachten en doorvegen de code zijn die met hardware
+  draait. Het meet een meerbandsdipool en een banddoorlaatfilter, en heeft bij een
+  calibratiemeting de gevraagde standaard ideaal op zijn poort.
+- **Geen poortlijst als bericht.** De server verbindt met zijn ene apparaat, zoals onder
+  "Eén apparaat, geen poortkeuze" voorgesteld; `Cmd::ListPorts` is niet gebouwd. Het
+  programma vraagt zijn eigen seriële poorten op zoals het deed.
+- **Verbinden en verbreken reizen niet mee.** Op een client openen en sluiten ze de
+  WebSocket; de server houdt zijn apparaat vast voor iedereen.
+- **Meerdere kijkers: niet alles gaat naar iedereen.** Het ontwerp zei "iedereen krijgt
+  alle gebeurtenissen". Een calibratiestandaard, de voortgang daarvan en een
+  schermafbeelding gaan alleen naar wie erom vroeg: anders krijgt een tweede kijker een
+  standaard in een calibratie die niet van hem is, of een voortgangsbalk die nooit meer
+  weggaat. Een gewone sweep gaat wel naar iedereen.
+- **Iedereen weet of er continu geveegd wordt** (`Event::Continuous`, door de worker zelf
+  gemeld als een server erom vraagt), zodat ieders Stop werkt.
+- **Niemand kijkt: de server stopt het apparaat.** Als de laatste client weggaat krijgt de
+  analyzer zijn eigen scherm terug. Loggen zonder kijker is daarmee geen bijvangst meer
+  maar iets voor later.
+- **Uitval heeft drie soorten**, elk met eigen tekst in de bovenbalk: het netwerk viel
+  weg, de server heeft (nog) geen analyzer, de analyzer viel van de USB van de server.
+  Bij een weggevallen netwerk probeert een client het twee minuten, niet de dertig
+  seconden van USB: een Pi doet ongeveer een minuut over herstarten. Doorvegen dat liep
+  wordt daarna opnieuw gevraagd, een calibratiestandaard nooit.
+- **Een trage client** krijgt alleen de nieuwste voortgang en de nieuwste sweep; wie dan
+  nog achterblijft wordt losgelaten. De server wacht nooit op een client.
+- **Calibratie in de browser** gaat via de bestandsvensters van de browser (laden) en een
+  download (opslaan). Niet in `localStorage` en niet op de server, zoals het ontwerp als
+  mogelijkheden noemde. Een calibratiebestand per segment bestaat in de browser niet.
+- **Wat van het netwerk komt wordt gecontroleerd** voordat de interface het ziet: een
+  sweep met ongelijke lengtes of een schermafbeelding van de verkeerde maat is een
+  melding, geen paniek.
+- **Geen TLS in het gewone programma.** `wss://` wordt daar geweigerd met uitleg; in de
+  browser werkt het vanzelf. Dat houdt een TLS-bibliotheek buiten het programma.
+- **De pagina zit gecomprimeerd in de server** (6,9 MB in totaal) als
+  `scripts/build-web.sh` vóór de build draaide; anders een pagina die zegt dat hij
+  ontbreekt, zodat een kale `cargo build` blijft werken. De geserveerde pagina draagt een
+  meta-tag waaraan hij ziet dat er een server achter zit.
+- **Niet gebouwd:** mDNS, een token of wachtwoord, een hello van de client (een server
+  kan een oude client dus niet weigeren), https op de server.
+
+### Gemeten
+
+| | |
+|---|---|
+| Sweep van 1001 punten, LiteVNA (met ruwe records) | 141 kB |
+| Sweep van 1001 punten, NanoVNA-F | 98 kB |
+| Schermafbeelding 480×320 | 410 kB |
+| `vna-server` met de pagina erin (macOS arm64) | 6,9 MB |
+| De browserbouw (wasm) | 12,2 MB, 3,6 MB met gzip |
+
+De ruwe FIFO-records reizen als de 32 bytes die het apparaat stuurde, in base64: als
+JSON-objecten waren ze groter dan de rest van de sweep. Ze reizen exact, omdat een
+calibratiestandaard met een ontbrekend punt ook op een client geweigerd moet worden.
+
+### Gezien, en hoe
+
+- De tests: 103 in de library, 10 in de GUI, 39 in `vna-link` (waarvan 8 via de echte
+  worker tegen het gesimuleerde apparaat), 23 in `vna-server` (waarvan 16 tegen een echte
+  server over loopback, met echte WebSocket- en http-clients).
+- In de ingebouwde browser (Chromium) op macOS, tegen `vna-server --simulate`: de pagina
+  van de server verbindt vanzelf en meet; calibreren (open, short, load) door de server
+  heen terwijl het doorvegen loopt; de schermafbeelding; de losse pagina met Add server…
+  en de rode regel bij een fout adres; twee clients tegelijk, waarvan de tweede meteen
+  Stop en het lopende spoor toont; een server die stopt en terugkomt onder een lopende
+  sweep, waarna die vanzelf verdergaat.
+- Het gewone programma is gestart met bewaarde instellingen waarin een server als poort
+  stond en Connect at start aan: het verbond vanzelf en draaide zonder fout. Het venster
+  zelf is niet bekeken.
+- **Niet gezien:** alles met een analyzer; een Raspberry Pi en de systemd-unit; de
+  release-workflow en de flake (Nix staat niet op de bouwmachine); Linux en Windows;
+  Safari, Firefox en een telefoon met de pagina die meet.
 
 ## Uitkomst in het kort
 
