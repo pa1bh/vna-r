@@ -18,7 +18,10 @@ een oudere Rust dan je denkt te hebben: een toolchain die rustup eerder installe
 voor die van je distributie. `rustup update stable` werkt hem bij.
 
 De programma's staan daarna in `target/release/`: `vna-cli`, `vna-gui` en `vna-server`
-(hoofdstuk 10). Starten kan ook rechtstreeks via cargo:
+(hoofdstuk 10). Een zelfgebouwde vna-server heeft de browserpagina alleen ingebouwd als
+`scripts/build-web.sh` vóór het bouwen gedraaid heeft (zie "In de browser" verderop);
+anders serveert hij een pagina die zegt dat de browserbouw ontbreekt, en verbindt het
+programma er gewoon mee. Starten kan ook rechtstreeks via cargo:
 
 ```bash
 cargo run --release -p vna-gui
@@ -166,7 +169,7 @@ De seriële poort kan maar door één programma open zijn. Staat de GUI verbonde
 de CLI een foutmelding dat de poort bezet is; klik dan eerst op **Disconnect**. Hetzelfde
 geldt voor NanoVNA-Saver of een ander programma dat met het apparaat praat.
 
-## In de browser, zonder apparaat
+## In de browser
 
 Dezelfde GUI is ook als WebAssembly te bouwen. Komt de pagina van vna-server, dan meet
 hij, in elke browser (hoofdstuk 10). Als losse pagina is het een viewer voor

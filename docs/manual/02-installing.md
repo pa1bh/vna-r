@@ -19,7 +19,10 @@ takes precedence over the one from your distribution. `rustup update stable` bri
 to date.
 
 The programs are then in `target/release/`: `vna-cli`, `vna-gui` and `vna-server` (chapter
-10). You can also start them directly through cargo:
+10). A vna-server you build yourself has the browser page built in only when
+`scripts/build-web.sh` ran before the build (see "In the browser" further on); otherwise
+it serves a page that says the browser build is missing, and the program connects to it
+all the same. You can also start them directly through cargo:
 
 ```bash
 cargo run --release -p vna-gui
@@ -165,7 +168,7 @@ The serial port can only be open in one program at a time. If the GUI is connect
 gives an error saying the port is busy; click **Disconnect** first. The same
 applies to NanoVNA-Saver or any other program that talks to the device.
 
-## In the browser, without a device
+## In the browser
 
 The same GUI also builds to WebAssembly. Served by vna-server it measures, in any browser
 (chapter 10). As a page of its own it is a viewer for Touchstone files (.s1p, .s2p) in a

@@ -20,7 +20,10 @@ browser, en dan hoeft er niets geïnstalleerd te worden.
 - Een LiteVNA of een NanoVNA-F, zoals voor al het andere.
 - Een computer voor de server, met een USB-poort: een Raspberry Pi 3, 4, 5 of Zero 2 W
   met een 64-bits Raspberry Pi OS (Bookworm of nieuwer), of een willekeurige computer met
-  Linux, macOS of Windows.
+  Linux, macOS of Windows. Geprobeerd is een Raspberry Pi 4 met Raspberry Pi OS op Debian
+  13, en een Mac; de andere modellen draaien hetzelfde archief maar zijn niet geprobeerd.
+- Voor een LiteVNA aan een Raspberry Pi: reken op een USB-hub met eigen voeding, zie
+  "Voeding" hieronder.
 - Een netwerk waar ze allebei op zitten: de wifi thuis, de hotspot van een telefoon.
 - Iets om mee te kijken: het programma vna-r op een computer, of een browser.
 
@@ -43,7 +46,8 @@ sudo systemctl daemon-reload && sudo systemctl enable --now vna-server
 
 De server draait nu, en start opnieuw na elke herstart van de Pi en na een storing. Hij
 zoekt elke twee seconden zelf naar de analyzer, dus het maakt niet uit of je die eerder of
-later aansluit. Wat hij doet staat in het log:
+later aansluit. Wisselen van analyzer kan ook zonder de server te herstarten: hij verbindt
+met wat er dan aan hangt, een LiteVNA of een NanoVNA-F. Wat hij doet staat in het log:
 
 ```bash
 journalctl -u vna-server -f
@@ -56,6 +60,18 @@ systemctl stop vna-server` stopt hem, en de analyzer krijgt dan zijn eigen scher
 
 Het archief is gebouwd voor 64-bits ARM. Het draait niet op een 32-bits Raspberry Pi OS,
 niet op de eerste Pi Zero en niet op een Raspberry Pi OS van vóór Bookworm.
+
+**Voeding.** De USB-poorten van een Raspberry Pi 4 leveren samen ongeveer 1,2 A. Een
+LiteVNA die aanstaat en tegelijk zijn accu laadt kan meer vragen. De Pi schakelt de
+poorten dan even uit, de analyzer valt van de USB en meldt zich opnieuw aan, en dat
+herhaalt zich elke paar seconden. De pagina blijft dan zeggen dat de server geen analyzer
+heeft, het log van de server meldt `connecting to /dev/ttyACM0: I/O error: Broken pipe`,
+en `sudo dmesg | grep over-current` op de Pi laat de oorzaak zien. Zo gezien met een
+LiteVNA 64 aan een Pi 4, met de officiële voeding van 3 A; een NanoVNA-F aan dezelfde
+poort had er geen last van. Een USB-hub met eigen voeding tussen de Pi en de analyzer is
+de aangewezen oplossing; de analyzer eerst vol laden kan ook helpen. Geen van beide is
+hier al geprobeerd. Een zwaardere voeding voor de Pi zelf helpt niet: de grens zit in de
+poorten.
 
 ## Met de hand starten
 

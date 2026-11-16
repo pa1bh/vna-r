@@ -102,7 +102,8 @@ measure it again. After 30 seconds without the device the button is back on **Co
 **Cancel** gets you there at once. The program also notices it when nothing is being measured.
 If it happens often, try another cable or port and keep the cable free of the connector
 you are turning. With an analyser behind a server the top bar says what it is waiting
-for in other words; chapter 10 explains each of them.
+for in other words; chapter 10 explains each of them. When a LiteVNA on a Raspberry Pi
+drops out every few seconds, it is the power of the USB ports: see "Power" in chapter 10.
 
 **The LiteVNA stays in USB MODE**, or the NanoVNA-F stays on the grid of the last
 measurement. `vna-cli release`, or switch it off and on.

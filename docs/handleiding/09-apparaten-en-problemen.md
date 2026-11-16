@@ -105,7 +105,9 @@ staat de knop weer op **Connect**; met **Cancel** ben je daar meteen. Het progra
 als er niets gemeten wordt.
 Gebeurt het vaak, probeer dan een andere kabel of poort en houd de kabel vrij van de
 connector waaraan je draait. Met een analyzer achter een server zegt de bovenbalk in
-andere woorden waarop hij wacht; hoofdstuk 10 legt ze een voor een uit.
+andere woorden waarop hij wacht; hoofdstuk 10 legt ze een voor een uit. Valt een LiteVNA
+aan een Raspberry Pi elke paar seconden weg, dan is het de voeding van de USB-poorten:
+zie "Voeding" in hoofdstuk 10.
 
 **De LiteVNA blijft in USB MODE**, of de NanoVNA-F blijft op het raster van de laatste
 meting staan. `vna-cli release`, of uit en aan.

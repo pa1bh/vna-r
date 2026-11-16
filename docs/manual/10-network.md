@@ -20,6 +20,10 @@ browser, in which case nothing needs installing.
 - A LiteVNA or a NanoVNA-F, as for everything else.
 - A computer for the server, with a USB port: a Raspberry Pi 3, 4, 5 or Zero 2 W with a
   64-bit Raspberry Pi OS (Bookworm or later), or any Linux, macOS or Windows computer.
+  What has been tried is a Raspberry Pi 4 with Raspberry Pi OS on Debian 13, and a Mac;
+  the other models run the same archive but have not been tried.
+- For a LiteVNA on a Raspberry Pi: count on a USB hub with its own power supply, see
+  "Power" below.
 - A network both are on: the wifi at home, the hotspot of a phone.
 - Something to look with: the vna-r program on a computer, or a browser.
 
@@ -42,7 +46,8 @@ sudo systemctl daemon-reload && sudo systemctl enable --now vna-server
 
 The server now runs, and starts again after every boot and after a failure. It looks for
 the analyser by itself every two seconds, so it does not matter whether you plug it in
-before or after. What it does is in the log:
+before or after. You can also swap analysers without restarting the server: it connects
+to whatever is plugged in then, a LiteVNA or a NanoVNA-F. What it does is in the log:
 
 ```bash
 journalctl -u vna-server -f
@@ -55,6 +60,17 @@ vna-server` stops it, and the analyser then gets its own screen back.
 
 The archive is built for 64-bit ARM. It does not run on a 32-bit Raspberry Pi OS, on the
 first Pi Zero, or on a Raspberry Pi OS older than Bookworm.
+
+**Power.** The USB ports of a Raspberry Pi 4 supply about 1.2 A between them. A LiteVNA
+that is switched on and charging its battery at the same time can ask for more. The Pi
+then switches the ports off for a moment, the analyser drops off the USB and comes back,
+and that repeats every few seconds. The page keeps saying the server has no analyser, the
+server's log reports `connecting to /dev/ttyACM0: I/O error: Broken pipe`, and `sudo dmesg
+| grep over-current` on the Pi shows the cause. Seen this way with a LiteVNA 64 on a Pi 4
+with the official 3 A supply; a NanoVNA-F on the same port had no trouble. A USB hub with
+its own power supply between the Pi and the analyser is the obvious cure; charging the
+analyser fully first may help too. Neither has been tried here yet. A heavier supply for
+the Pi itself does not help: the limit is in the ports.
 
 ## Starting it by hand
 

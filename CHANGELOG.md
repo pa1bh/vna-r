@@ -12,6 +12,15 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Changed
+
+- Manual chapter 10 and the README, after the first day with analysers behind a server:
+  the USB ports of a Raspberry Pi 4 can be too weak for a LiteVNA that charges (it then
+  drops out every few seconds; a hub with its own power supply is the likely cure), what
+  has actually been tried (a Raspberry Pi 4 on Debian 13 and a Mac), that analysers can be
+  swapped without restarting the server, and that a vna-server built from source has the
+  browser page built in only when `scripts/build-web.sh` ran first.
+
 ## [0.4.0] - 2026-11-16
 
 Measuring over the network. A new program, `vna-server`, shares the analyser on its USB

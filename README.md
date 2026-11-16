@@ -8,7 +8,10 @@ difference trace, segments, time-domain reflectometry (TDR) with gating, and Tou
 export. Hobby project by Bas Hendriks, PA1BH.
 
 Status: verified on a LiteVNA 64, a LiteVNA 67 and a NanoVNA-F 4.3, on macOS and on Linux (NixOS,
-Fedora, and Fedora Asahi Remix on an M1 with the `aarch64-linux` archive); the Windows build has not been tried with a device yet. The current version is in
+Fedora, and Fedora Asahi Remix on an M1 with the `aarch64-linux` archive); the Windows build has not been tried with a device yet.
+`vna-server` has been tried on macOS with a LiteVNA 67 and on a Raspberry Pi 4 (Raspberry Pi OS on
+Debian 13, the `aarch64-linux` archive as a systemd service) with a NanoVNA-F, with the program and a
+browser as its clients. The current version is in
 `Cargo.toml`; changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ![vna-r measuring an off-centre-fed HF dipole with a LiteVNA 67](docs/images/gui-ocf-antenne.webp)
@@ -149,7 +152,9 @@ run `vna-server` there (the `aarch64-linux` archive has a systemd unit for it). 
 `http://<that computer>:8080/` in any browser on the same network, or choose **Device ▸ Add server…**
 in `vna-gui` and pick the server in the port list. Several people can watch and steer one analyser;
 each calibrates in their own program or browser. There is no password yet, so use it on a network
-you trust. `vna-server --simulate` gives a simulated analyser to try it without one. The manual
+you trust. `vna-server --simulate` gives a simulated analyser to try it without one. A LiteVNA
+that charges from the USB of a Raspberry Pi can ask for more current than the Pi's ports give and
+then keeps dropping out; a USB hub with its own power supply is the likely cure. The manual
 has the details: [chapter 10](docs/manual/10-network.md) (Dutch:
 [hoofdstuk 10](docs/handleiding/10-netwerk.md)).
 
