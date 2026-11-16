@@ -1700,6 +1700,33 @@ bevinding 4 (de server bij een apparaat dat komt en gaat), die is uitgesteld. De
 release-workflow draait pas bij een tag en is nog nooit gedraaid: een release candidate
 test hem.
 
+### 16 november, de release 0.4.0
+
+Uitgebracht op verzoek van PA1BH als 0.4.0, zonder release candidate. De CI op de
+release-commit (`9a3c960`) was groen op alle zes taken; daarna de tag `v0.4.0`. De
+release-workflow, die voor het eerst de browserpagina bouwt en doorgeeft aan de vijf
+platformen, slaagde in één keer (run 43891700165, elf minuten): vijf archieven,
+`vna-r-v0.4.0-web.zip` en de controlesommen.
+
+Nagelopen:
+
+- **`aarch64-macos`** op de Mac: controlesom goed, geen AppleDouble-bestanden,
+  `vna-cli 0.4.0 (9a3c960)` en `vna-server 0.4.0 (9a3c960)`. De server uit het archief
+  met `--simulate`: "web client built in", de pagina met de meta-tag, de wasm als
+  `application/wasm`, 3,65 MB met gzip en 12,19 MB zonder.
+- **`vna-r-v0.4.0-web.zip`**: controlesom goed; `index.html`, `vna-gui.js` en
+  `vna-gui_bg.wasm` in één map.
+- **`aarch64-linux`** op de Raspberry Pi 4 (Debian 13): op de Pi gedownload, controlesom
+  goed. Het archief heeft `vna-cli`, `vna-gui`, `vna-server`, `70-litevna.rules` en
+  `vna-server.service`; de programma's missen geen bibliotheek. Geïnstalleerd volgens
+  hoofdstuk 10 van de handleiding, over de eigen build heen: de dienst is actief, meldt
+  `vna-server 0.4.0 (9a3c960)` en "web client built in", en de Mac haalt de pagina van de
+  Pi. Er hing op dat moment geen analyzer aan de Pi, dus een meting met dit archief is
+  niet gedaan; met de eigen build van dezelfde code wel (hierboven).
+
+**Niet nagelopen:** de archieven voor x86_64-linux, x86_64-macos en Windows, `vna-gui`
+uit een archief, en het Nix-pakket (de CI bouwt het en draait `vna-server --version`).
+
 ## Bevindingen tijdens het bouwen
 
 1. **Het zijpaneel afgeknipt na het laden.** Op de pagina van de server, in een
