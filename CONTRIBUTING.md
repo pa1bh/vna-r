@@ -17,7 +17,14 @@ cargo test --workspace
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && ./scripts/check-manuals.sh
 ```
 
-The last line is what CI enforces besides the tests. Rust 1.95 or later (the floor of
+```bash
+cargo clippy -p vna-gui --target wasm32-unknown-unknown -- -D warnings
+```
+
+Those two lines are what CI enforces besides the tests (the second one for the browser
+build, after `rustup target add wasm32-unknown-unknown`), plus `cargo doc` without
+warnings, a check with Rust 1.95 and `nix build` of the flake.
+Rust 1.95 or later (the floor of
 egui 0.37). On Linux you also need `pkg-config` and `libudev-dev`; `nix develop` gives a
 complete shell. No test needs a device.
 
@@ -63,6 +70,7 @@ submodules by subject, each seeing the parent through `use super::*`:
 | `files` | Touchstone open and save, device screenshot |
 | `diagnostics` | About, developer log, diagnostics text |
 | `servers` | Device ▸ Add server…, how a port or server reads, the texts for a lost link |
+| `web` | browser build only: picking a file and saving as a download, the server the page came from |
 
 A method that another module calls is `pub(super)`; a new panel gets its own module
 rather than growing `mod.rs`.

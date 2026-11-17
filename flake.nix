@@ -1,5 +1,5 @@
 {
-  description = "vna-r: LiteVNA / NanoVNA-F tooling (library, CLI, egui GUI)";
+  description = "vna-r: LiteVNA / NanoVNA-F tooling (library, CLI, egui GUI, server)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

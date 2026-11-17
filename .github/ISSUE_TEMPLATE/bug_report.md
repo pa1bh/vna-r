@@ -29,4 +29,6 @@ paste here
 **Device and connection**
 
 <!-- LiteVNA 64 / 67, NanoVNA-F, other; firmware; cable or adapter between
-     device and what you measured; calibration kit used. -->
+     device and what you measured; calibration kit used. And how the program reaches
+     the device: on USB of this computer, through a vna-server (from the program or
+     from a browser, which one), or no device at all (a file in the browser). -->

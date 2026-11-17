@@ -1,12 +1,17 @@
 # De GUI in de browser (WebAssembly): proef en viewer
 
-Stand: 13 november 2026. Dit staat sinds die dag op `main` (pull request 1, vanaf de
-branch `spike/wasm-viewer`) en zit nog in geen release. Het begon als onderzoek: kan de
-GUI in een browser draaien, en wat is daarvoor nodig? De variant **zonder apparaat** is
-daarna afgemaakt tot iets dat op een website kan staan: een viewer voor
-Touchstone-bestanden, die opent met een voorbeeldmeting. Meten met een apparaat in de
-browser is niet gebouwd; het laatste hoofdstuk zegt wat dat vraagt en wat het voor de
-native versies betekent.
+Stand: 17 november 2026. Dit staat sinds 13 november 2026 op `main` (pull request 1,
+vanaf de branch `spike/wasm-viewer`); de bron zit sinds versie 0.3.4 in de releases en
+sinds 0.4.0 is de gebouwde pagina er een eigen archief van, `…-web.zip`. Het begon als onderzoek: kan de GUI in een browser draaien, en wat is daarvoor
+nodig? De variant **zonder apparaat** is daarna afgemaakt tot iets dat op een website kan
+staan: een viewer voor Touchstone-bestanden, die opent met een voorbeeldmeting.
+
+Meten in de browser kan sinds versie 0.4.0, maar niet rechtstreeks: de pagina praat met
+een `vna-server` waar de analyzer aan de USB zit (zie [docs/10](10-client-server.md) en
+hoofdstuk 10 van de handleiding). Rechtstreeks meten vanuit de browser, met Web Serial,
+is niet gebouwd; het laatste hoofdstuk zegt wat dat vraagt en wat het voor de native
+versies betekent. De rest van dit document beschrijft de proef zoals die op 13 november
+was.
 
 ## Uitkomst in het kort
 
