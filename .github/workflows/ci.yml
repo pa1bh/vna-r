@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only unless a job says otherwise (the nix job cleans up its caches).
+permissions:
+  contents: read
+
+# A newer push to a pull request makes the run of the older one pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -41,33 +50,70 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: ./scripts/check-manuals.sh
 
+      # --locked everywhere: with a Cargo.lock that is behind Cargo.toml the build
+      # fails instead of quietly choosing other versions than the ones committed.
       - name: Build
-        run: cargo build --workspace --release
+        run: cargo build --workspace --release --locked
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --release -- -D warnings
+        run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
 
       - name: Test
-        run: cargo test --workspace --release
+        run: cargo test --workspace --release --locked
 
       - name: Test the library with overflow checks (debug)
         if: runner.os == 'Linux'
-        run: cargo test -p litevna
+        run: cargo test -p litevna --locked
 
-      - name: CLI smoke test (no device)
+      - name: Documentation without warnings
+        # Broken links between items, mostly. Once is enough.
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+
+      - name: Smoke test (no device)
         shell: bash
         run: |
           ./target/release/vna-cli --help
           ./target/release/vna-cli list
+          ./target/release/vna-server --version
+
+  msrv:
+    # Cargo.toml and the README promise this version; everything else here runs
+    # on the newest stable. Keep the number the same as `rust-version`.
+    name: oldest supported Rust (1.95)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev
+
+      - uses: dtolnay/rust-toolchain@1.95
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check
+        run: cargo check --workspace --all-targets --locked
 
   web:
-    # The browser build (a viewer without a device, docs/09-wasm-proef.md) is the same
-    # GUI code for another target. Nobody builds it day to day, so this job is what
-    # keeps it from rotting: it must compile, without warnings.
+    # The browser build (docs/09-wasm-proef.md) is the same GUI code for another
+    # target. Nobody builds it day to day, so this job is what keeps it from
+    # rotting: it must compile, without warnings, and the page must come out of
+    # scripts/build-web.sh and go into vna-server the way a release does it.
     name: browser build (wasm32)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        # For vna-server, which is built with the page in it below.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -77,10 +123,19 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clippy
-        run: cargo clippy -p vna-gui --target wasm32-unknown-unknown --release -- -D warnings
+        run: cargo clippy -p vna-gui --target wasm32-unknown-unknown --release --locked -- -D warnings
 
-      - name: Build
-        run: cargo build -p vna-gui --target wasm32-unknown-unknown --release
+      - name: Build the page
+        # Writes target/web; builds wasm-bindgen-cli into target/web-tools first.
+        run: scripts/build-web.sh
+
+      - name: vna-server with the page built in
+        env:
+          # The build fails if the page is incomplete (crates/vna-server/build.rs).
+          VNA_R_WEB_DIR: ${{ github.workspace }}/target/web
+        run: |
+          cargo test -p vna-server --release --locked
+          ./target/release/vna-server --version
 
   nix:
     name: nix build (flake)

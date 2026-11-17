@@ -17,8 +17,9 @@ on:
   push:
     tags: ["v*"]
 
+# Only the job that creates the release may write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   web:
@@ -120,11 +121,26 @@ jobs:
           # vna-server embeds the page from here; the build fails if it is incomplete.
           VNA_R_WEB_DIR: ${{ github.workspace }}/web
         run: |
+          # --locked: the versions in the Cargo.lock of the tag, or no build.
           if [ -n "${{ matrix.cargo_target }}" ]; then
-            cargo build --workspace --release --target "${{ matrix.cargo_target }}"
+            cargo build --workspace --release --locked --target "${{ matrix.cargo_target }}"
           else
-            cargo build --workspace --release
+            cargo build --workspace --release --locked
           fi
+
+      - name: Test and try the programs
+        # What is released is tested as it is built here: CI runs on other
+        # runner images than these. Not the cross-built Intel Mac build, which
+        # this runner cannot be counted on to run.
+        if: matrix.cargo_target == ''
+        shell: bash
+        env:
+          VNA_R_WEB_DIR: ${{ github.workspace }}/web
+        run: |
+          cargo test --workspace --release --locked
+          ./target/release/vna-cli --version
+          ./target/release/vna-cli list
+          ./target/release/vna-server --version
 
       - name: Package
         shell: bash
@@ -162,6 +178,8 @@ jobs:
   release:
     needs: [web, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -173,7 +191,9 @@ jobs:
         run: |
           v=${GITHUB_REF_NAME#v}
           awk -v v="$v" '/^## /{p = index($0, "[" v "]") > 0} p' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "See CHANGELOG.md." > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no section [$v]: a release needs its notes"; exit 1
+          fi
           cat notes.md
       - uses: softprops/action-gh-release@v2
         with:
@@ -186,6 +206,8 @@ jobs:
           # The changelog section is the release text; no auto-generated notes under it.
           body_path: notes.md
           generate_release_notes: false
+          # An archive or checksum that is not there is an error, not a smaller release.
+          fail_on_unmatched_files: true
           # A tag with a suffix (v0.3.0-rc.1) is a release candidate: marked as a
           # pre-release, so "latest" keeps pointing at the last full release.
           prerelease: ${{ contains(github.ref_name, '-') }}
