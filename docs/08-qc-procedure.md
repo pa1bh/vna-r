@@ -1772,6 +1772,131 @@ uit een archief, en het Nix-pakket (de CI bouwt het en draait `vna-server --vers
 4. Deel E en F met de LiteVNA, E6 met de NanoVNA-F.
 5. Deel G als de rest goed is.
 
+# Ronde schoonmaak (punt 73, 17 november 2026)
+
+De schoonmaak- en duurzaamheidsronde (roadmap punt 73, onder *Unreleased* in de CHANGELOG)
+is gebouwd op leeswerk en tests, zonder analyzer. Deze ronde haalt dat in. Gebouwd van
+`main` op commit f21c437 plus de ene reparatie die de ronde zelf opleverde (zie de
+bevinding).
+
+## Logboek
+
+### 17 november, door mij, zonder dat er een kabel of standaard bewogen is
+
+Opstelling: de LiteVNA 67 (fw 2.2, hw 2) aan de Mac op `/dev/cu.usbmodemv1_01`, een
+NanoVNA-F 4.3 (fw 1.0.4) aan de Raspberry Pi 4 op `/dev/ttyACM0`, beide met een
+sprietantenne aan poort 1. Op de Pi is `main` gebouwd uit een `git archive` (vandaar
+`vna-server 0.4.0 (unknown)`) en los gestart op poort 8080, met de dienst van 0.4.0
+zolang gestopt; na afloop is die dienst weer gestart.
+
+**`vna-cli` met de LiteVNA 67 op de Mac: in orde.**
+
+- `list`, `info`, `info --json`, `peek`: als voorheen.
+- Sweeps: 201 punten in 605 ms, 4001 punten over 50 kHz–6,3 GHz, 1001 met `--fifo-all`;
+  telkens 0 ontbrekend, 0 dubbel, alle checksums goed.
+- Met `--cal cal/n-1g.cal.json` op het eigen raster, uitvoer naar `.s2p`, `.s1p` en CSV:
+  205, 204 en 202 regels, het commentaar noemt de calibratie.
+- **Het commentaar bij `--calibrated`** zegt nu "device calibrated" (was "uncalibrated
+  raw"); zonder de optie nog steeds "uncalibrated raw".
+- **De sprongwaarschuwing** (50–150 MHz, 801 punten, met `n-1g`): één doorlopende zin, de
+  gaten van veertien spaties zijn weg.
+- `--gate 0.0:0.5 --port-extension 20`: gate en verlenging in het commentaar van het
+  bestand. Twee segmenten met elk een eigen calibratie: 1002 punten gemeten, 1001 regels
+  geschreven (het gedeelde punt één keer).
+- `tdr` met het apparaat, `tdr --from` een bestand, `--csv -` en `--json`: in orde.
+- **Een verkeerd getypte `--channel`** (`--average 4 --channel s12`, met `--trace`): de
+  fout komt voordat er iets naar register 0x40 is geschreven; alleen de drie bytes van het
+  aanmelden staan in de trace. Met `--channel s11` meet hij alleen S11 en staat register
+  0x44 daarna weer op 0.
+- `cal` op kopieën in een kladmap: `show`, `show --json`, `kit --open-c 40 --json` (stdout
+  alleen JSON, de regel "kit updated" op stderr), een nieuw bestand met de antenne als
+  "open" en daarna als "short" op het bewaarde raster, een kit-optie bij `cal load`
+  (geweigerd), `cal clear` op een onleesbaar bestand (verwijderd). Na al het schrijven
+  staat er geen tijdelijk bestand in de map.
+- `screenshot`: 1024×600, geldige PNG.
+
+**`vna-cli` op de Pi met de NanoVNA-F: in orde.** `info`, 201 punten in 1,4 s, een sweep
+van 250 tot 400 MHz met S21 boven de 280 MHz, 801 punten in stukken van 301.
+
+**`vna-server`, door een testclient die het draadformaat met de hand spreekt** (een
+script met de WebSocket van Node, 23 controles), met de LiteVNA 67 op de Mac en met de
+NanoVNA-F op de Pi: **23 van 23, twee keer.**
+
+- De hello, het apparaat en de stand van het doorvegen bij binnenkomst; een losse sweep.
+- **Vijf sweeps die de worker niet aankan** (2⁶⁴−1 herhalingen, geen segmenten met
+  doorvegen, nul punten, een raster voorbij het einde van de getallen, honderd
+  segmenten): elk geweigerd met "the server does not take this: …", en daarna meet het
+  apparaat gewoon door. Tegen 0.4.0 heb ik dit niet geprobeerd; daar had de eerste de
+  draad van het apparaat gestopt.
+- Onleesbare tekst en `connect`: een foutmelding, de verbinding blijft.
+- Twee clients: de tweede wordt bijgepraat; een standaard (gemiddelde van 2) en een
+  schermafbeelding (1024×600 in 1,4 s; 800×480 in 1,7 s op de Pi) komen alleen bij wie
+  erom vroeg; doorvegen bereikt beide (6 sweeps in 4 s met de LiteVNA, 2 met de
+  NanoVNA-F), de een stopt wat de ander startte, een nieuwe sweep breekt een lopende af,
+  en als de een vertrekt meet de ander door.
+
+**De pagina in de ingebouwde browser** (WebGPU), via de server op de Mac en via de Pi:
+
+- Verbindt vanzelf, toont het apparaat en de accuspanning, **Single** geeft een sweep.
+- **Band ▸ 630 m** zet `471.300kHz` en `479.700kHz` in Start en Stop en meet daarop.
+- **Disconnect tijdens een standaardmeting** (open, 1601 punten op de NanoVNA-F): tijdens
+  het meten staat er "open…" en zijn de knoppen grijs; na Disconnect en Connect zijn alle
+  standaardknoppen weer te gebruiken, en een Single daarna komt aan.
+- Na het herstarten van de server op de Pi verbond de open pagina vanzelf opnieuw.
+
+### Bevinding: een server die stopt nam geen afscheid
+
+Gevonden met een client die doorveegt terwijl de server `SIGTERM` krijgt: de client kreeg
+geen `disconnected` en geen sluitbericht; de verbinding brak af (code 1006). De hub zet
+het afscheid in de wachtrij van elke client, maar de draden van de verbindingen kijken
+daar om de 25 ms naar, en het programma was dan al weg. **Dit zat ook in 0.4.0** (zo
+gezien bij de dienst op de Pi); de tests merkten het niet omdat het testprogramma blijft
+leven. `Server::shutdown` wacht nu tot de verbindingen dicht zijn, twee seconden op zijn
+hoogst. Daarna, op de Mac en op de Pi: `disconnected`, een nette sluiting (code 1005), en
+het apparaat is direct weer vrij voor `vna-cli`.
+
+### 17 november, PA1BH: Asahi Linux op een M1 met de LiteVNA 64
+
+Gebouwd uit de bron op de M1 met Asahi Linux, de LiteVNA 64 aan de USB. S11, S21 en TDR
+gemeten, en de kabel losgetrokken en er weer in gestoken. **Alle resultaten als
+verwacht.** Daarmee is de worker na deze ronde met een echte kabel geprobeerd (punt 4
+hieronder), op Linux en met de 64 in plaats van op de Mac met de 67. Welke commit er
+gebouwd is en of het in het programma of met `vna-cli` was, staat hier niet bij.
+
+Ook op 17 november: met het programma over het netwerk verbonden met de Pi (**Add
+server…**), de NanoVNA-F eraan. **Zag er allemaal goed uit.** De dienst op de Pi was op
+dat moment 0.4.0, dus dit is het programma van nu tegen de server van de laatste release.
+Disconnect tijdens een standaardmeting is daarbij niet apart genoemd; dat heb ik in de
+browser gezien.
+
+### Niet door mij te doen
+
+Het venster van het programma (alleen de pagina in de browser is bekeken), alles waar een
+standaard of een kabel voor verwisseld moet worden, en bestanden kiezen in een dialoog.
+Dat staat hieronder.
+
+## Voor PA1BH
+
+1. **sweep from calibration** in het programma, met de LiteVNA 67: laad een calibratie
+   waarvan het eind geen rond getal in kHz is. `cal/n-hf.cal.json` (100 kHz–50 MHz, 1001
+   punten, stap 49,9 kHz) is rond en dus geen test; maak er een met 100 kHz–30 MHz en 1601
+   punten (eind 29,9992 MHz). Druk op **sweep from calibration**. Goed: Stop toont
+   `29.9992MHz`, de calibratie staat er als toegepast en niet als geïnterpoleerd, en een
+   standaard opnieuw meten begint geen nieuwe set.
+2. **Save** van een calibratie in het programma naar een bestaand bestand: het bestand is
+   daarna compleet en er ligt geen `.naam.PID.tmp` naast.
+3. **Referenties** (Hold, programma sluiten en weer openen): ze zijn er nog.
+4. **De kabel eruit** tijdens doorvegen: gemeld en weer opgepakt, zoals in deel A van de
+   vorige ronde. De worker is in deze ronde aangeraakt (een sweep zonder segmenten wordt
+   geweigerd, `fifo_all` is uit de tussenlaag). **Gedaan op 17 november** op Asahi Linux
+   met de LiteVNA 64, zie het logboek; met de LiteVNA 67 aan de Mac niet.
+5. **Sweep avg met drop** op een levende meting: ziet eruit als voorheen.
+6. **Add server…** in het programma naar de Pi, en daar Disconnect tijdens een standaard:
+   hetzelfde als wat ik in de browser zag. **Verbinden en meten gedaan op 17 november**,
+   zie het logboek; Disconnect tijdens een standaard in het programma niet apart.
+7. De dienst op de Pi draait nog 0.4.0. Wil je de build van `main` daar installeren, dan
+   staat hij in `~/vna-r/target/release/vna-server`.
+
 ---
 
 # Open vragen
