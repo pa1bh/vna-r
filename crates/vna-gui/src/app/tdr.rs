@@ -103,7 +103,6 @@ impl App {
             let cfg = TdrConfig {
                 window: self.tdr_window,
                 velocity_factor: self.tdr_vf,
-                fft_size: 0,
             };
             let kind = if self.gate_notch { GateKind::Notch } else { GateKind::BandPass };
             let g = Gate::from_distance(self.gate_start_m, self.gate_stop_m, self.tdr_vf, kind);
@@ -141,7 +140,6 @@ impl App {
             let cfg = TdrConfig {
                 window: self.tdr_window,
                 velocity_factor: self.tdr_vf,
-                fft_size: 0,
             };
             let result = tdr(&sweep.freqs_hz[range.clone()], &sweep.s11[range], &cfg).map_err(|e| match e {
                 litevna::Error::InvalidArgument(msg) => msg,

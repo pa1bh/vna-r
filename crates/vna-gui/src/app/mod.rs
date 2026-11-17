@@ -13,7 +13,7 @@ use litevna::bands::{Band, Region};
 use litevna::calibration::{interpolate_complex, plausibility_warning, CalKit, Calibration, CalibrationSet, OpenFit, OpenModel, Standard};
 use litevna::device::{log_segment_edges, plan_segments};
 use litevna::discovery::{self, PortCandidate};
-use litevna::freq::{format_hz, nearest_index, parse_hz};
+use litevna::freq::{format_hz, format_hz_exact, nearest_index, parse_hz};
 use litevna::timedomain::{gate, tdr, Gate, GateKind, TdrConfig, TdrResult, Window, C0, CABLES};
 use litevna::touchstone::write_s2p;
 #[cfg(not(target_arch = "wasm32"))]
@@ -223,6 +223,8 @@ pub struct App {
     active_marker: usize,
     /// Marker frequencies from the last session, mapped onto the first sweep.
     pending_marker_freqs: Option<[Option<u64>; MARKERS]>,
+    /// Why the serial ports could not be listed, the last time that failed.
+    ports_error: Option<String>,
     show_s11: bool,
     show_s21: bool,
     /// The amateur bands as a backdrop in the frequency plots (View ▸ Amateur bands).
@@ -350,6 +352,7 @@ impl App {
             markers: [None; MARKERS],
             active_marker: 0,
             pending_marker_freqs: None,
+            ports_error: None,
             show_s11: true,
             show_s21: true,
             show_bands: false,
@@ -518,7 +521,21 @@ impl App {
     }
 
     fn refresh_ports(&mut self) {
-        self.ports = discovery::list_ports().unwrap_or_default();
+        self.ports = match discovery::list_ports() {
+            Ok(ports) => {
+                self.ports_error = None;
+                ports
+            }
+            Err(e) => {
+                // Looks like "no ports" in the list; say why, once per reason.
+                let e = e.to_string();
+                if self.ports_error.as_ref() != Some(&e) {
+                    self.log(format!("listing serial ports: {e}"));
+                    self.ports_error = Some(e);
+                }
+                Vec::new()
+            }
+        };
         // Forget a selection whose port is gone, then default to a VNA if
         // there is one. A server is not a port that comes and goes.
         if let Some(sel) = &self.selected_port {
@@ -542,7 +559,7 @@ impl App {
 
     /// Top of the connected device's range; the LiteVNA's 6.3 GHz when nothing is connected.
     fn device_max_hz(&self) -> u64 {
-        self.device_limits().map_or(6_300_000_000, |l| l.max_hz)
+        self.device_limits().map_or(Limits::LITEVNA.max_hz, |l| l.max_hz)
     }
 
     fn device_limits(&self) -> Option<Limits> {
@@ -629,6 +646,9 @@ impl App {
                     self.running = false;
                     self.progress = None;
                     self.avg_buf.clear();
+                    // A standard being measured gets no answer any more (a
+                    // server sends none); without this its buttons stay disabled.
+                    self.cal.pending = None;
                 }
                 Event::SweepDone {
                     cfgs,
@@ -1339,7 +1359,7 @@ impl App {
                     );
                     if self.has_device() && ui.add_enabled(self.connected(), egui::Button::new("Set sweep for TDR")).on_hover_text("50 kHz to the needed stop, 1001 points").clicked() {
                         self.start = "50k".into();
-                        self.stop = format_hz(stop as u64).replace(' ', "");
+                        self.stop = format_hz_exact(stop as u64);
                         self.points = 1001;
                         self.start_sweep(self.running);
                     }

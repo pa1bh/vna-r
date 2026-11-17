@@ -359,6 +359,22 @@ struct Conn {
     json: bool,
 }
 
+/// Options that are only used once the sweep is in, checked before it
+/// starts: a typing error should not cost a measurement.
+fn check_processing(vf: Option<f64>, port_extension: Option<f64>) -> Result<()> {
+    if let Some(vf) = vf {
+        if !(0.1..=1.0).contains(&vf) {
+            bail!("--vf wants a velocity factor within 0.1..=1, got {vf}");
+        }
+    }
+    if let Some(ps) = port_extension {
+        if !ps.is_finite() {
+            bail!("--port-extension wants a delay in picoseconds, got {ps}");
+        }
+    }
+    Ok(())
+}
+
 /// `--port-extension <ps>`: move the reference plane of a sweep.
 fn apply_port_extension(sweep: &mut SweepResult, ps: Option<f64>) -> Result<()> {
     if let Some(ps) = ps {
@@ -658,6 +674,15 @@ fn peek(dev: &mut Vna, addr: &str, size: u8) -> Result<()> {
 fn measure(dev: &mut Vna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepResult> {
     let mut cfg = *cfg;
     cfg.calibrated = m.calibrated;
+    // Before anything is written to the device: a mistyped channel must not
+    // leave the average changed.
+    let channel = match m.channel.as_deref().map(str::to_ascii_lowercase).as_deref() {
+        None => None,
+        Some("s11") => Some(Channel::S11Only),
+        Some("s21") => Some(Channel::S21Only),
+        Some("both") => Some(Channel::Both),
+        Some(other) => bail!("unknown channel {other:?}, use s11, s21 or both"),
+    };
 
     // These registers persist in the device, so remember what was there.
     let prev_average = match m.average {
@@ -669,18 +694,12 @@ fn measure(dev: &mut Vna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepRes
         }
         None => None,
     };
-    let prev_channel = if m.channel.is_some() {
+    let prev_channel = if channel.is_some() {
         Some(lite(dev, "--channel")?.channel()?)
     } else {
         None
     };
-    if let Some(ch) = &m.channel {
-        let ch = match ch.to_ascii_lowercase().as_str() {
-            "s11" => Channel::S11Only,
-            "s21" => Channel::S21Only,
-            "both" => Channel::Both,
-            other => bail!("unknown channel {other:?}, use s11, s21 or both"),
-        };
+    if let Some(ch) = channel {
         lite(dev, "--channel")?.set_channel(ch)?;
     }
 
@@ -694,15 +713,20 @@ fn measure(dev: &mut Vna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepRes
     );
     let result = dev.sweep(&cfg, m.fifo_all);
 
+    // Both are tried, and the sweep's own error comes before one of theirs:
+    // it is the cause when the link went.
+    let mut restored = Ok(());
     if !m.keep_settings {
         if let Some(prev) = prev_average {
-            lite(dev, "--average")?.write_u8(reg::AVERAGE, prev)?;
+            restored = lite(dev, "--average").and_then(|d| Ok(d.write_u8(reg::AVERAGE, prev)?));
         }
         if let Some(prev) = prev_channel {
-            lite(dev, "--channel")?.write_u8(reg::CHANNEL_SELECT, prev)?;
+            let channel = lite(dev, "--channel").and_then(|d| Ok(d.write_u8(reg::CHANNEL_SELECT, prev)?));
+            restored = restored.and(channel);
         }
     }
     let result = result?;
+    restored?;
     if dev.kind() != Kind::LiteVna {
         eprintln!(
             "got {} points in {:.0} ms ({:.0} pts/s)",
@@ -735,7 +759,6 @@ fn measure(dev: &mut Vna, cfg: &SweepConfig, m: &MeasureArgs) -> Result<SweepRes
 
 /// What one measurement run produced.
 struct Acquired {
-    cfg: SweepConfig,
     raw: SweepResult,
     /// Calibrated when a calibration was given, otherwise the raw sweep.
     result: SweepResult,
@@ -749,8 +772,6 @@ fn model_of(dev: &mut Vna) -> String {
     dev.info().map(|i| i.model).unwrap_or_else(|_| dev.kind().name().to_string())
 }
 
-/// Resolve the grid (from args or the calibration file), sweep once and apply
-/// the calibration. Shared by `sweep` and `tdr`.
 /// Multi-segment sweep: each `START:STOP:POINTS[@cal.json]` is swept in
 /// turn (sorted by start) and corrected with its own calibration; the parts
 /// are concatenated into one result.
@@ -818,7 +839,6 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
     }
     let calibrated = cals.iter().any(|c| c.is_some());
     Ok(Acquired {
-        cfg: plan[0].0,
         raw: SweepResult::concat(&raws),
         calibrated,
         result: SweepResult::concat(&results),
@@ -826,6 +846,8 @@ fn acquire_segments(conn: &Conn, specs: &[String], m: &MeasureArgs, keep_usb_mod
     })
 }
 
+/// Resolve the grid (from args or the calibration file), sweep once and apply
+/// the calibration. Shared by `sweep` and `tdr`.
 fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path>, keep_usb_mode: bool) -> Result<Acquired> {
     // With a calibration file the grid defaults to the calibrated one; an
     // explicit --start/--stop/--points inside that span is interpolated.
@@ -873,7 +895,6 @@ fn acquire(conn: &Conn, grid: &GridArgs, m: &MeasureArgs, cal_file: Option<&Path
         None => raw.clone(),
     };
     Ok(Acquired {
-        cfg,
         raw,
         calibrated: calibration.is_some(),
         result,
@@ -901,8 +922,9 @@ fn sweep(
     if conn.json && csv.as_deref().is_some_and(|p| p.as_os_str() == "-") {
         bail!("--json and --csv - both write to stdout; give the CSV a file name");
     }
+    let gate_range = gate_arg.as_deref().map(parse_distance_range).transpose().context("--gate")?;
+    check_processing(gate_range.map(|_| vf), port_extension)?;
     let Acquired {
-        cfg,
         raw,
         mut result,
         calibrated,
@@ -919,8 +941,7 @@ fn sweep(
     if let Some(ps) = port_extension.filter(|ps| *ps != 0.0) {
         processing.push_str(&format!(", port extension {ps:.1} ps"));
     }
-    if let Some(spec) = &gate_arg {
-        let (start_m, stop_m) = parse_distance_range(spec).context("--gate")?;
+    if let Some((start_m, stop_m)) = gate_range {
         let kind = if gate_notch { GateKind::Notch } else { GateKind::BandPass };
         let g = Gate::from_distance(start_m, stop_m, vf, kind);
         let tcfg = TdrConfig {
@@ -938,7 +959,7 @@ fn sweep(
         result.s11 = gated.s11;
         processing.push_str(&format!(", S11 time-gated {start_m:.2}..{stop_m:.2} m {}", g.kind.name()));
     }
-    let state = match (calibrated, &cal_file, cfg.calibrated) {
+    let state = match (calibrated, &cal_file, m.calibrated) {
         (true, Some(c), _) => format!("host calibration {}", c.display()),
         (true, None, _) => "host calibration per segment".to_string(),
         (_, _, true) => "device calibrated".to_string(),
@@ -1012,7 +1033,11 @@ fn tdr_cmd(
     port_extension: Option<f64>,
     from: Option<PathBuf>,
 ) -> Result<()> {
+    if conn.json && csv.as_deref().is_some_and(|p| p.as_os_str() == "-") {
+        bail!("--json and --csv - both write to stdout; give the CSV a file name");
+    }
     let window = Window::parse(window).with_context(|| format!("unknown window {window:?}"))?;
+    check_processing(Some(vf), port_extension)?;
     let mut result = match from {
         Some(path) => {
             let r = litevna::touchstone::read_touchstone_file(&path).with_context(|| format!("reading {}", path.display()))?;
@@ -1036,7 +1061,6 @@ fn tdr_cmd(
     let cfg = TdrConfig {
         window,
         velocity_factor: vf,
-        fft_size: 0,
     };
     let t = compute_tdr(&result.freqs_hz, &result.s11, &cfg)?;
 
@@ -1180,7 +1204,7 @@ fn load_cal(path: &Path) -> Result<CalibrationSet> {
 }
 
 fn save_cal(path: &Path, set: &CalibrationSet) -> Result<()> {
-    fs::write(path, set.to_json()?).with_context(|| format!("writing {}", path.display()))
+    litevna::atomic::write(path, set.to_json()?).with_context(|| format!("writing {}", path.display()))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1206,6 +1230,17 @@ fn cal(
     if what.standard().is_none() && !grid.is_empty() {
         bail!("--start/--stop/--points set the grid when a standard is measured; this action uses the file as it is");
     }
+    if what != CalAction::Kit && !kit.is_empty() {
+        bail!("--open-c, --short-l, --load-r and the other kit options belong to `cal kit`");
+    }
+    // Before the file is read: `clear` is the way out of one that no longer reads.
+    if what == CalAction::Clear {
+        if file.exists() {
+            fs::remove_file(file)?;
+            say(conn.json, format_args!("removed {}", file.display()));
+        }
+        return Ok(());
+    }
     let existing = if file.exists() { Some(load_cal(file)?) } else { None };
 
     match what {
@@ -1223,7 +1258,7 @@ fn cal(
                 set.kit.name = "custom".into();
             }
             save_cal(file, &set)?;
-            println!("kit updated in {}", file.display());
+            say(conn.json, format_args!("kit updated in {}", file.display()));
             return show_cal(&set, conn.json);
         }
         CalAction::Check => {
@@ -1296,13 +1331,6 @@ fn cal(
             }
             return Ok(());
         }
-        CalAction::Clear => {
-            if file.exists() {
-                fs::remove_file(file)?;
-                println!("removed {}", file.display());
-            }
-            return Ok(());
-        }
         _ => {}
     }
     let standard = what.standard().expect("every action that is not a standard returned above");
@@ -1366,12 +1394,21 @@ fn cal(
     }
     set.set(standard, &sweep)?;
     save_cal(file, &set)?;
-    println!("stored {} in {}", standard.name(), file.display());
+    say(conn.json, format_args!("stored {} in {}", standard.name(), file.display()));
     show_cal(&set, conn.json)
 }
 
-/// Catch the classic mistakes (loose standard, wrong standard) before they
-/// poison a calibration: medians of the raw magnitude over the sweep.
+/// A line that says what was done: on stdout, or on stderr when stdout
+/// carries JSON and nothing else.
+fn say(json: bool, line: std::fmt::Arguments) {
+    if json {
+        eprintln!("{line}");
+    } else {
+        println!("{line}");
+    }
+}
+
+/// What a calibration file holds: grid, kit, standards measured and missing.
 fn show_cal(set: &CalibrationSet, json: bool) -> Result<()> {
     if json {
         let have: Vec<_> = Standard::ALL

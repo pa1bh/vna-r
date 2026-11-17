@@ -60,8 +60,8 @@ impl Web {
     pub(crate) fn describe(&self) -> String {
         match (&self.dir, BUILT_IN) {
             (Some(d), _) => format!("from {}", d.display()),
-            (None, Some(_)) => "built in".into(),
-            (None, None) => "a placeholder (built without the web client, see scripts/build-web.sh)".into(),
+            (None, true) => "built in".into(),
+            (None, false) => "a placeholder (built without the web client, see scripts/build-web.sh)".into(),
         }
     }
 
@@ -257,6 +257,6 @@ mod tests {
     fn the_built_in_page_has_the_tag() {
         let page = String::from_utf8(mark_served(INDEX)).unwrap();
         assert_eq!(page.matches("vna-r-server").count(), 1);
-        assert_eq!(BUILT_IN.is_some(), JS.is_some() && WASM.is_some());
+        assert_eq!(BUILT_IN, JS.is_some() && WASM.is_some());
     }
 }

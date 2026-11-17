@@ -47,7 +47,7 @@ impl PortCandidate {
             // Any STM32 VCP could be here; a NanoVNA names itself when it can.
             let named = u.product.as_deref().map(|p| p.to_ascii_lowercase());
             return match named {
-                Some(p) if p.contains("nanovna") || p.contains("vna") => Some(Kind::NanoVnaShell),
+                Some(p) if p.contains("vna") => Some(Kind::NanoVnaShell),
                 None => Some(Kind::NanoVnaShell),
                 Some(_) => None,
             };

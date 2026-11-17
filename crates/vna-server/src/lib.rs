@@ -6,13 +6,13 @@
 //!
 //! * the **worker** of `vna-link`, the same code that drives the device for
 //!   the GUI, owns the device;
-//! * the **hub** ([`hub`]) owns the worker's command channel and the list of
+//! * the **hub** (`hub`) owns the worker's command channel and the list of
 //!   clients. It finds and connects the device, routes the worker's events
 //!   to the clients and the clients' commands to the worker, and never waits
 //!   for a client;
 //! * a **forwarder** puts the worker's events on the hub's channel, so the
 //!   hub has one queue to wait on;
-//! * the **listener** accepts connections, one thread each ([`conn`]): a
+//! * the **listener** accepts connections, one thread each (`conn`): a
 //!   plain HTTP request for the web client is answered and closed, a
 //!   WebSocket stays and becomes a client of the hub.
 
@@ -24,7 +24,7 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -36,10 +36,10 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The path of the WebSocket. The page the server serves names it in
 /// `<meta name="vna-r-server" content="/ws">`.
-pub const WS_PATH: &str = "/ws";
+pub(crate) const WS_PATH: &str = "/ws";
 
 /// Whether the web client was built in (else the placeholder page is served).
-pub const BUILT_IN_WEB: bool = web::BUILT_IN.is_some();
+pub const BUILT_IN_WEB: bool = web::BUILT_IN;
 
 /// Connections served at the same time (page requests and clients); more are closed at once.
 const MAX_CONNECTIONS: usize = 64;
@@ -97,7 +97,7 @@ impl Config {
 }
 
 /// The host name, the default name of a server.
-pub fn host_name() -> String {
+fn host_name() -> String {
     let name = gethostname::gethostname().to_string_lossy().into_owned();
     if name.is_empty() {
         "vna-server".into()
@@ -123,6 +123,7 @@ pub struct Server {
     clients: Arc<AtomicUsize>,
     stopping: Arc<AtomicBool>,
     listener: Option<JoinHandle<()>>,
+    fatal: Option<Receiver<String>>,
 }
 
 impl Server {
@@ -132,7 +133,8 @@ impl Server {
         let listener = TcpListener::bind(config.listen)?;
         let addr = listener.local_addr()?;
         log::info!("listening on http://{addr}; web client {}", web.describe());
-        let (hub, clients) = hub::start(&config);
+        let (fatal_tx, fatal) = channel();
+        let (hub, clients) = hub::start(&config, fatal_tx);
         let shared = Arc::new(Shared {
             hub: hub.clone(),
             web,
@@ -152,6 +154,7 @@ impl Server {
             clients,
             stopping,
             listener: Some(listener),
+            fatal: Some(fatal),
         })
     }
 
@@ -159,20 +162,29 @@ impl Server {
         self.addr
     }
 
+    /// Hears it, once, when the server can no longer do its work (the thread
+    /// that drives the analyser died): shut it down and exit with an error,
+    /// so that whatever keeps the service running starts a new one. Can be
+    /// taken once.
+    pub fn fatal(&mut self) -> Option<Receiver<String>> {
+        self.fatal.take()
+    }
+
     /// WebSocket clients connected now.
     pub fn clients(&self) -> usize {
         self.clients.load(Ordering::SeqCst)
     }
 
-    /// Let go of the device, so that a LiteVNA leaves USB mode and gets its
-    /// own screen back, tell the clients, and stop listening. Returns when
+    /// Stop listening, let go of the device, so that a LiteVNA leaves USB
+    /// mode and gets its own screen back, and tell the clients. Returns when
     /// that is done, after a few seconds at most.
     pub fn shutdown(mut self) {
+        // First, so that nobody new comes in while the hub says goodbye.
+        self.stop_listening();
         let (done, wait) = channel();
         if self.hub.send(ToHub::Shutdown(done)).is_ok() {
             let _ = wait.recv_timeout(Duration::from_secs(10));
         }
-        self.stop_listening();
     }
 
     fn stop_listening(&mut self) {
@@ -214,8 +226,16 @@ fn accept(listener: TcpListener, shared: Arc<Shared>, stopping: Arc<AtomicBool>)
         }
         let shared2 = shared.clone();
         let spawned = thread::Builder::new().name("connection".into()).spawn(move || {
-            conn::serve(stream, &shared2);
-            shared2.active.fetch_sub(1, Ordering::SeqCst);
+            // Given back when the thread ends, also when it ends in a panic:
+            // a slot lost each time would in the end refuse everybody.
+            struct Slot(Arc<Shared>);
+            impl Drop for Slot {
+                fn drop(&mut self) {
+                    self.0.active.fetch_sub(1, Ordering::SeqCst);
+                }
+            }
+            let slot = Slot(shared2);
+            conn::serve(stream, &slot.0);
         });
         if let Err(e) = spawned {
             shared.active.fetch_sub(1, Ordering::SeqCst);

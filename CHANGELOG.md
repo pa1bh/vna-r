@@ -1,8 +1,8 @@
 # Changelog
 
 All notable changes per version. The version number lives once in `Cargo.toml`
-(`[workspace.package] version`) and applies to the library, the CLI, the GUI and the
-Nix flake; the GUI shows it in the title bar and under **Help ▸ About**, the CLI with
+(`[workspace.package] version`) and applies to the library, the CLI, the GUI, the server
+and the Nix flake; the GUI shows it in the title bar and under **Help ▸ About**, the CLI with
 `vna-cli --version`. A release is a git tag `vX.Y.Z` on `main` (see "Versions and
 releases" in the README).
 
@@ -12,8 +12,59 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Fixed
+
+Found by reading the code through, not by measuring; none of it has been tried with an
+analyser yet.
+
+- `vna-server`: a sweep command a client sends is checked before it reaches the device
+  thread. A command with an absurd number of passes stopped that thread, one without
+  segments kept it spinning. And when that thread does stop, the server now says so and
+  exits with an error (systemd then starts a new one) instead of listening on and
+  ignoring every command.
+- GUI: **sweep from calibration**, **Band**, the segment spread and **Set sweep for TDR**
+  wrote frequencies rounded to the kHz into Start and Stop. A calibration of 100 kHz to
+  30 MHz in 1601 points ends at 29.9992 MHz; "29.999MHz" is another grid, so the
+  calibration was interpolated and the next standard started a new set. The fields now
+  get as many decimals as the frequency needs.
+- GUI: after **Disconnect** from a server during a standard measurement the buttons of
+  the standards stayed disabled.
+- Touchstone, CSV and reference files: a write that failed at the very end (a full disk)
+  was reported as written.
+- The warning about a jump in the calibration had three gaps of fourteen spaces in it.
+- Sweep averaging with outliers dropped: a point that is not a number (a zero reference
+  wave) was the one outlier it could not drop.
+- A Touchstone file with a magnitude too large to be one (7000 dB) or a reflection that
+  cannot be converted to 50 Ω is refused instead of read as infinity.
+- `vna-cli sweep --calibrated` wrote "uncalibrated raw" in the comment of its files.
+- `vna-cli cal clear` failed on a file that no longer reads, the case it is for.
+- `vna-cli --json tdr --csv -` wrote JSON and CSV to stdout together; it is refused, as
+  `sweep` already did. `cal … --json` printed a line of text before the JSON.
+- `vna-cli cal`: kit options with another action than `kit` were ignored without a word,
+  and a mistyped `--channel` left the average of the device changed.
+- In the browser, a file with a step tiny against its top frequency could divide by zero
+  in the time-domain view; `sim:` with a rate like `1e-30` stopped the device thread; a
+  request to the server that starts with blank lines is answered 400 instead of 431.
+
 ### Changed
 
+- Calibration files (`vna-cli cal`, **Save** in the GUI) and the GUI's reference files
+  are written to a temporary file that then takes the place of the old one. A write
+  that fails half-way leaves the file that was there, with the standards in it.
+- `vna-cli`: `--gate`, `--vf` and `--port-extension` are checked before the sweep, not
+  after it.
+- `vna-server` stops listening before it lets go of the device, so that a client that
+  connects during the shutdown is not left waiting; a connection that ends in a crash
+  gives its place back.
+- The drivers check a sweep configuration themselves (at least one point, a last
+  frequency that fits), a calibration set refuses a sweep whose values do not match its
+  grid in number, and the line check refuses a ripple band too small for the sweep.
+- GUI: when the serial ports cannot be listed, the developer log says why.
+- CI and releases: the oldest supported Rust (1.95) is checked, every build uses the
+  committed `Cargo.lock` (`--locked`), the documentation must build without warnings and
+  the browser page is built the way a release builds it. A release tests what it builds,
+  and stops when its changelog section or one of its archives is missing instead of
+  publishing without it. Dependabot proposes newer actions and crates once a month.
 - Manual chapter 10 and the README, after the first day with analysers behind a server:
   the USB ports of a Raspberry Pi 4 can be too weak for a LiteVNA that charges (it then
   drops out every few seconds; a hub with its own power supply is the likely cure), what
@@ -607,7 +658,11 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.0
+[0.3.6]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.6
+[0.3.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.5
+[0.3.4]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.4
 [0.3.3]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.3
 [0.3.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.2
 [0.3.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.1

@@ -199,10 +199,12 @@ impl App {
         self.view = if s.view_tdr { View::Tdr } else { View::Frequency };
         // A hand-edited or future settings file may hold 0, NaN or nonsense;
         // the DragValues only clamp on interaction.
+        // What is not usable falls back to the default, kept in one place.
+        let d = Settings::default();
         let finite_or = |v: f64, lo: f64, hi: f64, default: f64| if v.is_finite() { v.clamp(lo, hi) } else { default };
-        self.tdr_vf = finite_or(s.tdr_vf, 0.3, 1.0, 0.70);
+        self.tdr_vf = finite_or(s.tdr_vf, 0.3, 1.0, d.tdr_vf);
         self.tdr_window = Window::parse(&s.tdr_window).unwrap_or(Window::Hann);
-        self.tdr_max_m = finite_or(s.tdr_max_m, 0.1, 1000.0, 2.0);
+        self.tdr_max_m = finite_or(s.tdr_max_m, 0.1, 1000.0, d.tdr_max_m);
         let mut marker_freqs = [None; MARKERS];
         for (slot, f) in marker_freqs.iter_mut().zip(&s.marker_freqs) {
             *slot = *f;
@@ -217,14 +219,14 @@ impl App {
         }
         self.gd_aperture = s.gd_aperture.clamp(1, 50);
         self.gate_on = s.gate_on;
-        self.gate_start_m = finite_or(s.gate_start_m, -1000.0, 1000.0, -0.1);
-        self.gate_stop_m = finite_or(s.gate_stop_m, -1000.0, 1000.0, 0.5);
+        self.gate_start_m = finite_or(s.gate_start_m, -1000.0, 1000.0, d.gate_start_m);
+        self.gate_stop_m = finite_or(s.gate_stop_m, -1000.0, 1000.0, d.gate_stop_m);
         if self.gate_stop_m <= self.gate_start_m {
             self.gate_stop_m = self.gate_start_m + 0.01;
         }
         self.gate_notch = s.gate_notch;
-        self.port_ext_ps = finite_or(s.port_ext_ps, -PORT_EXT_MAX_PS, PORT_EXT_MAX_PS, 0.0);
-        self.s21_offset_db = finite_or(s.s21_offset_db, -S21_OFFSET_MAX_DB, S21_OFFSET_MAX_DB, 0.0);
+        self.port_ext_ps = finite_or(s.port_ext_ps, -PORT_EXT_MAX_PS, PORT_EXT_MAX_PS, d.port_ext_ps);
+        self.s21_offset_db = finite_or(s.s21_offset_db, -S21_OFFSET_MAX_DB, S21_OFFSET_MAX_DB, d.s21_offset_db);
         self.sweep_avg = s.sweep_avg.clamp(1, MAX_SWEEP_AVG);
         self.avg_drop = s.avg_drop.min(self.sweep_avg.saturating_sub(2));
         self.extra_segments = s.extra_segments;

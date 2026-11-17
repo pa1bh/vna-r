@@ -16,7 +16,7 @@ use std::sync::Arc;
 use web_time::Instant;
 
 use crate::remote::{not_connected, Opener, RemoteTiming, Session, Socket};
-use crate::{is_server_address, server_url, Cmd, Event};
+use crate::{is_server_address, server_url, Cmd, Event, CONNECT_FAILED};
 
 /// Called after every event, from whichever thread has it, so that the GUI
 /// repaints instead of polling. It must return quickly: during a sweep it
@@ -85,7 +85,7 @@ fn url_for(port: &str) -> Result<String, &'static str> {
 /// A `Connect` that fails before anything is tried.
 fn cannot_connect(port: &str, why: &str) -> Event {
     Event::Error {
-        msg: format!("connecting to {port}: {why}"),
+        msg: format!("{CONNECT_FAILED}{port}: {why}"),
         stops_sweep: true,
     }
 }

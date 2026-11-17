@@ -34,9 +34,9 @@ fn main() -> eframe::Result {
     eframe::run_native("vna-r", options, Box::new(|cc| Ok(Box::new(app::App::new(cc)))))
 }
 
-/// The browser build: the same [`app::App`] in a canvas, without a device
-/// (the serial port and the worker thread do not exist there): a viewer for
-/// Touchstone files, see `docs/09-wasm-proef.md`.
+/// The browser build: the same [`app::App`] in a canvas. The serial port and
+/// the worker thread do not exist there: it shows Touchstone files, and
+/// measures through a vna-server (`docs/09-wasm-proef.md`, `docs/10-client-server.md`).
 #[cfg(target_arch = "wasm32")]
 fn main() {
     use eframe::wasm_bindgen::JsCast as _;

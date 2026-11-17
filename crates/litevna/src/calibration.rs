@@ -24,7 +24,8 @@ use crate::error::{Error, Result};
 
 pub use crate::Z0;
 
-/// The five things you can measure during a calibration.
+/// What can be measured into a calibration: the five standards and the two
+/// lines of the kit fit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Standard {
@@ -50,19 +51,6 @@ impl Standard {
     ];
     /// Auxiliary measurements used by [`CalibrationSet::fit_open_capacitance`].
     pub const LINE: [Standard; 2] = [Standard::LineOpen, Standard::LineShort];
-
-    pub fn parse(text: &str) -> Option<Self> {
-        Some(match text.to_ascii_lowercase().as_str() {
-            "open" | "o" => Standard::Open,
-            "short" | "s" => Standard::Short,
-            "load" | "l" => Standard::Load,
-            "through" | "thru" | "t" => Standard::Through,
-            "isolation" | "isol" | "i" => Standard::Isolation,
-            "line-open" | "line_open" | "lineopen" => Standard::LineOpen,
-            "line-short" | "line_short" | "lineshort" => Standard::LineShort,
-            _ => return None,
-        })
-    }
 
     pub fn name(&self) -> &'static str {
         match self {
@@ -308,6 +296,15 @@ impl CalibrationSet {
         if sweep.missing_points() > 0 {
             return Err(Error::Calibration(format!("{} points missing in sweep", sweep.missing_points())));
         }
+        // What `solve` and `validate` count on; a driver never gives anything else.
+        let n = self.freqs_hz.len();
+        if sweep.s11.len() != n || sweep.s21.len() != n {
+            return Err(Error::Calibration(format!(
+                "{} S11 and {} S21 values for a grid of {n} points",
+                sweep.s11.len(),
+                sweep.s21.len()
+            )));
+        }
         // A NaN or infinity (a record with a zero reference wave, a damaged
         // file) would spread into every error term and, once saved, make the
         // calibration file unreadable: JSON has no such numbers.
@@ -326,10 +323,6 @@ impl CalibrationSet {
             s21: sweep.s21.clone(),
         });
         Ok(())
-    }
-
-    pub fn clear(&mut self, standard: Standard) {
-        *self.slot(standard) = None;
     }
 
     pub fn to_json(&self) -> Result<String> {
@@ -387,8 +380,6 @@ impl CalibrationSet {
         Ok(())
     }
 
-    /// Solve the error terms. Needs open, short and load; through and
-    /// isolation are optional (without a through, S21 is left uncorrected).
     /// The standards a one-port calibration needs (open, short, load) that
     /// have not been measured yet. Empty means [`CalibrationSet::solve`] has
     /// what it needs; a cheap check for a status line, without solving.
@@ -399,6 +390,8 @@ impl CalibrationSet {
             .collect()
     }
 
+    /// Solve the error terms. Needs open, short and load; through and
+    /// isolation are optional (without a through, S21 is left uncorrected).
     pub fn solve(&self) -> Result<Calibration> {
         let (open, short, load) = match (&self.open, &self.short, &self.load) {
             (Some(o), Some(s), Some(l)) => (o, s, l),
@@ -557,7 +550,7 @@ impl CalibrationSet {
 
     /// Places where a raw standard measurement jumps between two neighbouring
     /// calibration points: the change per hertz is at least [`JUMP_RATIO`]
-    /// times the largest of the [`JUMP_NEIGHBOURS`] steps on either side, and
+    /// times the largest of the `JUMP_NEIGHBOURS` steps on either side, and
     /// the step itself is at least [`JUMP_MIN_STEP`].
     ///
     /// A VNA that switches its signal source or its mixing scheme at some
@@ -644,7 +637,10 @@ impl CalibrationSet {
             n => format!(" {n} more such steps lie in this sweep."),
         };
         Some(format!(
-            "{} sweep points lie between the calibration points {} and {}, where the raw {} measurement jumps              (the step is {:.0} times larger than those around it): the VNA probably switches its signal source              there. The error terms are interpolated across that jump and results between those two frequencies              are unreliable. Calibrate on this grid instead.{}",
+            "{} sweep points lie between the calibration points {} and {}, where the raw {} measurement jumps \
+             (the step is {:.0} times larger than those around it): the VNA probably switches its signal source \
+             there. The error terms are interpolated across that jump and results between those two frequencies \
+             are unreliable. Calibrate on this grid instead.{}",
             inside,
             crate::freq::format_hz(first.f_lo_hz),
             crate::freq::format_hz(first.f_hi_hz),
@@ -714,15 +710,7 @@ pub fn interpolate_complex(xs: &[u64], ys: &[C64], targets: &[u64]) -> Vec<C64> 
             }
             let (x0, x1) = (xs[i - 1] as f64, xs[i] as f64);
             let w = (t as f64 - x0) / (x1 - x0);
-            let (a, b) = (ys[i - 1], ys[i]);
-            let mag = a.norm() * (1.0 - w) + b.norm() * w;
-            let mut dphi = b.arg() - a.arg();
-            if dphi > PI {
-                dphi -= 2.0 * PI;
-            } else if dphi < -PI {
-                dphi += 2.0 * PI;
-            }
-            C64::from_polar(mag, a.arg() + w * dphi)
+            crate::traces::interpolate_polar(ys[i - 1], ys[i], w)
         })
         .collect()
 }
@@ -880,7 +868,7 @@ pub fn plausibility_warning(standard: Standard, sweep: &SweepResult) -> Option<S
     if sweep.s11.is_empty() {
         return None;
     }
-    let db = crate::touchstone::db;
+    let db = crate::traces::db;
     let s11_db = median(sweep.s11.iter().map(|s| db(s.norm())).collect());
     let s21_db = median(sweep.s21.iter().map(|s| db(s.norm())).collect());
     match standard {
@@ -1003,6 +991,8 @@ impl CalibrationSet {
     ///
     /// Needs line-open and line-short on a uniform grid of ≥ 8 points.
     pub fn check_lines(&self, band_hz: f64) -> Result<LineCheck> {
+        /// The most ripple bands one check reports.
+        const MAX_RIPPLE_BANDS: f64 = 10_000.0;
         use crate::timedomain::{gate, tdr, Gate, GateKind, TdrConfig};
         if !(band_hz > 0.0) || !band_hz.is_finite() {
             // The band walk below steps by `band_hz`; zero or negative would never end.
@@ -1052,6 +1042,13 @@ impl CalibrationSet {
         let f_first = (f[0] + edge_hz).max(f[clamped]);
         let f_last = (f[n - 1] - edge_hz).min(f[n - 1 - clamped]);
         let mut bands = Vec::new();
+        // A band far below the span is thousands of rows nobody reads, and one
+        // below the resolution of a float at these frequencies never ends.
+        if (f_last - f_first) / band_hz > MAX_RIPPLE_BANDS {
+            return Err(Error::InvalidArgument(format!(
+                "ripple band {band_hz} Hz is too small for this sweep"
+            )));
+        }
         let mut lo_f = (f_first / band_hz).ceil() * band_hz;
         if lo_f - f_first > band_hz / 2.0 {
             lo_f -= band_hz; // start half a band earlier if that still clears the edge
@@ -1340,6 +1337,7 @@ mod tests {
         let inside: Vec<u64> = (0..801).map(|i| 50_000_000 + i * 125_000).collect();
         let w = set.jump_warning(&inside).expect("warning");
         assert!(w.contains("95.905 MHz") && w.contains("100.900 MHz") && w.contains("short"), "{w}");
+        assert!(!w.contains("  "), "{w}");
         assert_eq!(set.interpolation_warnings(&inside), vec![w]);
         // away from the step, on the step's own two points, or on the calibration grid: silence
         let above: Vec<u64> = (0..101).map(|i| 200_000_000 + i * 1_000_000).collect();

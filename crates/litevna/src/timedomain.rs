@@ -143,8 +143,6 @@ pub struct TdrConfig {
     pub window: Window,
     /// Velocity factor of the line (0.66 RG-58, ~0.70 RG-316, 0.83 foam).
     pub velocity_factor: f64,
-    /// FFT length; 0 picks the next power of two ≥ 8× the harmonic grid.
-    pub fft_size: usize,
 }
 
 impl Default for TdrConfig {
@@ -152,7 +150,6 @@ impl Default for TdrConfig {
         TdrConfig {
             window: Window::Hann,
             velocity_factor: 0.70,
-            fft_size: 0,
         }
     }
 }
@@ -232,7 +229,7 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
     let mut buf = vec![Complex64::new(0.0, 0.0); nfft];
     let mut gain = 0.0;
     for (i, s) in s11.iter().enumerate() {
-        let x = if n > 1 { 2.0 * i as f64 / (n - 1) as f64 - 1.0 } else { 0.0 };
+        let x = 2.0 * i as f64 / (n - 1) as f64 - 1.0;
         let w = cfg.window.at(x);
         gain += w;
         // Place the band at its true bin so phase slopes map to the right delay;
@@ -256,26 +253,17 @@ pub fn tdr(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<TdrRe
         let pos = (f - f0) / df;
         let i = pos.floor() as usize;
         let t = pos - i as f64;
-        let (a, b) = (s11[i], s11[(i + 1).min(n - 1)]);
-        // Interpolate in polar form. A long line turns S11 by a good part of
-        // a circle between neighbouring points, and a straight line between
-        // two such phasors cuts the corner and shrinks the magnitude.
-        let mag = a.norm() * (1.0 - t) + b.norm() * t;
-        let mut dphi = b.arg() - a.arg();
-        if dphi > PI {
-            dphi -= 2.0 * PI;
-        } else if dphi < -PI {
-            dphi += 2.0 * PI;
-        }
-        Complex64::from_polar(mag, a.arg() + t * dphi)
+        // In polar form. A long line turns S11 by a good part of a circle
+        // between neighbouring points, and a straight line between two such
+        // phasors cuts the corner and shrinks the magnitude.
+        crate::traces::interpolate_polar(s11[i], s11[(i + 1).min(n - 1)], t)
     };
     // Bin 0 (DC) is left empty here and solved for below.
     for k in 1..=m {
         let v = interp(k as f64 * df) * one_sided(k);
         spec[k] = v;
-        if k < nfft - k {
-            spec[nfft - k] = v.conj();
-        }
+        // The mirror bin: nfft > 2·m, so it is never the bin itself.
+        spec[nfft - k] = v.conj();
     }
     ifft.process(&mut spec);
     let scale = 1.0 / nfft as f64;
@@ -357,11 +345,14 @@ fn check_grid(freqs_hz: &[u64], s11: &[Complex64], cfg: &TdrConfig) -> Result<Gr
     let fmax = *freqs_hz.last().unwrap() as f64;
     // Harmonic grid k·Δf, k = 0..=m, covering the measured band.
     let m = (fmax / df).round() as usize;
-    let nfft = if cfg.fft_size > 0 {
-        cfg.fft_size.max(2 * m + 2)
-    } else {
-        (8 * (m + 1)).next_power_of_two()
-    };
+    // The next power of two ≥ 8× the harmonic grid. Checked: on a 32-bit
+    // target (the browser) a file with a tiny step would otherwise wrap
+    // around to a small size and pass the check below.
+    let nfft = m
+        .checked_add(1)
+        .and_then(|k| k.checked_mul(8))
+        .and_then(usize::checked_next_power_of_two)
+        .unwrap_or(usize::MAX);
     if nfft > MAX_FFT_SIZE {
         return Err(Error::InvalidArgument(format!(
             "sweep too narrow for TDR: top frequency / step = {m}, at most {} (widen the span or use fewer points)",
@@ -403,7 +394,7 @@ impl GateKind {
 
 /// Round-trip time (s) of a reflection at one-way distance `distance_m` on a
 /// line with this velocity factor; the inverse of what [`TdrResult::distance_m`] shows.
-pub fn distance_to_time(distance_m: f64, velocity_factor: f64) -> f64 {
+pub(crate) fn distance_to_time(distance_m: f64, velocity_factor: f64) -> f64 {
     2.0 * distance_m / (C0 * velocity_factor)
 }
 

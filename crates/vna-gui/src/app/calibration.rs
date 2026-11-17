@@ -409,8 +409,8 @@ impl App {
     /// `(points, start_hz, stop_hz)` and the sweep is applied when a device is connected.
     /// A point count outside the sweep panel's choices takes the nearest choice and says so.
     pub(super) fn sweep_from_calibration(&mut self, (n, start_hz, stop_hz): (usize, u64, u64)) {
-        self.start = format_hz(start_hz).replace(' ', "");
-        self.stop = format_hz(stop_hz).replace(' ', "");
+        self.start = format_hz_exact(start_hz);
+        self.stop = format_hz_exact(stop_hz);
         let nearest = POINT_CHOICES
             .iter()
             .copied()
@@ -428,8 +428,8 @@ impl App {
     /// Points stay, and the sweep is applied when a device is connected.
     pub(super) fn sweep_to_band(&mut self, band: &Band) {
         let (lo, hi) = band.with_margin(BAND_MARGIN);
-        self.start = format_hz(lo).replace(' ', "");
-        self.stop = format_hz(hi).replace(' ', "");
+        self.start = format_hz_exact(lo);
+        self.stop = format_hz_exact(hi);
         self.sweep_error = None;
         if self.connected() {
             self.start_sweep(self.running);
@@ -611,7 +611,7 @@ impl App {
         match set
             .to_json()
             .map_err(|e| e.to_string())
-            .and_then(|j| std::fs::write(&path, j).map_err(|e| e.to_string()))
+            .and_then(|j| litevna::atomic::write(&path, j).map_err(|e| e.to_string()))
         {
             Ok(()) => {
                 self.log(format!("saved calibration {}", path.display()));

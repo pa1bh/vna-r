@@ -15,7 +15,7 @@
 //! * [`discovery`] — find candidate USB serial ports and their protocol.
 //! * [`calibration`] — SOL(T) error-term calibration applied on the host.
 //! * [`timedomain`] — TDR: impulse/step response and impedance along a line from S11.
-//! * [`touchstone`] — read Touchstone `.s1p`/`.s2p` files, write `.s2p` and CSV.
+//! * [`touchstone`] — read and write Touchstone `.s1p`/`.s2p` files, write CSV.
 //! * [`traces`] — derived quantities for display: dB, phase, SWR, impedance, group delay.
 //! * [`freq`] — parse human friendly frequencies such as `"14.2M"`.
 //! * [`bands`] — the amateur bands, a backdrop for frequency plots.
@@ -24,6 +24,7 @@
 /// crate (calibration kit models, impedance, SWR, TDR) is relative to it.
 pub const Z0: f64 = 50.0;
 
+pub mod atomic;
 pub mod bands;
 pub mod calibration;
 pub mod device;

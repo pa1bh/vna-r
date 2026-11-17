@@ -191,6 +191,9 @@ pub(crate) fn start(notify: Notify, options: Options) -> (Sender<Cmd>, Receiver<
     (cmd_tx, evt_rx)
 }
 
+/// How the [`Event::Error`] of a `Connect` that failed begins, the port
+/// after it. A vna-server tells its own failed tries from other errors by it.
+pub const CONNECT_FAILED: &str = "connecting to ";
 /// How often an idle worker looks whether the port of its device still exists.
 const IDLE_CHECK: Duration = Duration::from_millis(500);
 /// How often a worker that lost its link looks whether the port is back.
@@ -541,7 +544,7 @@ impl Worker {
                             via: None,
                         });
                     }
-                    Err(e) => self.fail(&format!("connecting to {port}"), e),
+                    Err(e) => self.fail(&format!("{CONNECT_FAILED}{port}"), e),
                 }
             }
             Cmd::Disconnect => {
@@ -628,11 +631,16 @@ impl Worker {
     }
 
     fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose, repeat: usize) {
+        if cfgs.is_empty() {
+            // Nothing to measure; as continuous sweeping it would spin.
+            self.fail("sweep", "no segments given");
+            return;
+        }
         let repeat = repeat.max(1);
-        let total = cfgs.iter().map(|c| c.points as usize).sum::<usize>() * repeat;
+        let total = cfgs.iter().map(|c| c.points as usize).sum::<usize>().saturating_mul(repeat);
         // Points of the segments and passes that are complete.
         let mut before = 0usize;
-        let mut passes: Vec<SweepResult> = Vec::with_capacity(repeat);
+        let mut passes: Vec<SweepResult> = Vec::new();
         for _ in 0..repeat {
             let mut parts = Vec::with_capacity(cfgs.len());
             for cfg in &cfgs {
@@ -670,7 +678,7 @@ impl Worker {
                     ControlFlow::Continue(())
                 };
                 d.measuring(purpose);
-                match d.sweep_with(cfg, false, &mut progress) {
+                match d.sweep_with(cfg, &mut progress) {
                     Ok(r) => {
                         before += cfg.points as usize;
                         parts.push(r);

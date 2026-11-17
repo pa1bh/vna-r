@@ -12,7 +12,7 @@ use litevna::{LiteVna, Result, Screenshot, SweepConfig, SweepResult, Vna};
 use crate::Purpose;
 
 pub(crate) trait Device: Send {
-    fn sweep_with(&mut self, cfg: &SweepConfig, fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult>;
+    fn sweep_with(&mut self, cfg: &SweepConfig, progress: SweepProgress<'_>) -> Result<SweepResult>;
     fn screenshot(&mut self) -> Result<Screenshot>;
     fn battery_millivolts(&mut self) -> Result<u16>;
     fn release(&mut self) -> Result<()>;
@@ -24,8 +24,9 @@ pub(crate) trait Device: Send {
 }
 
 impl Device for Vna {
-    fn sweep_with(&mut self, cfg: &SweepConfig, fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult> {
-        Vna::sweep_with(self, cfg, fifo_all, progress)
+    fn sweep_with(&mut self, cfg: &SweepConfig, progress: SweepProgress<'_>) -> Result<SweepResult> {
+        // In the 255-point chunks every LiteVNA firmware answers, not `READFIFO 0`.
+        Vna::sweep_with(self, cfg, false, progress)
     }
 
     fn screenshot(&mut self) -> Result<Screenshot> {

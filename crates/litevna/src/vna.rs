@@ -6,7 +6,8 @@
 //! The CLI and the GUI only need sweeps, screenshots, identity and battery, so
 //! that is what this enum offers; protocol-specific extras (registers,
 //! averaging, bandwidth) stay on the concrete types behind [`Vna::as_lite_mut`]
-//! and [`Vna::as_shell_mut`].
+//! and [`Vna::as_shell_mut`]. Not every one of those has a caller in this
+//! workspace: they are the driver's API for what the protocols offer.
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +25,16 @@ pub struct Limits {
     pub max_points_per_scan: Option<u16>,
     /// The LiteVNA averaging register exists (`set_average`).
     pub has_device_average: bool,
+}
+
+impl Limits {
+    /// What a LiteVNA 64 or 67 takes: 50 kHz to 6.3 GHz, a sweep in one piece.
+    pub const LITEVNA: Limits = Limits {
+        min_hz: 50_000,
+        max_hz: 6_300_000_000,
+        max_points_per_scan: None,
+        has_device_average: true,
+    };
 }
 
 /// Identity of a connected device, protocol-independent.
@@ -139,12 +150,7 @@ impl Vna {
                         format!("{}.{}", i.fw_major, i.fw_minor)
                     },
                     detail: format!("hw {}", i.hardware_revision),
-                    limits: Limits {
-                        min_hz: 50_000,
-                        max_hz: 6_300_000_000,
-                        max_points_per_scan: None,
-                        has_device_average: true,
-                    },
+                    limits: Limits::LITEVNA,
                     lite: Some(i),
                     shell: None,
                 })
