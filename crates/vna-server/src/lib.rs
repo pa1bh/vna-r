@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use hub::ToHub;
 
@@ -43,6 +43,8 @@ pub const BUILT_IN_WEB: bool = web::BUILT_IN;
 
 /// Connections served at the same time (page requests and clients); more are closed at once.
 const MAX_CONNECTIONS: usize = 64;
+/// How long a shutdown waits for the connections to say goodbye and close.
+const CLOSE_WITHIN: Duration = Duration::from_secs(2);
 
 /// Which analyser the server drives.
 #[derive(Debug, Clone, PartialEq)]
@@ -124,6 +126,7 @@ pub struct Server {
     stopping: Arc<AtomicBool>,
     listener: Option<JoinHandle<()>>,
     fatal: Option<Receiver<String>>,
+    shared: Arc<Shared>,
 }
 
 impl Server {
@@ -145,9 +148,10 @@ impl Server {
         });
         let stopping = Arc::new(AtomicBool::new(false));
         let stop = stopping.clone();
+        let for_listener = shared.clone();
         let listener = thread::Builder::new()
             .name("listener".into())
-            .spawn(move || accept(listener, shared, stop))?;
+            .spawn(move || accept(listener, for_listener, stop))?;
         Ok(Server {
             addr,
             hub,
@@ -155,6 +159,7 @@ impl Server {
             stopping,
             listener: Some(listener),
             fatal: Some(fatal),
+            shared,
         })
     }
 
@@ -184,6 +189,13 @@ impl Server {
         let (done, wait) = channel();
         if self.hub.send(ToHub::Shutdown(done)).is_ok() {
             let _ = wait.recv_timeout(Duration::from_secs(10));
+        }
+        // The hub has put the goodbye in every client's outbox; the threads
+        // of the connections still have to send it and close. A program that
+        // exits right after this call would cut them off before they do.
+        let deadline = Instant::now() + CLOSE_WITHIN;
+        while self.shared.active.load(Ordering::SeqCst) > 0 && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(5));
         }
     }
 

@@ -14,14 +14,19 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ### Fixed
 
-Found by reading the code through, not by measuring; none of it has been tried with an
-analyser yet.
+Found by reading the code through. Tried on 17 November with a LiteVNA 67 on a Mac and a
+NanoVNA-F behind a Raspberry Pi, as far as that goes without moving a cable or a
+standard, and with a LiteVNA 64 on Asahi Linux (S11, S21, TDR, and the cable pulled and
+put back); docs/08 says what was tried and what is left.
 
 - `vna-server`: a sweep command a client sends is checked before it reaches the device
   thread. A command with an absurd number of passes stopped that thread, one without
   segments kept it spinning. And when that thread does stop, the server now says so and
   exits with an error (systemd then starts a new one) instead of listening on and
   ignoring every command.
+- `vna-server` that stops (Ctrl-C, `systemctl stop`) says goodbye to its clients: they
+  got neither the last message nor a close and saw the connection break. Also so in
+  0.4.0; found with a client that kept sweeping while the server stopped.
 - GUI: **sweep from calibration**, **Band**, the segment spread and **Set sweep for TDR**
   wrote frequencies rounded to the kHz into Start and Stop. A calibration of 100 kHz to
   30 MHz in 1601 points ends at 29.9992 MHz; "29.999MHz" is another grid, so the
