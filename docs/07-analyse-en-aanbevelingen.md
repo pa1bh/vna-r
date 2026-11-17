@@ -5,6 +5,10 @@
 > controleert in [docs/08-qc-procedure.md](08-qc-procedure.md). Eén advies hieronder
 > bleek onjuist: de handleiding lokaal openen (F7, besluit 6) lost "een correctie zonder
 > release" niet op. Besloten is de Help-links bij de tag te houden.
+>
+> De verwijzingen naar regels in de code wijzen naar de bron zoals die toen was (commit
+> 94fe525): `app.rs` is sindsdien de map `crates/vna-gui/src/app/` en `worker.rs` staat
+> in `crates/vna-link/`.
 
 Stand: versie 0.2.5, commit 94fe525, 10 november 2026. Een brede doorlichting van het
 project op UX/UI, bugs, functionaliteit, nieuwe features, veiligheid, duurzaamheid van de
@@ -66,30 +70,30 @@ diagnostics; Help-links naar de eigen versie.
 Wrijvingspunten, ruwweg op volgorde van belang:
 
 - **U1 — Standaarden op het getypte raster.** `standard_buttons` roept `current_config()`
-  aan ([app.rs:1735](../crates/vna-gui/src/app.rs#L1735), [app.rs:587](../crates/vna-gui/src/app.rs#L587)),
+  aan ([app.rs:1735](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L1735), [app.rs:587](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L587)),
   dat Start/Stop/Points live leest. Wie Stop wijzigt, "Apply sweep" vergeet en op
   open/short/load klikt, calibreert op raster B terwijl de weergave op raster A sweept; de
   calibratie wordt dan stil geïnterpoleerd. Gebruik het primaire segment uit `last_plan`,
   of waarschuw zodra het getypte raster afwijkt van het toegepaste. Bevestigd.
 - **U2 — Bevestigingen verdwijnen.** "measured open", "loaded" en "kit updated … save to
   keep it" worden in `cal.message` gezet en direct daarna door `calibration_for` gewist
-  ([app.rs:187](../crates/vna-gui/src/app.rs#L187)). Met apply aan (standaard) ziet
+  ([app.rs:187](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L187)). Met apply aan (standaard) ziet
   niemand ze ooit. Scheid de solve-fout van de statusmelding. Bevestigd, zie B4.
 - **U3 — Segmentwijzigingen gelden pas na Apply sweep**, zonder dat de UI dat zegt: het
   rijtje toont het nieuwe cal-bestand terwijl `sent_plan_cals` nog het oude gebruikt
-  ([app.rs:641](../crates/vna-gui/src/app.rs#L641)). Bevestigd.
+  ([app.rs:641](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L641)). Bevestigd.
 - **U4 — Stop en Disconnect reageren pas na een hele sweep.** De worker kijkt alleen
-  tussen complete multi-segment-sweeps naar commando's ([worker.rs:85](../crates/vna-gui/src/worker.rs#L85)).
+  tussen complete multi-segment-sweeps naar commando's ([worker.rs:85](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/worker.rs#L85)).
   Op een NanoVNA-F duurt 3201 punten bijna een halve minuut waarin Stop dood lijkt. De
   puntenkeuzes negeren `Limits.max_points_per_scan` en de snelheid van het apparaat.
   Minimaal een "sweeping…"-indicator; beter een annuleerpunt per segment of per
   `scan_bin`-stuk (zie F2).
 - **U5 — "Set sweep for TDR" is LiteVNA-logica**: 6,3 GHz hard gecodeerd
-  ([app.rs:1434](../crates/vna-gui/src/app.rs#L1434)); op een NanoVNA-F levert het direct
+  ([app.rs:1434](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L1434)); op een NanoVNA-F levert het direct
   de oranje buiten-bereik-waarschuwing op. Gebruik `device_limits().max_hz`. Bevestigd.
 - **U6 — TDR-fouten gebruiken het globale foutvak en de placeholder liegt.** Bij een
   log-gespreide .s1p of een te smalle sweep schrijft `tdr_result` elk frame `self.error`
-  ([app.rs:2244](../crates/vna-gui/src/app.rs#L2244)); het kruisje werkt niet en het
+  ([app.rs:2244](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L2244)); het kruisje werkt niet en het
   middenvlak zegt "Connect and press Run" terwijl er data zijn. De gate heeft wel een
   eigen `gate_error`: twee conventies voor buurfuncties.
 - **U7 — Clear wist alleen de paneelcalibratie**; segmentbestanden blijven gelden, dus de
@@ -100,8 +104,8 @@ Wrijvingspunten, ruwweg op volgorde van belang:
 - **U9 — Enter in Start/Stop doet niets**; validatie pas bij Apply; "Apply sweep" in
   rust doet één sweep, wat niet voor de hand ligt.
 - **U10 — Verouderde teksten**: "Hold (top bar)" terwijl Hold in de markerbalk zit
-  ([app.rs:1684](../crates/vna-gui/src/app.rs#L1684)); "step 8 will read them back" is
-  roadmap-jargon in gebruikerstekst ([app.rs:1719](../crates/vna-gui/src/app.rs#L1719));
+  ([app.rs:1684](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L1684)); "step 8 will read them back" is
+  roadmap-jargon in gebruikerstekst ([app.rs:1719](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L1719));
   standaard-bestandsnaam `litevna.cal.json` voor NanoVNA-bezitters; `sweep.s2p` zonder
   datum.
 - **U11 — Kleine dingen**: Copy diagnostics meldt onder het kopje Files; TDR-impedantie
@@ -111,7 +115,7 @@ Wrijvingspunten, ruwweg op volgorde van belang:
 CLI-kant:
 
 - **U12 — `vna-cli sweep` print elke keer een debugregel** ("first raw record: fwd0=…")
-  naar stderr ([main.rs:748](../crates/vna-cli/src/main.rs#L748)). Hoort achter `--trace`.
+  naar stderr ([main.rs:748](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-cli/src/main.rs#L748)). Hoort achter `--trace`.
 - **U13 — Stil genegeerde vlaggen**: `--segment` overschrijft `--start/--stop/--points/--cal`
   zonder `conflicts_with`; `tdr --from` negeert raster- en meetargumenten; `--fifo-all`
   en `--keep-usb-mode` bestaan maar alleen op `sweep`; `--channel both` op een NanoVNA-F
@@ -126,31 +130,31 @@ CLI-kant:
 
 | # | Wat | Waar | Status |
 |---|-----|------|--------|
-| B1 | Calibratie-interpolatie in re/im krimpt alle standaarden met cos(θ/2); grens π/2 laat tot −3 dB toe; through via kabel ongecontroleerd | [calibration.rs:410](../crates/litevna/src/calibration.rs#L410), [:510](../crates/litevna/src/calibration.rs#L510) | bevestigd (wiskunde); omvang in de praktijk afhankelijk van rasterstap |
-| B2 | `max_time_s = 1/df` terwijl de arrays tot 1/(2·df) lopen; GUI-label en as-limiet, CLI `limit_m` nemen dat over | [timedomain.rs:245](../crates/litevna/src/timedomain.rs#L245), [:256](../crates/litevna/src/timedomain.rs#L256) | bevestigd |
-| B3 | Mislukte `NanoVnaShell::open` stuurt via Drop nog `resume` en wacht nog eens 3 s | [shell.rs:205](../crates/litevna/src/shell.rs#L205), [:500](../crates/litevna/src/shell.rs#L500) | bevestigd |
-| B4 | "measured …", "loaded", "save to keep it" worden direct overschreven | [app.rs:187](../crates/vna-gui/src/app.rs#L187), [:965](../crates/vna-gui/src/app.rs#L965) | bevestigd |
-| B5 | `fail()` zet altijd `continuous = None`; mislukte screenshot of SetAverage stopt de sweep | [worker.rs:115](../crates/vna-gui/src/worker.rs#L115) | bevestigd |
-| B6 | Markers zijn indices; na rasterwijziging andere frequentie | [app.rs:258](../crates/vna-gui/src/app.rs#L258) | bevestigd |
-| B7 | Pijltjestoetsen niet gefilterd op tekstfocus (`key_pressed` leest ruwe events) | [app.rs:2010](../crates/vna-gui/src/app.rs#L2010) | bevestigd in egui-bron |
-| B8 | s2p-commentaar zegt "uncalibrated raw" bij `--segment …@cal.json`, en altijd "LiteVNA sweep" | [main.rs:757](../crates/vna-cli/src/main.rs#L757) | bevestigd |
-| B9 | `tdr --csv -` maakt een bestand met de naam `-`; handleiding belooft stdout | [main.rs:852](../crates/vna-cli/src/main.rs#L852) | bevestigd |
-| B10 | Drie encoderingen van "geen ruwe records" in `SweepResult.points`; Touchstone-sweep wordt als standaard geweigerd ("n points missing") | [touchstone.rs:153](../crates/litevna/src/touchstone.rs#L153), [shell.rs:443](../crates/litevna/src/shell.rs#L443), [device.rs:113](../crates/litevna/src/device.rs#L113) | bevestigd |
-| B11 | Screenshot-header kan tot 17 GB laten alloceren (u16×u16×4) vóór er data gelezen zijn | [device.rs:574](../crates/litevna/src/device.rs#L574) | bevestigd |
-| B12 | Export-commentaar en referentienaam gebruiken `is_calibrated()` van de vorige apparaatsweep bij een bestandstrace | [app.rs:903](../crates/vna-gui/src/app.rs#L903), [:1966](../crates/vna-gui/src/app.rs#L1966) | bevestigd |
-| B13 | Standaard-sweeps gaan buiten de software-middeling om | [app.rs:776](../crates/vna-gui/src/app.rs#L776) | bevestigd (ontwerpgat) |
-| B14 | `tdr_vf`, `tdr_max_m`, gate-grenzen worden ongeclampt uit de instellingen gelezen; 0 of NaN → deling door nul, elk frame een fout | [app.rs:417](../crates/vna-gui/src/app.rs#L417) | bevestigd, vereist kapot settings-bestand |
-| B15 | `SweepConfig::stop_hz()` met `points == 0` → underflow; `check_grid` trekt u64's ongecontroleerd af | [device.rs:89](../crates/litevna/src/device.rs#L89), [timedomain.rs:277](../crates/litevna/src/timedomain.rs#L277) | bevestigd op handgebouwde input |
-| B16 | `check_lines` hangt bij `band_hz < 0` | [calibration.rs:848](../crates/litevna/src/calibration.rs#L848) | bevestigd, alleen via library-API |
-| B17 | Cache-thrash en misleidende rasterwaarschuwing bij ≥2 paneelgecalibreerde segmenten | [app.rs:154](../crates/vna-gui/src/app.rs#L154), [:932](../crates/vna-gui/src/app.rs#L932) | bevestigd |
-| B18 | FIFO-timeouts (20 ms/punt, min 3 s) schalen niet met average 1..80 of shell-bandbreedte | [device.rs:228](../crates/litevna/src/device.rs#L228), [shell.rs:51](../crates/litevna/src/shell.rs#L51) | plausibel, meten |
-| B19 | Na een timeout midden in een chunk geen resync (`configured` blijft staan) | [device.rs:497](../crates/litevna/src/device.rs#L497) | plausibel |
-| B20 | Stale records na een configuratiewijziging kunnen als vers geteld worden | [device.rs:520](../crates/litevna/src/device.rs#L520) | plausibel, meten |
-| B21 | NaN/inf kan via Touchstone, `fwd0 == 0` of `fit_open` in een `CalibrationSet` komen en maakt de JSON daarna onleesbaar | [calibration.rs:287](../crates/litevna/src/calibration.rs#L287), [:636](../crates/litevna/src/calibration.rs#L636) | plausibel |
-| B22 | Touchstone: gelijke opeenvolgende frequenties worden geaccepteerd; ruisparameterblok geeft verwarrende fout | [touchstone.rs:143](../crates/litevna/src/touchstone.rs#L143) | plausibel |
-| B23 | Eén sweep lang verkeerde segment-calibraties bij Apply tijdens lopen met gelijk aantal segmenten | [app.rs:750](../crates/vna-gui/src/app.rs#L750) | plausibel, zelfherstellend |
-| B24 | Verbinden is niet te annuleren; onbekende poort probeert beide protocollen | [vna.rs:65](../crates/litevna/src/vna.rs#L65) | plausibel |
-| B25 | `build.rs` kijkt alleen naar `.git/HEAD`; een nieuwe commit op dezelfde branch ververst de git-revisie niet | [build.rs:9](../crates/vna-cli/build.rs#L9) | bevestigd |
+| B1 | Calibratie-interpolatie in re/im krimpt alle standaarden met cos(θ/2); grens π/2 laat tot −3 dB toe; through via kabel ongecontroleerd | [calibration.rs:410](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/calibration.rs#L410), [:510](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/calibration.rs#L510) | bevestigd (wiskunde); omvang in de praktijk afhankelijk van rasterstap |
+| B2 | `max_time_s = 1/df` terwijl de arrays tot 1/(2·df) lopen; GUI-label en as-limiet, CLI `limit_m` nemen dat over | [timedomain.rs:245](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/timedomain.rs#L245), [:256](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/timedomain.rs#L256) | bevestigd |
+| B3 | Mislukte `NanoVnaShell::open` stuurt via Drop nog `resume` en wacht nog eens 3 s | [shell.rs:205](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/shell.rs#L205), [:500](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/shell.rs#L500) | bevestigd |
+| B4 | "measured …", "loaded", "save to keep it" worden direct overschreven | [app.rs:187](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L187), [:965](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L965) | bevestigd |
+| B5 | `fail()` zet altijd `continuous = None`; mislukte screenshot of SetAverage stopt de sweep | [worker.rs:115](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/worker.rs#L115) | bevestigd |
+| B6 | Markers zijn indices; na rasterwijziging andere frequentie | [app.rs:258](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L258) | bevestigd |
+| B7 | Pijltjestoetsen niet gefilterd op tekstfocus (`key_pressed` leest ruwe events) | [app.rs:2010](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L2010) | bevestigd in egui-bron |
+| B8 | s2p-commentaar zegt "uncalibrated raw" bij `--segment …@cal.json`, en altijd "LiteVNA sweep" | [main.rs:757](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-cli/src/main.rs#L757) | bevestigd |
+| B9 | `tdr --csv -` maakt een bestand met de naam `-`; handleiding belooft stdout | [main.rs:852](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-cli/src/main.rs#L852) | bevestigd |
+| B10 | Drie encoderingen van "geen ruwe records" in `SweepResult.points`; Touchstone-sweep wordt als standaard geweigerd ("n points missing") | [touchstone.rs:153](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/touchstone.rs#L153), [shell.rs:443](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/shell.rs#L443), [device.rs:113](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L113) | bevestigd |
+| B11 | Screenshot-header kan tot 17 GB laten alloceren (u16×u16×4) vóór er data gelezen zijn | [device.rs:574](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L574) | bevestigd |
+| B12 | Export-commentaar en referentienaam gebruiken `is_calibrated()` van de vorige apparaatsweep bij een bestandstrace | [app.rs:903](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L903), [:1966](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L1966) | bevestigd |
+| B13 | Standaard-sweeps gaan buiten de software-middeling om | [app.rs:776](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L776) | bevestigd (ontwerpgat) |
+| B14 | `tdr_vf`, `tdr_max_m`, gate-grenzen worden ongeclampt uit de instellingen gelezen; 0 of NaN → deling door nul, elk frame een fout | [app.rs:417](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L417) | bevestigd, vereist kapot settings-bestand |
+| B15 | `SweepConfig::stop_hz()` met `points == 0` → underflow; `check_grid` trekt u64's ongecontroleerd af | [device.rs:89](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L89), [timedomain.rs:277](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/timedomain.rs#L277) | bevestigd op handgebouwde input |
+| B16 | `check_lines` hangt bij `band_hz < 0` | [calibration.rs:848](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/calibration.rs#L848) | bevestigd, alleen via library-API |
+| B17 | Cache-thrash en misleidende rasterwaarschuwing bij ≥2 paneelgecalibreerde segmenten | [app.rs:154](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L154), [:932](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L932) | bevestigd |
+| B18 | FIFO-timeouts (20 ms/punt, min 3 s) schalen niet met average 1..80 of shell-bandbreedte | [device.rs:228](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L228), [shell.rs:51](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/shell.rs#L51) | plausibel, meten |
+| B19 | Na een timeout midden in een chunk geen resync (`configured` blijft staan) | [device.rs:497](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L497) | plausibel |
+| B20 | Stale records na een configuratiewijziging kunnen als vers geteld worden | [device.rs:520](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/device.rs#L520) | plausibel, meten |
+| B21 | NaN/inf kan via Touchstone, `fwd0 == 0` of `fit_open` in een `CalibrationSet` komen en maakt de JSON daarna onleesbaar | [calibration.rs:287](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/calibration.rs#L287), [:636](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/calibration.rs#L636) | plausibel |
+| B22 | Touchstone: gelijke opeenvolgende frequenties worden geaccepteerd; ruisparameterblok geeft verwarrende fout | [touchstone.rs:143](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/touchstone.rs#L143) | plausibel |
+| B23 | Eén sweep lang verkeerde segment-calibraties bij Apply tijdens lopen met gelijk aantal segmenten | [app.rs:750](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L750) | plausibel, zelfherstellend |
+| B24 | Verbinden is niet te annuleren; onbekende poort probeert beide protocollen | [vna.rs:65](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/litevna/src/vna.rs#L65) | plausibel |
+| B25 | `build.rs` kijkt alleen naar `.git/HEAD`; een nieuwe commit op dezelfde branch ververst de git-revisie niet | [build.rs:9](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-cli/build.rs#L9) | bevestigd |
 
 Gecontroleerd en in orde: FIFO-byteoffsets en checksum, `scan_bin`-framing, `recv_exact`,
 de SOLT-oplosser en enhanced-response S21, TDR-binplaatsing, window-normalisatie, DC-term
@@ -261,9 +265,9 @@ Lage prioriteit, zoals afgesproken; voor de volledigheid:
   `settings.rs`, `calibration_ui.rs`, `segments.rs`, `plots.rs`, `tdr_ui.rs`, `files.rs`,
   `diagnostics.rs`. Twee `impl CalState`-blokken samenvoegen.
 - **D3 — UI-vrije logica uit de GUI naar `litevna`**, waar de CLI het deels al dubbel
-  heeft: `resample_complex` ([app.rs:2616](../crates/vna-gui/src/app.rs#L2616)) is bijna
+  heeft: `resample_complex` ([app.rs:2616](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-gui/src/app.rs#L2616)) is bijna
   regel voor regel `calibration::interpolate_complex`; `push_average`; `segment_plan`
-  met overlapcontrole (de CLI heeft dezelfde melding op [main.rs:554](../crates/vna-cli/src/main.rs#L554));
+  met overlapcontrole (de CLI heeft dezelfde melding op [main.rs:554](https://github.com/pa1bh/vna-r/blob/94fe525dac316393c0792f71f793443fde884bf6/crates/vna-cli/src/main.rs#L554));
   "breedste segment voor TDR"; per-segment-correctie met eigen calibratiebestand;
   `nearest_index`; de "benodigde span"-regel; gate-spec en meter→seconde (twee keer).
 - **D4 — Instellingen versioneren.** `marker_freqs: [Option<u64>; 4]` en

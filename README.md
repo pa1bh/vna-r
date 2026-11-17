@@ -269,7 +269,8 @@ the git revision recorded by `build.rs`), the CLI with `vna-cli --version`.
 To cut a release:
 
 1. Put the new number in `Cargo.toml`, move the items under *Unreleased* in `CHANGELOG.md` to a
-   section `## [X.Y.Z] - date`, and commit.
+   section `## [X.Y.Z] - date`, add its link at the bottom of that file and point the
+   *Unreleased* link there at the new tag, and commit.
 2. Tag and push:
 
    ```bash

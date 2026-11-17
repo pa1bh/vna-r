@@ -1,6 +1,21 @@
 # Roadmap
 
-Stand: 2026-11-10. De twaalf stappen hieronder zijn gedaan (stap 4 onderzocht, stap 10 op
+Stand: 2026-11-17, versie 0.4.0. Dit document is in drie lagen gegroeid: de twaalf
+stappen van 4 november, de werklijst van 10 november en de werklijst van 13 november. Wat
+gedaan is blijft staan als geschiedenis. **Open staat nu:**
+
+| # | Werk | Waar |
+|---|------|------|
+| 37 | Host-middeling via `valuesPerFrequency` | Werklijst november, "Later" |
+| 39 | Smith-chart hover-uitlezing en frequentielabels | idem |
+| 42 | Kit-bestanden lezen, load serie-L (opgevolgd door punt 62) | idem |
+| 43, 44 | Tekst-`scan` voor NanoVNA-H/H4; 12-term 2-poorts | idem, alleen met hardware |
+| 45–47 | FIFO-timeouts bij average 80, stale records, Windows met een apparaat | "Meten" |
+| 50, 51 | Schermafbeeldingen van de handleiding; onderkant van een brede calibratie | "Toegevoegd tijdens het werk" |
+| 61–68 | Analysepanelen, standaard uit s1p, calibratie-assistent, Center/Span, eigen banden, µ-plot, log-as, segmentwaarschuwing | Werklijst na NanoVNA-Saver, "Open" |
+| stap 10 | NanoVNA-H1 (geparkeerd; gedaan op een NanoVNA-F) | de twaalf stappen |
+
+De twaalf stappen hieronder zijn gedaan (stap 4 onderzocht, stap 10 op
 een NanoVNA-F in plaats van de H1); het vervolg staat onderaan in "Werklijst november
 2026". De oorspronkelijke tekst van 4 november:
 
@@ -186,7 +201,7 @@ in de library met twee implementaties, detectie op VID/PID en zo nodig een probe
 zijn apparaatonafhankelijk en werken meteen.
 
 **Klaar als** `vna-cli info` en `sweep` op de H1 werken, en de GUI het apparaat
-automatisch kiest. Documentatie in `docs/06-nanovna-h-protocol.md`.
+automatisch kiest. Documentatie in `docs/06-nanovna-shell-protocol.md`.
 
 **Resultaat (4 november 2026).** Gedaan met een NanoVNA-F 4.3 in plaats van de H1:
 `shell.rs` (`NanoVnaShell`, `scan_bin` met ruwe data, 301 punten per stuk, `capture`),
@@ -281,12 +296,12 @@ en de meetpunten 45 tot 47; de reden staat in de statuskolom.
 | 21 | `SerialLink` met injecteerbare nep-poort; tests voor `LiteVna::sweep`, `scan_bin`, `command`, screenshots | D1, D6 | M/L | gedaan 2026-11-10: `from_port` + `fakeport.rs`, 29 drivertests, resync na mislukte sweep (B19). Niet gedaan: één gedeelde `SerialLink` (D6); beide drivers houden hun eigen leeslus |
 | 22 | Annuleren en voortgang: `sweep_with(cfg, callback)` per chunk; worker en Stop erdoorheen (besluit 5) | F2, N2, U4 | M | gedaan 2026-11-10 (library getest met de nep-apparaten; de worker zelf alleen met hardware te controleren) |
 | 23 | UI-vrije logica naar `litevna`: resampling, middeling, segmentplanning, breedste segment, per-segment-correctie, `nearest_index`, gate-spec | D3 | M | gedaan 2026-11-10, op de per-segment-correctie na: die is in de GUI verweven met het laden en cachen van bestanden en verhuist mee met punt 24 |
-| 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | gedaan 2026-11-10: `app/` met zeven submodules; code ongewijzigd verplaatst door een script dat op verloren regels controleert |
+| 24 | `app.rs` splitsen in settings, calibration_ui, segments, plots, tdr_ui, files, diagnostics | D2 | M | gedaan 2026-11-10: `app/` met zeven submodules (inmiddels negen: `servers` en `web` erbij); code ongewijzigd verplaatst door een script dat op verloren regels controleert |
 | 25 | Versieveld in bewaarde instellingen en calibratie-JSON; `Vec` in plaats van vaste arrays | D4 | S | gedaan 2026-11-10 (0.2.5-instellingen blijven leesbaar, getest) |
 | 26 | Eén meldingsmodel (`Notice`) voor error, cal.message, gate_error, file_message, sweep_error | D5, U6, U11 | S/M | gedaan 2026-11-10 in beperkte vorm: TDR-fout bij de TDR, korte bevestiging in de topbalk, lange fout afgekapt met hover. Geen algemeen `Notice`-type: de vijf plekken hebben elk hun eigen paneel en dat werkt |
 | 27 | Fouttype: `Parse { line }`, `NotConnected`, `Unsupported(Kind)`; "apparaat weg" ook bij `Timeout` | D7 | S | gedaan 2026-11-10 (`Parse`, `Unsupported`, poort-verdwenen-controle; geen `NotConnected`: de library kent geen verbindingsloze toestand) |
 | 28 | Help opent de lokale handleiding naast de binary, GitHub als terugval (besluit 6) | F7 | S | vervallen 2026-11-10: de lokale kopie is even oud als de tag en lost "correctie zonder release" niet op. Besluit: de Help-links blijven bij de tag; documentatiecorrecties gaan mee met de volgende release |
-| 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache) |
+| 29 | CI: clippy, `rust-version`, `COPYFILE_DISABLE`, `generate_release_notes` uit, handleiding-synccheck | D11, D13 | S | gedaan 2026-11-10 (MSRV 1.95; release op ubuntu-22.04; geen dependabot, geen Nix-cache; die laatste is er sinds 0.3.5) |
 | 30 | Dode code en stale commentaren opruimen; `probe_shell` op `NanoVnaShell::command` | L4, L6, L7 | S | gedaan 2026-11-10 (protocolfuncties zoals `set_power`, `set_bandwidth`, `pause` blijven als driver-API; `probe_shell` blijft bewust los van de driver, met uitleg) |
 | 31 | `Arc<SweepResult>` voor shown en referenties; statusstring cachen | D9 | S | gedaan 2026-11-10, eenvoudiger dan gepland: één kopie per frame zonder ruwe records, status uit aanwezige standaarden. Geen `Arc`: de winst weegt niet op tegen de ingreep |
 | 32 | Z0, SWR-clamp en dB-vloer op één plek | D8 | S | gedaan 2026-11-10 |
@@ -359,6 +374,7 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 70 | Knop **sweep from calibration** in het calibratiepaneel: start, stop en punten op het raster van de calibratie en toepassen; wens van PA1BH | S | gedaan 2026-11-13 |
 | 71 | **Band** in het sweeppaneel: start en stop op een amateurband met 10 % marge, sweep toepassen; bandentabel voor IARU-regio 2 en een regiokeuze onder View ▸ Amateur bands; wens van Steve Falco (groups.io) | S | gedaan 2026-11-13 |
 | 72 | Meten via het netwerk: `vna-server` deelt een analyzer aan USB (een Raspberry Pi bijvoorbeeld), de browserbouw en het programma verbinden ermee over een WebSocket; een gesimuleerd apparaat om zonder analyzer te werken. Ontwerp in [docs/10](10-client-server.md), wens van PA1BH | L | gedaan 2026-11-16 en uitgebracht in 0.4.0; wat met apparaten gezien is en wat niet staat in [docs/08](08-qc-procedure.md) "Ronde client/server" |
+| 73 | Schoonmaak- en duurzaamheidsronde: de hele codebase doorgelezen op bugs, zwakke plekken, overbodige code en verouderde documentatie. Bugs hersteld (onder meer een `Sweep` van een client die de server kon stilleggen, **sweep from calibration** die een ander raster gaf, bestanden die niet geflusht werden), calibratiebestanden worden in één stap vervangen, dode code en verouderde commentaren weg, de documenten bijgewerkt, CI en release strenger (oudste Rust getest, `--locked`, een release test wat hij bouwt en faalt niet meer stil). Wat het was staat onder *Unreleased* in de CHANGELOG | M | gedaan 2026-11-17 op leeswerk en tests, zonder analyzer; nog niet uitgebracht. Wat bewust bleef staan: de protocolfuncties van de driver (punt 30). De gewijzigde workflows hebben nog niet op GitHub gedraaid |
 
 ## Open
 

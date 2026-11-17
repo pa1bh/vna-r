@@ -136,7 +136,8 @@ elkaar: de Pi serveert de pagina zelf, en dezelfde pagina staat op de eigen webs
 
 ## Hoe het nu zit: de knip bestaat al
 
-`crates/vna-gui/src/worker.rs` is de enige plek waar de GUI het apparaat aanraakt. De
+`crates/vna-gui/src/worker.rs` (sinds 0.4.0 `crates/vna-link/src/worker.rs`) is de enige
+plek waar de GUI het apparaat aanraakt. De
 `App` stuurt een `Cmd` en leest `Event`s; de worker draait op een eigen thread omdat
 seriële I/O blokkeert.
 
