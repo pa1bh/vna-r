@@ -1869,6 +1869,18 @@ dat moment 0.4.0, dus dit is het programma van nu tegen de server van de laatste
 Disconnect tijdens een standaardmeting is daarbij niet apart genoemd; dat heb ik in de
 browser gezien.
 
+### 17 november: de release 0.4.1
+
+CI op de releasecommit (0db86c7) was groen op alle zeven jobs, daarna de tag. De
+release-workflow, die voor het eerst test wat hij bouwt, slaagde in één keer: zes
+archieven met hun checksums, geen pre-release, de sectie uit de CHANGELOG als tekst.
+
+Op de Mac nagelopen: `aarch64-macos` en `web.zip` kloppen met hun checksum, geen
+AppleDouble-bestanden in het archief, `vna-cli 0.4.1 (0db86c7)` en `vna-server 0.4.1
+(0db86c7)`. Met de LiteVNA 67: een sweep van 201 punten met `vna-cli` uit het archief, en
+`vna-server` uit het archief met de pagina ingebouwd, waar de testclient weer 23 van 23
+haalde. De andere archieven zijn niet uitgepakt.
+
 ### Niet door mij te doen
 
 Het venster van het programma (alleen de pagina in de browser is bekeken), alles waar een
