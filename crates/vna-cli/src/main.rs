@@ -434,7 +434,11 @@ fn is_closed_pipe(e: &anyhow::Error) -> bool {
 }
 
 fn run() -> Result<()> {
-    let cli = Cli::parse();
+    run_with(Cli::parse())
+}
+
+/// What `main` does with the parsed command line, apart from the exit code.
+fn run_with(cli: Cli) -> Result<()> {
     let conn = Conn {
         port: cli.port.clone(),
         trace: cli.trace,
@@ -1543,4 +1547,157 @@ fn screenshot(dev: &mut Vna, out: &Path, swap_bytes: bool) -> Result<()> {
     println!("wrote {}", out.display());
     dev.release()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    /// A port that is not there: a test that got past the checks it is about
+    /// would fail on it, instead of sweeping an analyser that happens to be
+    /// plugged in.
+    const NO_PORT: &str = "/nonexistent/vna-r-test-port";
+
+    fn parse(args: &[&str]) -> std::result::Result<Cli, clap::Error> {
+        Cli::try_parse_from(["vna-cli", "--port", NO_PORT].iter().chain(args))
+    }
+
+    /// The message of running `args`, which must fail.
+    fn refused(args: &[&str]) -> String {
+        let cli = parse(args).unwrap_or_else(|e| panic!("{args:?} does not parse: {e}"));
+        match run_with(cli) {
+            Ok(()) => panic!("{args:?} was accepted"),
+            Err(e) => format!("{e:#}"),
+        }
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("vna-cli-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn the_command_line_definition_is_sound() {
+        // Duplicate names, a `requires` or `conflicts_with` naming an option
+        // that does not exist: clap only checks these when asked.
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn options_that_exclude_each_other_are_refused_by_the_parser() {
+        assert!(parse(&["sweep", "--segment", "1M:2M:11"]).is_ok());
+        for bad in [
+            &["sweep", "--segment", "1M:2M:11", "--start", "1M"][..],
+            &["sweep", "--segment", "1M:2M:11", "--cal", "x.json"],
+            &["sweep", "--gate-notch"],
+            &["tdr", "--from", "x.s1p", "--cal", "x.json"],
+            &["tdr", "--from", "x.s1p", "--points", "101"],
+            &["cal", "open"],
+            &["cal", "nothing", "--file", "x.json"],
+        ] {
+            assert!(parse(bad).is_err(), "{bad:?} should not parse");
+        }
+        // the short names of the standards
+        for (name, standard) in [
+            ("o", Standard::Open),
+            ("thru", Standard::Through),
+            ("line_short", Standard::LineShort),
+        ] {
+            let cli = parse(&["cal", name, "--file", "x.json"]).unwrap();
+            let Cmd::Cal { what, .. } = cli.cmd else { panic!() };
+            assert_eq!(what.standard(), Some(standard));
+        }
+    }
+
+    #[test]
+    fn the_grid_comes_from_the_options_then_the_calibration_then_the_default() {
+        let grid = |start: Option<&str>, stop: Option<&str>, points| GridArgs {
+            start: start.map(String::from),
+            stop: stop.map(String::from),
+            points,
+        };
+        let cal: Vec<u64> = (0..201).map(|i| 1_000_000 + i * 245_000).collect();
+        let none = grid(None, None, None);
+        assert!(none.is_empty());
+        let c = none.config(None).unwrap();
+        assert_eq!((c.start_hz, c.stop_hz(), c.points), (1_000_000, 30_000_000, 101));
+        let c = none.config(Some(&cal)).unwrap();
+        assert_eq!((c.start_hz, c.step_hz, c.points), (1_000_000, 245_000, 201));
+        // one option given: the calibration's grid is not used
+        let some = grid(None, Some("50M"), None);
+        assert!(!some.is_empty());
+        let c = some.config(Some(&cal)).unwrap();
+        assert_eq!((c.start_hz, c.stop_hz(), c.points), (1_000_000, 50_000_000, 101));
+        assert!(grid(Some("2M"), Some("1M"), None).config(None).is_err());
+        assert!(grid(Some("soon"), None, None).config(None).is_err());
+    }
+
+    #[test]
+    fn kit_options_change_only_what_they_name() {
+        let cli = parse(&["cal", "kit", "--file", "x.json", "--open-c", "55", "--load-r", "49.5"]).unwrap();
+        let Cmd::Cal { kit, .. } = cli.cmd else { panic!() };
+        assert!(!kit.is_empty());
+        let mut k = CalKit::ideal();
+        kit.apply_to(&mut k);
+        assert!((k.open_c0() - 55e-15).abs() < 1e-20);
+        assert_eq!(k.short, CalKit::ideal().short);
+        let Cmd::Cal { kit, .. } = parse(&["cal", "show", "--file", "x.json"]).unwrap().cmd else {
+            panic!()
+        };
+        assert!(kit.is_empty());
+    }
+
+    #[test]
+    fn an_option_for_another_action_is_refused_before_anything_happens() {
+        let dir = scratch("cal-options");
+        let file = dir.join("c.json");
+        let file = file.to_str().unwrap();
+        assert!(refused(&["cal", "show", "--file", file, "--open-c", "55"]).contains("belong to `cal kit`"));
+        assert!(refused(&["cal", "show", "--file", file, "--note", "x"]).contains("--note"));
+        assert!(refused(&["cal", "show", "--file", file, "--points", "11"]).contains("--start/--stop/--points"));
+        assert!(refused(&["cal", "open", "--file", file, "--apply"]).contains("cal fit"));
+        // and without them, the file that is not there is what is wrong
+        assert!(refused(&["cal", "show", "--file", file]).contains("does not exist"));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn cal_clear_removes_a_file_that_no_longer_reads() {
+        let dir = scratch("cal-clear");
+        let file = dir.join("broken.json");
+        fs::write(&file, "not a calibration").unwrap();
+        let path = file.to_str().unwrap();
+        assert!(refused(&["cal", "show", "--file", path]).contains("JSON"));
+        run_with(parse(&["cal", "clear", "--file", path]).unwrap()).unwrap();
+        assert!(!file.exists());
+        // nothing to remove is not an error
+        run_with(parse(&["cal", "clear", "--file", path]).unwrap()).unwrap();
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn what_is_wrong_with_the_options_is_said_before_the_sweep() {
+        // Each of these would otherwise go on to open the port.
+        assert!(refused(&["sweep", "--gate", "1:x"]).contains("--gate"));
+        assert!(refused(&["sweep", "--gate", "1:2", "--vf", "3"]).contains("--vf"));
+        assert!(refused(&["sweep", "--port-extension", "nan"]).contains("--port-extension"));
+        assert!(refused(&["tdr", "--vf", "0"]).contains("--vf"));
+        assert!(refused(&["tdr", "--window", "round"]).contains("window"));
+        assert!(refused(&["--json", "sweep", "--csv", "-"]).contains("stdout"));
+        assert!(refused(&["--json", "tdr", "--csv", "-"]).contains("stdout"));
+        // --vf is only read with a gate: without one a sweep gets as far as the port
+        assert!(!refused(&["sweep", "--vf", "3"]).contains("--vf"));
+    }
+
+    #[test]
+    fn a_closed_pipe_is_told_from_other_errors() {
+        let pipe = || io::Error::new(io::ErrorKind::BrokenPipe, "gone");
+        assert!(is_closed_pipe(&anyhow::Error::from(pipe())));
+        assert!(is_closed_pipe(&anyhow::Error::from(litevna::Error::Io(pipe())).context("writing")));
+        assert!(!is_closed_pipe(&anyhow::Error::from(io::Error::other("disk full"))));
+        assert!(!is_closed_pipe(&anyhow::anyhow!("no VNA found")));
+    }
 }

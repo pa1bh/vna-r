@@ -136,9 +136,11 @@ fn continuous_sweeping_goes_on_until_stop() {
 
 #[test]
 fn a_display_sweep_cuts_a_running_one_short() {
-    // 4001 points at 5000 points/s: 0.8 s, the first block after 51 ms.
+    // 60001 points at 5000 points/s: 12 s, the first block after 51 ms. Long,
+    // so that a test machine that stalls for a second still sends the second
+    // sweep while the first one runs; the test itself takes a block or two.
     let w = connect("5000");
-    w.send(sweep(vec![lin(1_000_000, 30_000_000, 4001)], Purpose::Display, false, 1));
+    w.send(sweep(vec![lin(1_000_000, 31_000_000, 60001)], Purpose::Display, false, 1));
     until(&w, |e| matches!(e, Event::Progress { .. }));
     let short = vec![lin(7_000_000, 7_200_000, 21)];
     w.send(sweep(short.clone(), Purpose::Display, false, 1));

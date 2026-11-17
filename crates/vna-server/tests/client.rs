@@ -225,8 +225,10 @@ fn a_server_on_another_protocol_version_is_refused() {
 #[test]
 fn a_client_that_says_nothing_is_kept_alive_by_the_pings() {
     let mut c = Config::new("127.0.0.1:0".parse().unwrap(), DeviceChoice::Simulator(Some(0.0)));
-    c.ping_every = Duration::from_millis(50);
-    c.silent_for = Duration::from_millis(300);
+    // A second of silence, not less: the handle answers a ping at once, but a
+    // test machine that stalls for longer than the limit would lose it too.
+    c.ping_every = Duration::from_millis(100);
+    c.silent_for = Duration::from_secs(1);
     let s = Server::start(c).unwrap();
     let h = handle();
     h.send(Cmd::Connect(url(s.local_addr())));
@@ -235,9 +237,10 @@ fn a_client_that_says_nothing_is_kept_alive_by_the_pings() {
     let mute = TcpStream::connect(s.local_addr()).unwrap();
     let (_mute, _) = tungstenite::client(url(s.local_addr()), mute).unwrap();
     eventually("both are there", || s.clients() == 2);
-    // Several times the limit: only time can tell.
-    thread::sleep(Duration::from_millis(1200));
-    assert_eq!(s.clients(), 1, "the mute client is let go, the handle is not");
+    eventually("the mute client is let go", || s.clients() == 1);
+    // And the handle is not, a limit and a half later: only time can tell.
+    thread::sleep(Duration::from_millis(1500));
+    assert_eq!(s.clients(), 1, "the handle is still there");
     let mut seen = Vec::new();
     while let Some(e) = h.try_recv() {
         seen.push(e);

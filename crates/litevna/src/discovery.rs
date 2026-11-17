@@ -90,3 +90,54 @@ pub fn find_vna_port() -> crate::Result<Option<String>> {
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn usb(vid: u16, pid: u16, product: Option<&str>) -> PortCandidate {
+        PortCandidate {
+            path: "/dev/ttyACM0".into(),
+            usb: Some(UsbPortInfo {
+                vid,
+                pid,
+                serial_number: None,
+                manufacturer: None,
+                product: product.map(String::from),
+            }),
+        }
+    }
+
+    #[test]
+    fn the_usb_ids_say_which_protocol_to_expect() {
+        // the ids of linux/70-litevna.rules
+        assert_eq!(usb(0x04B4, 0x0008, None).kind(), Some(Kind::LiteVna));
+        assert_eq!(usb(0x04B4, 0x0008, Some("anything")).kind(), Some(Kind::LiteVna));
+        // An STM32 virtual COM port is a NanoVNA when it says so or says nothing.
+        assert_eq!(usb(0x0483, 0x5740, None).kind(), Some(Kind::NanoVnaShell));
+        assert_eq!(usb(0x0483, 0x5740, Some("NanoVNA-F")).kind(), Some(Kind::NanoVnaShell));
+        assert_eq!(usb(0x0483, 0x5740, Some("tinyVNA")).kind(), Some(Kind::NanoVnaShell));
+        assert_eq!(usb(0x0483, 0x5740, Some("STM32 Virtual ComPort")).kind(), None);
+        // one id right is not enough
+        assert_eq!(usb(0x04B4, 0x5740, None).kind(), None);
+        assert_eq!(usb(0x0483, 0x0008, None).kind(), None);
+        assert!(usb(0x04B4, 0x0008, None).looks_like_vna());
+        assert!(!usb(0x1A86, 0x7523, Some("USB Serial")).looks_like_vna());
+    }
+
+    #[test]
+    fn a_port_that_is_not_usb_is_no_analyser() {
+        let p = PortCandidate {
+            path: "/dev/ttyS0".into(),
+            usb: None,
+        };
+        assert_eq!(p.kind(), None);
+        assert!(!p.looks_like_vna());
+    }
+
+    #[test]
+    fn the_protocols_have_a_name() {
+        assert_eq!(Kind::LiteVna.name(), "LiteVNA");
+        assert_eq!(Kind::NanoVnaShell.name(), "NanoVNA");
+    }
+}

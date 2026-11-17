@@ -1027,6 +1027,27 @@ mod tests {
         assert_eq!(vna.battery_millivolts().unwrap(), 4123);
     }
 
+    /// The handle the CLI and the GUI hold, over a LiteVNA.
+    #[test]
+    fn the_vna_handle_over_a_litevna() {
+        use crate::vna::{Limits, Vna};
+        let (vna, _) = lite(FakeLite::new());
+        let mut v = Vna::Lite(vna);
+        assert_eq!(v.kind(), crate::discovery::Kind::LiteVna);
+        let info = v.info().unwrap();
+        assert_eq!(
+            (info.model.as_str(), info.firmware.as_str(), info.detail.as_str()),
+            ("LiteVNA", "2.2", "hw 64")
+        );
+        assert_eq!(info.limits, Limits::LITEVNA);
+        assert!(info.lite.is_some() && info.shell.is_none());
+        assert_eq!(v.battery_millivolts().unwrap(), 4123);
+        let c = cfg(300);
+        assert_eq!(v.sweep(&c, false).unwrap().freqs_hz, c.frequencies());
+        // what needs registers gets them
+        assert!(v.require_lite("peek").is_ok() && v.as_lite_mut().is_some() && v.as_shell_mut().is_none());
+    }
+
     #[test]
     fn sweep_collects_every_point_once() {
         let (mut vna, port) = lite(FakeLite::new());
