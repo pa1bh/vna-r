@@ -12,12 +12,28 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
-### Fixed
+## [0.4.1] - 2026-11-17
 
-Found by reading the code through. Tried on 17 November with a LiteVNA 67 on a Mac and a
-NanoVNA-F behind a Raspberry Pi, as far as that goes without moving a cable or a
-standard, and with a LiteVNA 64 on Asahi Linux (S11, S21, TDR, and the cable pulled and
-put back); docs/08 says what was tried and what is left.
+A clean-up round: the whole code base read through for bugs, for places that break on
+bad input and for code and documentation that had outlived their use. No new features.
+The fixes that matter most are in `vna-server`: a client could stop its device thread
+with one command, a server whose device thread had stopped kept listening, and a server
+that stopped did not say goodbye to its clients.
+
+Tried: `vna-cli` with a LiteVNA 67 on macOS and with a NanoVNA-F on a Raspberry Pi 4;
+`vna-server` on both with a client that speaks the protocol by hand (among it the
+commands the device thread could not take, two viewers, stopping the server under a
+running sweep); the page in a browser through both servers, with **Band** and with
+Disconnect during a standard measurement. Built on Asahi Linux (Apple M1) with a
+LiteVNA 64: S11, S21, TDR, and the cable pulled and put back. The program connected to
+the server of 0.4.0 on the Pi. **Not tried**: **sweep from calibration** on the screen
+with a calibration whose end is not a round number of kHz (the fix is covered by a test
+of the text that goes into the fields, and **Band** was seen in the browser), saving a
+calibration and the references from the program's window, the archives of this release,
+whose workflow tests what it builds for the first time, and Windows with a device.
+docs/08 has the log.
+
+### Fixed
 
 - `vna-server`: a sweep command a client sends is checked before it reaches the device
   thread. A command with an absurd number of passes stopped that thread, one without
@@ -663,7 +679,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.1
 [0.4.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.0
 [0.3.6]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.6
 [0.3.5]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.5

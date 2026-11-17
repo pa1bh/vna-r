@@ -2174,7 +2174,7 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 
 [[package]]
 name = "litevna"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "num-complex",
  "rustfft",
@@ -4136,7 +4136,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vna-cli"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4148,7 +4148,7 @@ dependencies = [
 
 [[package]]
 name = "vna-gui"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "eframe",
  "egui",
@@ -4168,7 +4168,7 @@ dependencies = [
 
 [[package]]
 name = "vna-link"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64",
  "ewebsock",
@@ -4184,7 +4184,7 @@ dependencies = [
 
 [[package]]
 name = "vna-server"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "clap",
  "ctrlc",

@@ -1,6 +1,6 @@
 # Roadmap
 
-Stand: 2026-11-17, versie 0.4.0. Dit document is in drie lagen gegroeid: de twaalf
+Stand: 2026-11-17, versie 0.4.1. Dit document is in drie lagen gegroeid: de twaalf
 stappen van 4 november, de werklijst van 10 november en de werklijst van 13 november. Wat
 gedaan is blijft staan als geschiedenis. **Open staat nu:**
 
@@ -374,7 +374,7 @@ De kleine punten (S) zijn op 13 november gedaan, elk in een eigen commit, onder
 | 70 | Knop **sweep from calibration** in het calibratiepaneel: start, stop en punten op het raster van de calibratie en toepassen; wens van PA1BH | S | gedaan 2026-11-13 |
 | 71 | **Band** in het sweeppaneel: start en stop op een amateurband met 10 % marge, sweep toepassen; bandentabel voor IARU-regio 2 en een regiokeuze onder View ▸ Amateur bands; wens van Steve Falco (groups.io) | S | gedaan 2026-11-13 |
 | 72 | Meten via het netwerk: `vna-server` deelt een analyzer aan USB (een Raspberry Pi bijvoorbeeld), de browserbouw en het programma verbinden ermee over een WebSocket; een gesimuleerd apparaat om zonder analyzer te werken. Ontwerp in [docs/10](10-client-server.md), wens van PA1BH | L | gedaan 2026-11-16 en uitgebracht in 0.4.0; wat met apparaten gezien is en wat niet staat in [docs/08](08-qc-procedure.md) "Ronde client/server" |
-| 73 | Schoonmaak- en duurzaamheidsronde: de hele codebase doorgelezen op bugs, zwakke plekken, overbodige code en verouderde documentatie. Bugs hersteld (onder meer een `Sweep` van een client die de server kon stilleggen, **sweep from calibration** die een ander raster gaf, bestanden die niet geflusht werden), calibratiebestanden worden in één stap vervangen, dode code en verouderde commentaren weg, de documenten bijgewerkt, CI en release strenger (oudste Rust getest, `--locked`, een release test wat hij bouwt en faalt niet meer stil). Wat het was staat onder *Unreleased* in de CHANGELOG | M | gedaan 2026-11-17 op leeswerk en tests, zonder analyzer; nog niet uitgebracht. Wat bewust bleef staan: de protocolfuncties van de driver (punt 30). De gewijzigde workflows hebben nog niet op GitHub gedraaid |
+| 73 | Schoonmaak- en duurzaamheidsronde: de hele codebase doorgelezen op bugs, zwakke plekken, overbodige code en verouderde documentatie. Bugs hersteld (onder meer een `Sweep` van een client die de server kon stilleggen, **sweep from calibration** die een ander raster gaf, bestanden die niet geflusht werden), calibratiebestanden worden in één stap vervangen, dode code en verouderde commentaren weg, de documenten bijgewerkt, CI en release strenger (oudste Rust getest, `--locked`, een release test wat hij bouwt en faalt niet meer stil). Wat het was staat onder *Unreleased* in de CHANGELOG | M | gedaan 2026-11-17 op leeswerk en tests, daarna met drie analyzers geprobeerd (docs/08, "Ronde schoonmaak"); uitgebracht in 0.4.1. Wat bewust bleef staan: de protocolfuncties van de driver (punt 30). De gewijzigde `release.yml` draait bij 0.4.1 voor het eerst |
 
 ## Open
 
