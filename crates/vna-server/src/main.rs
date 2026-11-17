@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::channel;
+use std::thread;
 
 use clap::Parser;
 use vna_server::{Config, DeviceChoice, Server};
@@ -81,21 +82,34 @@ fn run(cli: Cli) -> Result<(), String> {
     }
     config.web_dir = cli.web;
     log::info!("vna-server {VERSION}, \"{}\"", config.name);
-    let server = Server::start(config).map_err(|e| format!("starting on {listen}: {e}"))?;
+    let mut server = Server::start(config).map_err(|e| format!("starting on {listen}: {e}"))?;
 
     // Ctrl-C, or SIGTERM from `systemctl stop`: let go of the device first,
     // so that a LiteVNA gets its screen back. A second one does not wait.
-    let (tx, rx) = channel();
+    let (tx, rx) = channel::<Option<String>>();
     let asked = AtomicBool::new(false);
+    // A server that cannot measure any more stops too, with an error:
+    // systemd (`Restart=on-failure`) then starts a fresh one.
+    if let Some(fatal) = server.fatal() {
+        let tx = tx.clone();
+        thread::spawn(move || {
+            if let Ok(why) = fatal.recv() {
+                let _ = tx.send(Some(why));
+            }
+        });
+    }
     ctrlc::set_handler(move || {
         if asked.swap(true, Ordering::SeqCst) {
             std::process::exit(130);
         }
-        let _ = tx.send(());
+        let _ = tx.send(None);
     })
     .map_err(|e| format!("installing the signal handler: {e}"))?;
-    let _ = rx.recv();
+    let failed = rx.recv().ok().flatten();
     server.shutdown();
     log::info!("stopped");
-    Ok(())
+    match failed {
+        Some(why) => Err(why),
+        None => Ok(()),
+    }
 }

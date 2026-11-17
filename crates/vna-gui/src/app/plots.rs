@@ -37,8 +37,11 @@ pub(super) fn write_references(dir: &Path, references: &[Reference]) -> std::io:
         let path = reference_file(dir, k);
         match references.get(k) {
             Some(r) => {
-                let f = std::io::BufWriter::new(std::fs::File::create(&path)?);
-                write_s2p(f, &r.sweep, Some(&format!("vna-r reference: {}", r.name)))?;
+                // In one step: a truncated file would end the list at the
+                // next start, and the references behind it with it.
+                let mut text = Vec::new();
+                write_s2p(&mut text, &r.sweep, Some(&format!("vna-r reference: {}", r.name)))?;
+                litevna::atomic::write(&path, text)?;
             }
             None if path.exists() => std::fs::remove_file(&path)?,
             None => {}
@@ -124,7 +127,6 @@ impl App {
         }
     }
 
-    /// The sweep the frequency view works on: `shown`, with S11 gated when the gate is on.
     /// What the frequency view shows: the shown sweep, with S11 time-gated
     /// when the gate is on. A copy without the raw FIFO records, which no
     /// view or export needs.

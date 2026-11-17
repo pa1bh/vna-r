@@ -31,7 +31,7 @@ use crate::device::{Screenshot, SweepConfig, SweepProgress, SweepResult};
 use crate::error::{Error, Result};
 
 /// The shell prompt that terminates every reply.
-pub const PROMPT: &[u8] = b"ch> ";
+pub(crate) const PROMPT: &[u8] = b"ch> ";
 /// Largest `points` the firmware accepts in one `scan` ("sweep points exceeds range 301").
 pub const MAX_SCAN_POINTS: u16 = 301;
 
@@ -76,7 +76,7 @@ pub struct ShellInfo {
 }
 
 /// Parse the reply of `info` (`Key: value` lines).
-pub fn parse_info(text: &str) -> ShellInfo {
+pub(crate) fn parse_info(text: &str) -> ShellInfo {
     let mut info = ShellInfo {
         raw: text.trim().to_string(),
         ..Default::default()
@@ -95,7 +95,7 @@ pub fn parse_info(text: &str) -> ShellInfo {
 }
 
 /// Screen size of the known models (`capture` sends no header).
-pub fn screen_size_for_model(model: &str) -> Option<(u16, u16)> {
+pub(crate) fn screen_size_for_model(model: &str) -> Option<(u16, u16)> {
     let m = model.to_ascii_lowercase();
     if m.contains("nanovna-f") {
         Some((800, 480))
@@ -109,7 +109,7 @@ pub fn screen_size_for_model(model: &str) -> Option<(u16, u16)> {
 }
 
 /// Split a sweep into chunks of at most `max_points` on the same grid.
-pub fn scan_chunks(cfg: &SweepConfig, max_points: u16) -> Vec<SweepConfig> {
+pub(crate) fn scan_chunks(cfg: &SweepConfig, max_points: u16) -> Vec<SweepConfig> {
     let max = max_points.max(1) as u32;
     let n = cfg.points as u32;
     let mut out = Vec::new();
@@ -130,14 +130,14 @@ pub fn scan_chunks(cfg: &SweepConfig, max_points: u16) -> Vec<SweepConfig> {
 
 /// One point of a decoded `scan_bin` block.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct ScanPoint {
+pub(crate) struct ScanPoint {
     pub freq_hz: Option<u32>,
     pub s11: Option<Complex64>,
     pub s21: Option<Complex64>,
 }
 
 /// Bytes per point for a mask.
-pub fn point_size(mask: u16) -> usize {
+pub(crate) fn point_size(mask: u16) -> usize {
     let mut n = 0;
     if mask & mask::FREQ != 0 {
         n += 4;
@@ -152,7 +152,7 @@ pub fn point_size(mask: u16) -> usize {
 }
 
 /// Decode the 4-byte header of a `scan_bin` reply: `(mask, points)`.
-pub fn parse_scan_header(header: &[u8; 4]) -> (u16, u16) {
+pub(crate) fn parse_scan_header(header: &[u8; 4]) -> (u16, u16) {
     (
         u16::from_le_bytes([header[0], header[1]]),
         u16::from_le_bytes([header[2], header[3]]),
@@ -160,7 +160,7 @@ pub fn parse_scan_header(header: &[u8; 4]) -> (u16, u16) {
 }
 
 /// Decode the point block of a `scan_bin` reply for `mask` (as sent in the header).
-pub fn parse_scan_points(mask: u16, points: u16, data: &[u8]) -> Result<Vec<ScanPoint>> {
+pub(crate) fn parse_scan_points(mask: u16, points: u16, data: &[u8]) -> Result<Vec<ScanPoint>> {
     let per = point_size(mask);
     let need = per * points as usize;
     if data.len() != need {
@@ -546,6 +546,7 @@ impl NanoVnaShell {
     /// [`NanoVnaShell::sweep`] that reports progress and can be stopped
     /// between chunks, see [`SweepProgress`].
     pub fn sweep_with(&mut self, cfg: &SweepConfig, progress: SweepProgress<'_>) -> Result<SweepResult> {
+        cfg.validate()?;
         if self.saved_sweep.is_none() {
             self.saved_sweep = Some(self.sweep_settings()?);
             // After raw scans the NanoVNA-F 1.0.4 showed an uncalibrated trace on screen

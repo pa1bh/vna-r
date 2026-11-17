@@ -263,6 +263,49 @@ fn the_last_client_leaving_stops_the_device() {
 }
 
 #[test]
+fn a_sweep_the_worker_could_not_take_is_refused_and_the_server_lives_on() {
+    let s = server(0.0);
+    let mut a = Client::ready(s.local_addr());
+    let refused = |a: &mut Client, text: &str| {
+        a.ws.send(Message::Text(text.into())).unwrap();
+        match a.event() {
+            Event::Error { msg, stops_sweep } => {
+                assert!(msg.contains("does not take this"), "{msg}");
+                assert!(stops_sweep);
+            }
+            other => panic!("{text}: {other:?}"),
+        }
+    };
+    let cfg = r#"{"start_hz":1000000,"step_hz":1000,"points":11,"values_per_freq":1,"calibrated":false}"#;
+    // more passes than memory holds
+    refused(
+        &mut a,
+        &format!(r#"{{"sweep":{{"cfgs":[{cfg}],"purpose":"display","continuous":false,"repeat":18446744073709551615}}}}"#),
+    );
+    // nothing to sweep, for ever
+    refused(&mut a, r#"{"sweep":{"cfgs":[],"purpose":"display","continuous":true,"repeat":1}}"#);
+    // no points, and a grid past the end of the numbers
+    refused(
+        &mut a,
+        &format!(
+            r#"{{"sweep":{{"cfgs":[{}],"purpose":"display","continuous":false,"repeat":1}}}}"#,
+            cfg.replace(r#""points":11"#, r#""points":0"#)
+        ),
+    );
+    refused(
+        &mut a,
+        &format!(
+            r#"{{"sweep":{{"cfgs":[{}],"purpose":"display","continuous":false,"repeat":1}}}}"#,
+            cfg.replace("1000000", "18446744073709551615")
+        ),
+    );
+    // and the device still measures
+    a.send(sweep(11, Purpose::Display, false));
+    assert!(a.until(is_done).iter().any(is_done));
+    s.shutdown();
+}
+
+#[test]
 fn a_message_that_does_not_read_gets_an_error_and_the_connection_lives_on() {
     let s = server(0.0);
     let mut a = Client::ready(s.local_addr());

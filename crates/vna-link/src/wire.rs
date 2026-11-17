@@ -37,6 +37,11 @@ use crate::{Cmd, Event, Purpose};
 /// Raised for every change an older peer would misread; see the module documentation.
 pub const PROTOCOL_VERSION: u32 = 1;
 
+/// The most segments in one sweep, and the most passes averaged into one,
+/// that a server takes from a client. Well above what the GUI asks for.
+pub const MAX_SEGMENTS: usize = 64;
+pub const MAX_REPEAT: usize = 1024;
+
 /// The first message of a server on every connection.
 ///
 /// Its JSON form starts `{"hello":{"protocol":N` in every version, so that
@@ -237,6 +242,24 @@ impl ClientMsg {
 
     pub fn decode(text: &str) -> Result<ClientMsg, Error> {
         serde_json::from_str(text).map_err(malformed)
+    }
+
+    /// What the worker takes for granted about a command, and the GUI
+    /// guarantees: one from the network is checked before it gets there.
+    pub fn check(&self) -> Result<(), String> {
+        let ClientMsg::Sweep { cfgs, repeat, .. } = self else {
+            return Ok(());
+        };
+        if cfgs.is_empty() {
+            return Err("a sweep without segments".into());
+        }
+        if cfgs.len() > MAX_SEGMENTS {
+            return Err(format!("a sweep of {} segments, at most {MAX_SEGMENTS}", cfgs.len()));
+        }
+        if *repeat > MAX_REPEAT {
+            return Err(format!("a sweep repeated {repeat} times, at most {MAX_REPEAT}"));
+        }
+        cfgs.iter().try_for_each(|c| c.validate().map_err(|e| e.to_string()))
     }
 }
 

@@ -147,10 +147,10 @@ fn parse(buf: &[u8]) -> Head {
     let mut r = httparse::Request::new(&mut headers);
     match r.parse(buf) {
         Ok(httparse::Status::Complete(_)) => {}
-        Ok(httparse::Status::Partial) | Err(httparse::Error::TooManyHeaders) => {
-            return Head::Refuse(431, "request head too large");
-        }
-        Err(_) => return Head::Refuse(400, "not an HTTP request"),
+        Err(httparse::Error::TooManyHeaders) => return Head::Refuse(431, "request head too large"),
+        // The head was read up to its blank line, and its size checked, by
+        // `read_head`: one that still is not complete began with blank lines.
+        Ok(httparse::Status::Partial) | Err(_) => return Head::Refuse(400, "not an HTTP request"),
     }
     let head_only = match r.method {
         Some("GET") => false,
@@ -311,7 +311,7 @@ fn websocket(stream: Replay, peer: SocketAddr, origin: Option<String>, shared: &
     // Gone from the hub before the client hears the close reply: whoever
     // connects after that finds the hub without this client.
     let (ack, acked) = channel();
-    if shared.hub.send(ToHub::Leave { id, why, ack: Some(ack) }).is_ok() {
+    if shared.hub.send(ToHub::Leave { id, why, ack }).is_ok() {
         let _ = acked.recv_timeout(Duration::from_secs(2));
     }
     if closed_by_peer {
@@ -348,5 +348,6 @@ mod tests {
         assert!(!r.upgrade && !r.head_only);
         assert!(matches!(parse(b"POST / HTTP/1.1\r\n\r\n"), Head::Refuse(405, _)));
         assert!(matches!(parse(b"\x00\x01\x02\r\n\r\n"), Head::Refuse(400, _)));
+        assert!(matches!(parse(b"\r\n\r\nGET / HTTP/1.1\r\n"), Head::Refuse(400, _)));
     }
 }

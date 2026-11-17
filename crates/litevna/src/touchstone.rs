@@ -1,5 +1,5 @@
-//! Touchstone v1 `.s2p` export (Hz, real/imaginary, 50 Ω) and import of
-//! `.s1p` / `.s2p` files in any of the v1 formats.
+//! Touchstone v1 `.s1p` and `.s2p` export (Hz, real/imaginary, 50 Ω), CSV
+//! export, and import of `.s1p` / `.s2p` files in any of the v1 formats.
 //!
 //! The LiteVNA measures S11 and S21 only; S12 and S22 are written as zero so
 //! the file stays a valid two-port file that every tool accepts.
@@ -112,7 +112,7 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
         Some(2) => 9,
         Some(n) => return Err(Error::parse(None, format!("{n}-port files are not supported"))),
         None => {
-            if tokens.len().is_multiple_of(9) && tokens.len().is_multiple_of(3) && looks_like_two_port(&tokens) {
+            if tokens.len().is_multiple_of(9) && looks_like_two_port(&tokens) {
                 9
             } else if tokens.len().is_multiple_of(3) {
                 3
@@ -156,6 +156,15 @@ pub fn read_touchstone_full<R: BufRead>(r: R, ports: Option<usize>) -> Result<To
         for g in &mut s11 {
             *g = renormalise_gamma(*g, z0, 50.0);
         }
+    }
+    // The numbers in the file are finite, what they stand for need not be:
+    // 7000 dB is not a magnitude, and Γ = -1 against another reference
+    // impedance than the file's can divide by zero.
+    if s11.iter().chain(&s21).any(|v| !v.is_finite()) {
+        return Err(Error::parse(
+            None,
+            "a value in the file is too large to be an S-parameter".to_string(),
+        ));
     }
     Ok(TouchstoneFile {
         sweep: SweepResult {
@@ -252,7 +261,8 @@ pub fn write_s2p<W: Write>(mut w: W, sweep: &SweepResult, comment: Option<&str>)
             sweep.freqs_hz[i], s11.re, s11.im, s21.re, s21.im
         )?;
     }
-    Ok(())
+    // A buffered writer would otherwise swallow a failing last write when it is dropped.
+    w.flush()
 }
 
 /// Write the reflection of a sweep as a one-port Touchstone file (`.s1p`):
@@ -274,7 +284,8 @@ pub fn write_s1p<W: Write>(mut w: W, sweep: &SweepResult, comment: Option<&str>)
         let s11 = sweep.s11[i];
         writeln!(w, "{} {:.9e} {:.9e}", sweep.freqs_hz[i], s11.re, s11.im)?;
     }
-    Ok(())
+    // A buffered writer would otherwise swallow a failing last write when it is dropped.
+    w.flush()
 }
 
 /// Half-width in points of the group-delay difference in the CSV export.
@@ -314,12 +325,11 @@ pub fn write_csv<W: Write>(mut w: W, sweep: &SweepResult) -> std::io::Result<()>
             group_delay.get(i).copied().unwrap_or(0.0) * 1e9,
         )?;
     }
-    Ok(())
+    // A buffered writer would otherwise swallow a failing last write when it is dropped.
+    w.flush()
 }
 
-// `db` and `swr` live in [`crate::traces`] with the other derived quantities;
-// re-exported here because the CSV writer uses them and callers imported them from this module.
-pub use crate::traces::{db, swr};
+use crate::traces::{db, swr};
 
 #[cfg(test)]
 mod tests {
@@ -375,6 +385,30 @@ mod tests {
         assert!(err.to_string().contains("not a finite number"), "{err}");
         let err = read_touchstone("# MHz S RI R 50\n1 0.5 0.0\n1 0.4 0.0\n2 0.3 0.0\n".as_bytes(), Some(1)).unwrap_err();
         assert_eq!(err.to_string(), "frequency 1000000 Hz appears more than once");
+        // finite numbers that stand for something that is not
+        let err = read_touchstone("# MHz S DB R 50\n1 7000 0\n".as_bytes(), Some(1)).unwrap_err();
+        assert!(err.to_string().contains("too large"), "{err}");
+        let err = read_touchstone("# MHz S RI R 75\n1 -5 0\n".as_bytes(), Some(1)).unwrap_err();
+        assert!(err.to_string().contains("too large"), "{err}");
+    }
+
+    /// A buffered writer holds the last lines until it is flushed: a disk
+    /// that is full shows there, not in a `writeln!`.
+    #[test]
+    fn a_write_that_fails_at_the_end_is_reported() {
+        struct Full;
+        impl Write for Full {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::Error::other("disk full"))
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let big = || std::io::BufWriter::with_capacity(1 << 20, Full);
+        assert!(write_s2p(big(), &sample(), None).is_err());
+        assert!(write_s1p(big(), &sample(), None).is_err());
+        assert!(write_csv(big(), &sample()).is_err());
     }
 
     #[test]

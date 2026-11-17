@@ -11,12 +11,12 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use vna_link::wire::{self, ClientMsg, Hello, ServerMsg};
-use vna_link::{Cmd, Event, Options, Purpose, SIMULATOR};
+use vna_link::{Cmd, Event, Options, Purpose, CONNECT_FAILED, SIMULATOR};
 
 use crate::{Config, DeviceChoice, PortCheck, VERSION};
 
@@ -35,13 +35,16 @@ pub(crate) enum ToHub {
     Leave {
         id: u64,
         why: String,
-        ack: Option<Sender<()>>,
+        ack: Sender<()>,
     },
     Message {
         id: u64,
         msg: Result<ClientMsg, wire::Error>,
     },
     Event(Event),
+    /// The worker thread ended while the hub still held its command channel:
+    /// it panicked. Nothing can be measured any more.
+    WorkerGone,
     /// Let go of the device, then answer.
     Shutdown(Sender<()>),
 }
@@ -56,10 +59,6 @@ const RETRY_FIRST: Duration = Duration::from_secs(5);
 const RETRY_MAX: Duration = Duration::from_secs(60);
 /// How long shutting down waits for the worker to let go of the device.
 const RELEASE_FOR: Duration = Duration::from_secs(5);
-
-/// The prefix of the worker's error when `Cmd::Connect` fails
-/// (`fail(&format!("connecting to {port}"), e)` in the worker).
-const CONNECT_FAILED: &str = "connecting to ";
 
 /// How a queued message is treated when a client falls behind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,7 +88,7 @@ impl Outbox {
     /// Queue a message; `false` when the client is too far behind, which
     /// closes the outbox.
     pub(crate) fn push(&self, kind: Kind, text: Arc<str>) -> bool {
-        let mut q = self.queue.lock().expect("outbox");
+        let mut q = self.queue.lock().unwrap_or_else(PoisonError::into_inner);
         if q.closed {
             return true;
         }
@@ -116,7 +115,7 @@ impl Outbox {
     /// What is waiting, and whether the hub has closed the outbox (after
     /// which nothing more comes).
     pub(crate) fn take(&self) -> (Vec<Arc<str>>, bool) {
-        let mut q = self.queue.lock().expect("outbox");
+        let mut q = self.queue.lock().unwrap_or_else(PoisonError::into_inner);
         q.bytes = 0;
         let items = q.items.drain(..).map(|(_, t)| t).collect();
         (items, q.closed)
@@ -124,7 +123,7 @@ impl Outbox {
 
     /// No more messages; those queued are still delivered.
     pub(crate) fn close(&self) {
-        self.queue.lock().expect("outbox").closed = true;
+        self.queue.lock().unwrap_or_else(PoisonError::into_inner).closed = true;
     }
 }
 
@@ -147,7 +146,8 @@ enum DeviceState {
 
 /// Start the worker, the forwarder and the hub.
 /// The number is that of the clients connected, kept up to date by the hub.
-pub(crate) fn start(config: &Config) -> (Sender<ToHub>, Arc<AtomicUsize>) {
+/// `fatal` hears it when the server can no longer do its work.
+pub(crate) fn start(config: &Config, fatal: Sender<String>) -> (Sender<ToHub>, Arc<AtomicUsize>) {
     let (tx, rx) = channel();
     let (commands, events) = vna_link::spawn_worker(
         // The forwarder below blocks on the events, it needs no wake-up.
@@ -164,9 +164,12 @@ pub(crate) fn start(config: &Config) -> (Sender<ToHub>, Arc<AtomicUsize>) {
         .spawn(move || {
             for e in events {
                 if forward.send(ToHub::Event(e)).is_err() {
-                    break;
+                    return;
                 }
             }
+            // The events end when the worker does. On a shutdown the hub is
+            // gone by then and this goes nowhere.
+            let _ = forward.send(ToHub::WorkerGone);
         })
         .expect("spawn forwarder thread");
     let disconnected: Arc<str> = ServerMsg::Event(Event::Disconnected).encode().into();
@@ -189,6 +192,8 @@ pub(crate) fn start(config: &Config) -> (Sender<ToHub>, Arc<AtomicUsize>) {
         device_line: disconnected,
         continuous: false,
         last_sweep: None,
+        fatal,
+        worker_gone: false,
     };
     thread::Builder::new()
         .name("hub".into())
@@ -231,16 +236,19 @@ struct Hub {
     continuous: bool,
     /// The last display sweep.
     last_sweep: Option<Arc<str>>,
+    fatal: Sender<String>,
+    worker_gone: bool,
 }
 
 impl Hub {
     fn run(mut self, rx: Receiver<ToHub>) {
         loop {
-            if self.state == DeviceState::Searching && Instant::now() >= self.next_search {
+            let searching = self.state == DeviceState::Searching && !self.worker_gone;
+            if searching && Instant::now() >= self.next_search {
                 self.search();
             }
             let wait = match self.state {
-                DeviceState::Searching => self.next_search.saturating_duration_since(Instant::now()),
+                DeviceState::Searching if searching => self.next_search.saturating_duration_since(Instant::now()),
                 _ => Duration::from_secs(1),
             };
             match rx.recv_timeout(wait) {
@@ -266,14 +274,35 @@ impl Hub {
                     log::info!("client {id} ({}) left: {why}; {} connected", c.peer, self.clients.len());
                     self.forget(id);
                 }
-                if let Some(ack) = ack {
-                    let _ = ack.send(());
-                }
+                let _ = ack.send(());
             }
             ToHub::Message { id, msg } => self.message(id, msg),
             ToHub::Event(e) => self.event(e),
+            ToHub::WorkerGone => self.worker_gone(),
             ToHub::Shutdown(_) => unreachable!("handled in run"),
         }
+    }
+
+    /// The worker panicked. Commands would go nowhere from here on, so say
+    /// so, to the clients and to whoever runs the server, instead of
+    /// looking alive.
+    fn worker_gone(&mut self) {
+        const MSG: &str = "the thread that drives the analyser stopped unexpectedly";
+        log::error!("{MSG}");
+        self.worker_gone = true;
+        self.state = DeviceState::Searching;
+        self.continuous = false;
+        self.last_sweep = None;
+        self.device_line = encode(Event::Disconnected);
+        self.broadcast(
+            Kind::Other,
+            encode(Event::Error {
+                msg: format!("the server has a problem: {MSG}"),
+                stops_sweep: true,
+            }),
+        );
+        self.broadcast(Kind::Other, self.device_line.clone());
+        let _ = self.fatal.send(MSG.to_string());
     }
 
     fn join(&mut self, id: u64, peer: SocketAddr, origin: Option<String>, outbox: Arc<Outbox>) {
@@ -327,7 +356,7 @@ impl Hub {
             Err(e) => {
                 log::warn!("client {id}: {e}");
                 self.send_to(
-                    Some(id),
+                    id,
                     encode(Event::Error {
                         msg: format!("the server could not read a message: {e}"),
                         stops_sweep: false,
@@ -340,13 +369,24 @@ impl Hub {
             // Only what asks for an answer gets one.
             if matches!(msg, ClientMsg::Sweep { .. } | ClientMsg::Screenshot) {
                 self.send_to(
-                    Some(id),
+                    id,
                     encode(Event::Error {
                         msg: "the server has no analyser connected".into(),
                         stops_sweep: true,
                     }),
                 );
             }
+            return;
+        }
+        if let Err(e) = msg.check() {
+            log::warn!("client {id}: {e}");
+            self.send_to(
+                id,
+                encode(Event::Error {
+                    msg: format!("the server does not take this: {e}"),
+                    stops_sweep: matches!(msg, ClientMsg::Sweep { .. }),
+                }),
+            );
             return;
         }
         match &msg {
@@ -442,8 +482,8 @@ impl Hub {
         }
     }
 
-    fn send_to(&mut self, id: Option<u64>, text: Arc<str>) {
-        self.send_kind_to(id, Kind::Other, text);
+    fn send_to(&mut self, id: u64, text: Arc<str>) {
+        self.send_kind_to(Some(id), Kind::Other, text);
     }
 
     fn send_kind_to(&mut self, id: Option<u64>, kind: Kind, text: Arc<str>) {
@@ -537,16 +577,20 @@ impl Hub {
         log::info!("shutting down: letting go of the device");
         let _ = self.worker.send(Cmd::Disconnect);
         let deadline = Instant::now() + RELEASE_FOR;
-        loop {
+        // Without a worker there is no answer to wait for; it dropped the device as it went.
+        while !self.worker_gone {
             match rx.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
                 Ok(ToHub::Event(Event::Disconnected)) => {
                     self.broadcast(Kind::Other, encode(Event::Disconnected));
                     break;
                 }
                 Ok(ToHub::Event(e)) => self.event(e),
-                Ok(ToHub::Leave { ack: Some(ack), .. }) => {
+                Ok(ToHub::Leave { ack, .. }) => {
                     let _ = ack.send(());
                 }
+                // Accepted just before the listener stopped: without this it
+                // would wait, pinged and all, for a hub that is gone.
+                Ok(ToHub::Join { outbox, .. }) => outbox.close(),
                 Ok(_) => {}
                 Err(_) => {
                     log::warn!("the worker did not let go of the device within {} s", RELEASE_FOR.as_secs());
@@ -570,6 +614,18 @@ mod tests {
 
     fn texts(o: &Outbox) -> Vec<String> {
         o.take().0.iter().map(|t| t.to_string()).collect()
+    }
+
+    /// The hub tells a failed connect of its own by how the worker's error
+    /// begins. Were that to change, it would wait for ever in `Connecting`.
+    #[test]
+    fn the_worker_reports_a_failed_connect_the_way_the_hub_reads_it() {
+        let (commands, events) = vna_link::spawn_worker(Arc::new(|| {}), Options::default());
+        commands.send(Cmd::Connect(format!("{SIMULATOR}not-a-rate"))).unwrap();
+        match events.recv_timeout(Duration::from_secs(10)) {
+            Ok(Event::Error { msg, .. }) => assert!(msg.starts_with(CONNECT_FAILED), "{msg}"),
+            other => panic!("{other:?}"),
+        }
     }
 
     #[test]

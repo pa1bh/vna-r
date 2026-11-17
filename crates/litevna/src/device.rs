@@ -100,6 +100,27 @@ impl SweepConfig {
         })
     }
 
+    /// What a driver takes for granted: at least one point and a last
+    /// frequency that fits. [`SweepConfig::linear`] and the other
+    /// constructors give nothing else, but the fields are public and a
+    /// config can come from a file or the network.
+    pub fn validate(&self) -> Result<()> {
+        if self.points == 0 {
+            return Err(Error::InvalidArgument("points must be > 0".into()));
+        }
+        let stop = self
+            .step_hz
+            .checked_mul(u64::from(self.points) - 1)
+            .and_then(|span| self.start_hz.checked_add(span));
+        if stop.is_none() {
+            return Err(Error::InvalidArgument(format!(
+                "a sweep from {} Hz in steps of {} Hz does not fit",
+                self.start_hz, self.step_hz
+            )));
+        }
+        Ok(())
+    }
+
     /// The last frequency; `start_hz` for a (meaningless) zero-point config
     /// rather than an underflow.
     pub fn stop_hz(&self) -> u64 {
@@ -282,9 +303,14 @@ impl SweepResult {
         let mut trimmed_mean = |pick: &dyn Fn(&SweepResult) -> Complex64| -> Complex64 {
             values.clear();
             values.extend(sweeps.iter().map(|s| pick(s)));
-            let mean = values.iter().sum::<Complex64>() / values.len() as f64;
             if drop > 0 {
-                values.sort_by(|a, b| (a - mean).norm().total_cmp(&(b - mean).norm()));
+                // The centre comes from the finite values and a non-finite one
+                // counts as the farthest: with a NaN in the mean every distance
+                // is NaN, and the glitch that most needs dropping would stay.
+                let finite = values.iter().filter(|v| v.is_finite());
+                let mean = finite.clone().sum::<Complex64>() / finite.count() as f64;
+                let far = |v: &Complex64| if v.is_finite() { (v - mean).norm() } else { f64::INFINITY };
+                values.sort_by(|a, b| far(a).total_cmp(&far(b)));
                 values.truncate(values.len() - drop);
             }
             values.iter().sum::<Complex64>() / values.len() as f64
@@ -615,9 +641,7 @@ impl LiteVna {
     /// Program the sweep. Writing these registers takes the device out of its
     /// own UI and into USB data mode; the sweep starts running immediately.
     pub fn configure_sweep(&mut self, cfg: &SweepConfig) -> Result<()> {
-        if cfg.points == 0 {
-            return Err(Error::InvalidArgument("points must be > 0".into()));
-        }
+        cfg.validate()?;
         self.reset_protocol()?;
         let mode = if cfg.calibrated { DataMode::Calibrated } else { DataMode::Usb };
         let mut bytes = Vec::with_capacity(32);
@@ -773,7 +797,7 @@ impl LiteVna {
         let width = u16::from_le_bytes([header[0], header[1]]);
         let height = u16::from_le_bytes([header[2], header[3]]);
         let bpp = header[4];
-        // The LiteVNA family sends RGB565 (16 bpp) at 320×240 to 800×480; the
+        // The LiteVNA family sends RGB565 (16 bpp), 480×320 on the 64 and 1024×600 on the 67; the
         // conversion assumes 16 bpp. Bound the allocation by the header too: a
         // garbage header (a non-LiteVNA answering the probe, a broken link)
         // could otherwise ask for u16 × u16 × 4 bytes, 17 GB.
@@ -1176,9 +1200,7 @@ mod tests {
 
     #[test]
     fn a_silent_device_times_out() {
-        let mut dev = FakeLite::new();
-        // No records at all: the device answers nothing to READFIFO.
-        dev.mem[reg::SWEEP_POINTS as usize] = 0;
+        // A device that answers nothing at all.
         struct Mute;
         impl FakeDevice for Mute {
             fn on_write(&mut self, _: &[u8], _: &mut VecDeque<u8>) {}
@@ -1307,6 +1329,15 @@ mod tests {
         // are sweeps keeps one; a lone sweep is returned as it is.
         assert_eq!(trimmed.checksum_ok, 5);
         assert_eq!(trimmed.elapsed, Duration::from_millis(50));
+        // A glitch that is not a number (a zero reference wave) is the one
+        // dropped, wherever it sits among the sweeps.
+        for at in 0..3 {
+            let mut with_nan = vec![sweep(0.10), sweep(0.12), sweep(0.11)];
+            with_nan[at].s11[1] = Complex64::new(f64::NAN, f64::NAN);
+            let t = SweepResult::average_trimmed(&with_nan, 1).unwrap();
+            assert!(t.s11[1].re.is_finite(), "NaN in sweep {at}");
+            assert!(t.s11[0].re.is_finite());
+        }
         let one_left = SweepResult::average_trimmed(&sweeps, 9).unwrap();
         assert!(one_left.s11[0].re.is_finite());
         let alone = SweepResult::average_trimmed(&sweeps[2..3], 2).unwrap();

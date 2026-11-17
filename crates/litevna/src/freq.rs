@@ -58,6 +58,26 @@ pub fn format_hz(hz: u64) -> String {
     }
 }
 
+/// A frequency as text for an input field: [`format_hz`] without the space
+/// when [`parse_hz`] reads that back as the same number, otherwise with as
+/// many decimals as it takes. `format_hz` rounds to the kHz from 1 MHz up,
+/// and a grid rebuilt from a rounded stop frequency is another grid.
+pub fn format_hz_exact(hz: u64) -> String {
+    let reads_back = |text: &str| parse_hz(text).is_ok_and(|v| v == hz);
+    let short = format_hz(hz).replace(' ', "");
+    if reads_back(&short) {
+        return short;
+    }
+    let (unit, scale, decimals) = if hz >= 1_000_000_000 { ("GHz", 1e9, 9) } else { ("MHz", 1e6, 6) };
+    let full = format!("{:.*}", decimals, hz as f64 / scale);
+    let text = format!("{}{unit}", full.trim_end_matches('0'));
+    if reads_back(&text) {
+        text
+    } else {
+        hz.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -93,6 +113,42 @@ mod tests {
         assert_eq!(parse_hz("145000000").unwrap(), 145_000_000);
         assert_eq!(parse_hz(" 6.3 g ").unwrap(), 6_300_000_000);
         assert!(parse_hz("abc").is_err());
+    }
+
+    #[test]
+    fn a_field_text_reads_back_as_the_same_frequency() {
+        // as before where three decimals are exact
+        assert_eq!(format_hz_exact(14_200_000), "14.200MHz");
+        assert_eq!(format_hz_exact(50_000), "50.000kHz");
+        assert_eq!(format_hz_exact(999), "999Hz");
+        assert_eq!(format_hz_exact(6_300_000_000), "6.300000GHz");
+        // the stop of 100 kHz to 30 MHz in 1601 points
+        assert_eq!(format_hz_exact(29_999_200), "29.9992MHz");
+        assert_eq!(format_hz_exact(1_000_001), "1.000001MHz");
+        assert_eq!(format_hz_exact(6_299_999_999), "6.299999999GHz");
+        for hz in [
+            0,
+            1,
+            999,
+            1_000,
+            1_001,
+            999_999,
+            1_000_000,
+            29_999_200,
+            123_456_789,
+            999_999_999,
+            1_000_000_001,
+            6_299_999_999,
+            9_999_999_999_999,
+        ] {
+            assert_eq!(parse_hz(&format_hz_exact(hz)).unwrap(), hz, "{}", format_hz_exact(hz));
+        }
+        let mut x: u64 = 12345;
+        for _ in 0..20_000 {
+            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let hz = (x >> 20) % 7_000_000_000;
+            assert_eq!(parse_hz(&format_hz_exact(hz)).unwrap(), hz, "{}", format_hz_exact(hz));
+        }
     }
 
     #[test]

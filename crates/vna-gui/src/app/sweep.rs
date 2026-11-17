@@ -56,8 +56,8 @@ impl App {
     pub(super) fn start_sweep(&mut self, continuous: bool) {
         if let Some(plan) = self.segment_plan() {
             self.running = continuous;
-            // The primary segment is the one without its own calibration file
-            // that came from the Sweep panel; `segment_plan` sorts, so find it.
+            // The primary segment is the one from the Sweep panel; `segment_plan`
+            // sorts, so it need not be the first of the plan.
             self.applied_primary = self.current_config();
             self.sent_plan_cals = plan.iter().map(|(_, c)| c.clone()).collect();
             let cfgs: Vec<SweepConfig> = plan.into_iter().map(|(c, _)| c).collect();
@@ -162,7 +162,7 @@ impl App {
             ui.horizontal(|ui| {
                 if ui.small_button("+ segment").clicked() {
                     let start = self.extra_segments.last().map(|s| s.stop.clone()).unwrap_or_else(|| self.stop.clone());
-                    let stop = format_hz(self.device_max_hz()).replace(' ', "");
+                    let stop = format_hz_exact(self.device_max_hz());
                     self.extra_segments.push(SegmentSettings { start, stop, points: 1001, cal_file: None });
                 }
                 if ui
@@ -200,7 +200,7 @@ impl App {
         }
         match log_segment_edges(lo, hi, all.len()) {
             Ok(edges) => {
-                let text = |hz: u64| format_hz(hz).replace(' ', "");
+                let text = format_hz_exact;
                 self.start = text(edges[0].0);
                 self.stop = text(edges[0].1);
                 for (seg, (a, b)) in self.extra_segments.iter_mut().zip(&edges[1..]) {

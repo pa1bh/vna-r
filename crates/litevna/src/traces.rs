@@ -249,7 +249,21 @@ pub fn swr_clamped(mag: f64, max: f64) -> f64 {
 
 /// Unwrap a phase sequence (radians) so consecutive samples never jump by
 /// more than π.
-pub fn unwrap_phase(phase_rad: &[f64]) -> Vec<f64> {
+/// A point between two phasors, `t` of the way from `a` to `b`: magnitude
+/// and phase each interpolated, the phase along the shorter arc. Unlike a
+/// straight line between the two it keeps the magnitude when the phase turns.
+pub fn interpolate_polar(a: C64, b: C64, t: f64) -> C64 {
+    let mag = a.norm() * (1.0 - t) + b.norm() * t;
+    let mut dphi = b.arg() - a.arg();
+    if dphi > PI {
+        dphi -= 2.0 * PI;
+    } else if dphi < -PI {
+        dphi += 2.0 * PI;
+    }
+    C64::from_polar(mag, a.arg() + t * dphi)
+}
+
+pub(crate) fn unwrap_phase(phase_rad: &[f64]) -> Vec<f64> {
     let mut out = Vec::with_capacity(phase_rad.len());
     let mut offset = 0.0;
     let mut prev = None;

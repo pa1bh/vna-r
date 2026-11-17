@@ -50,11 +50,10 @@ fn embed_web() {
         let js = gzip(&dir.join("vna-gui.js"), &out.join("vna-gui.js.gz"));
         let wasm = gzip(&dir.join("vna-gui_bg.wasm"), &out.join("vna-gui_bg.wasm.gz"));
         format!(
-            "pub(crate) const BUILT_IN: Option<&str> = Some({dir:?});\n\
+            "pub(crate) const BUILT_IN: bool = true;\n\
              pub(crate) const INDEX: &[u8] = include_bytes!({index:?});\n\
              pub(crate) const JS: Option<Packed> = Some({js});\n\
              pub(crate) const WASM: Option<Packed> = Some({wasm});\n",
-            dir = dir.display().to_string(),
             index = index.display().to_string(),
         )
     } else {
@@ -69,7 +68,7 @@ fn embed_web() {
         }
         let placeholder = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/placeholder.html");
         format!(
-            "pub(crate) const BUILT_IN: Option<&str> = None;\n\
+            "pub(crate) const BUILT_IN: bool = false;\n\
              pub(crate) const INDEX: &[u8] = include_bytes!({:?});\n\
              pub(crate) const JS: Option<Packed> = None;\n\
              pub(crate) const WASM: Option<Packed> = None;\n",

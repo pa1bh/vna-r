@@ -81,11 +81,10 @@ pub(crate) fn open(port: &str) -> Result<(Box<dyn Device>, VnaInfo, Option<u16>)
             Some(r) => format!("no hardware, {r:.0} points/s"),
             None => "no hardware, unpaced".into(),
         },
+        // The range of a LiteVNA, without the averaging in the device.
         limits: Limits {
-            min_hz: 50_000,
-            max_hz: 6_300_000_000,
-            max_points_per_scan: None,
             has_device_average: false,
+            ..Limits::LITEVNA
         },
         lite: None,
         shell: None,
@@ -107,7 +106,7 @@ struct Simulator {
 }
 
 impl Device for Simulator {
-    fn sweep_with(&mut self, cfg: &SweepConfig, _fifo_all: bool, progress: SweepProgress<'_>) -> Result<SweepResult> {
+    fn sweep_with(&mut self, cfg: &SweepConfig, progress: SweepProgress<'_>) -> Result<SweepResult> {
         let n = cfg.points as usize;
         if n == 0 {
             return Err(Error::InvalidArgument("a sweep needs at least one point".into()));
@@ -117,8 +116,14 @@ impl Device for Simulator {
         while filled < n {
             filled += (n - filled).min(BLOCK);
             if let Some(rate) = self.rate {
-                let due = started + Duration::from_secs_f64(filled as f64 / rate);
-                thread::sleep(due.saturating_duration_since(Instant::now()));
+                // A rate so low that the time does not fit a `Duration` (or an
+                // `Instant`) is a sweep that never ends, not a panic.
+                let after = Duration::try_from_secs_f64(filled as f64 / rate).unwrap_or(Duration::MAX);
+                let wait = match started.checked_add(after) {
+                    Some(due) => due.saturating_duration_since(Instant::now()),
+                    None => after,
+                };
+                thread::sleep(wait);
             }
             // Like the drivers: a break after the last block changes nothing.
             if progress(filled, n).is_break() && filled < n {
