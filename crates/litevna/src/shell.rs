@@ -796,6 +796,26 @@ mod tests {
         assert_eq!(sh.sweep_settings().unwrap(), (1_000_000, 30_000_000, 101));
     }
 
+    /// The handle the CLI and the GUI hold, over a NanoVNA-F.
+    #[test]
+    fn the_vna_handle_over_a_shell() {
+        use crate::vna::Vna;
+        let (dev, _) = FakeShell::new();
+        let (sh, _) = shell(dev);
+        let mut v = Vna::Shell(sh);
+        assert_eq!(v.kind(), crate::discovery::Kind::NanoVnaShell);
+        let info = v.info().unwrap();
+        assert_eq!(info.model, "NanoVNA-F 4.3");
+        assert_eq!(info.limits.max_points_per_scan, Some(MAX_SCAN_POINTS));
+        assert!(!info.limits.has_device_average);
+        assert!(info.shell.is_some() && info.lite.is_none());
+        assert_eq!(v.battery_millivolts().unwrap(), 4209);
+        // what needs the registers of a LiteVNA says so, naming what was asked
+        let err = v.require_lite("--average").err().expect("no registers on a shell");
+        assert_eq!(err.to_string(), "--average needs a LiteVNA (register protocol); this is a NanoVNA");
+        assert!(v.as_lite_mut().is_none() && v.as_shell_mut().is_some());
+    }
+
     #[test]
     fn command_strips_echo_and_prompt() {
         let (dev, _) = FakeShell::new();
