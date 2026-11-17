@@ -1,0 +1,23 @@
+# Monthly pull requests for newer versions, one per group, so that the actions
+# the workflows run and the crates in Cargo.lock do not age unseen.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      # egui, eframe and egui_plot move together.
+      egui:
+        patterns: ["egui*", "eframe"]
+      crates:
+        patterns: ["*"]
+        exclude-patterns: ["egui*", "eframe"]

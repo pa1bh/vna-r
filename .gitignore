@@ -1,6 +1,8 @@
 /target
-*.s2p
-*.csv
+# Measurements saved while trying things out, in the top folder only: a test
+# file or an example deeper down can be tracked.
+/*.s2p
+/*.csv
 /*.png
 .DS_Store
 
@@ -14,3 +16,5 @@ assets/nanovna-saver
 assets/*.pdf
 assets/*.bin
 /cal/
+# Claude Code: its worktrees and local launch settings.
+.claude/

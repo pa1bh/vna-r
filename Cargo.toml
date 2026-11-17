@@ -9,6 +9,8 @@ edition = "2021"
 rust-version = "1.95"
 license = "MIT"
 repository = "https://github.com/pa1bh/vna-r"
+# Released as archives on GitHub and through the flake, not on crates.io.
+publish = false
 
 [workspace.lints.clippy]
 # `!(x > 0.0)` is used on purpose where NaN must be rejected along with the
@@ -48,3 +50,9 @@ httparse = "1.10"
 flate2 = "1"
 ctrlc = { version = "3.5", features = ["termination"] }
 gethostname = "1.1"
+# The browser build.
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = "0.3"
+# The format eframe stores its settings in (vna-gui's tests read old ones with it).
+ron = "0.12"

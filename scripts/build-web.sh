@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the browser viewer (docs/09-wasm-proef.md) into target/web: the GUI as
+# Build the browser page (docs/09-wasm-proef.md) into target/web: the GUI as
 # WebAssembly, the JavaScript glue wasm-bindgen writes for it, and the page.
 # That folder is the whole site: three static files, to be copied to a web server.
 # Needs the Rust target once: rustup target add wasm32-unknown-unknown
@@ -18,7 +18,7 @@ if [ ! -x "$bindgen" ] || [ "$("$bindgen" --version | awk '{ print $2 }')" != "$
     cargo install wasm-bindgen-cli --version "$version" --locked --root "$tools"
 fi
 
-cargo build --release --target wasm32-unknown-unknown -p vna-gui
+cargo build --release --locked --target wasm32-unknown-unknown -p vna-gui
 rm -rf "$out"
 mkdir -p "$out"
 "$bindgen" --target web --no-typescript --out-dir "$out" target/wasm32-unknown-unknown/release/vna-gui.wasm
