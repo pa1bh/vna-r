@@ -12,6 +12,10 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-18
+
+One fix, for the NanoVNA-F.
+
 ### Fixed
 
 - **A NanoVNA-F that sat idle after a sweep lost its reflection.** Measured on a
@@ -692,7 +696,8 @@ Internal version: LiteVNA 64/67 through the binary register protocol, SOLT calib
 with kit fit and interpolation, Smith chart and seven views, markers, references,
 segments, TDR with gating, Touchstone export and import, CLI with the same functions.
 
-[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/pa1bh/vna-r/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.2
 [0.4.1]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.1
 [0.4.0]: https://github.com/pa1bh/vna-r/releases/tag/v0.4.0
 [0.3.6]: https://github.com/pa1bh/vna-r/releases/tag/v0.3.6

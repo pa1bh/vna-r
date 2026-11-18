@@ -1,6 +1,6 @@
 # Roadmap
 
-Stand: 2026-11-17, versie 0.4.1. Dit document is in drie lagen gegroeid: de twaalf
+Stand: 2026-11-18, versie 0.4.2. Dit document is in drie lagen gegroeid: de twaalf
 stappen van 4 november, de werklijst van 10 november en de werklijst van 13 november. Wat
 gedaan is blijft staan als geschiedenis. **Open staat nu:**
 
