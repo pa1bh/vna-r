@@ -27,7 +27,7 @@ serde = { version = "1", features = ["derive"] }
 # vna-link alone, so that a build of one crate behaves like a build of all.
 serde_json = { version = "1", features = ["float_roundtrip"] }
 # Bytes inside JSON (the client/server wire of vna-link: FIFO records, screenshots).
-base64 = "0.22"
+base64 = "0.23"
 rustfft = "6.4"
 thiserror = "2"
 anyhow = "1"
@@ -37,14 +37,14 @@ png = "0.18"
 eframe = { version = "0.37", features = ["persistence"] }
 egui = "0.37"
 egui_plot = "0.38"
-rfd = "0.17"
+rfd = "0.18"
 log = "0.4"
 env_logger = "0.11"
 # std::time::Instant that also works in a browser (it is std itself on native).
 web-time = "1.1"
 # The client/server mode (docs/10). tungstenite in the version ewebsock 0.8 uses
 # natively, so that the server and the native client share one copy.
-tungstenite = { version = "0.24", default-features = false, features = ["handshake"] }
+tungstenite = { version = "0.30", default-features = false, features = ["handshake"] }
 ewebsock = "0.8"
 httparse = "1.10"
 flate2 = "1"
