@@ -160,7 +160,9 @@ Een **NanoVNA-F** kent geen USB MODE: zijn scherm blijft gewoon werken. Tijdens 
 meting van vna-r staat zijn eigen sweep tijdelijk op het raster van het laatste stuk dat
 vna-r gemeten heeft (maximaal 301 punten per stuk; langere sweeps gaan in stukken), en
 na **Disconnect**, het einde van een CLI-commando of `vna-cli release` zet vna-r de
-oorspronkelijke sweep terug. Zijn bandbreedte stel je op het apparaat zelf in; het vak
+oorspronkelijke sweep terug. Dat doet vna-r ook als er een halve minuut geen sweep is
+geweest: het apparaat sweept dan zelf verder tot de volgende meting, omdat een
+NanoVNA-F die minutenlang stilstaat zijn reflectiemeting kwijtraakt. Zijn bandbreedte stel je op het apparaat zelf in; het vak
 **Average** in de GUI staat voor dit apparaat uit.
 
 ## Eén programma tegelijk

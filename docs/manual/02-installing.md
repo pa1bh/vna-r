@@ -159,7 +159,9 @@ A **NanoVNA-F** has no USB MODE: its screen simply keeps working. During a
 measurement by vna-r its own sweep is temporarily set to the grid of the last chunk that
 vna-r measured (at most 301 points per chunk; longer sweeps are done in chunks), and
 after **Disconnect**, the end of a CLI command or `vna-cli release`, vna-r restores the
-original sweep. Its bandwidth is set on the device itself; the
+original sweep. vna-r does the same when there has been no sweep for half a minute: the
+device then sweeps on by itself until the next measurement, because a NanoVNA-F that
+sits still for minutes loses its reflection measurement. Its bandwidth is set on the device itself; the
 **Average** box in the GUI is disabled for this device.
 
 ## One program at a time

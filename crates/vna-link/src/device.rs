@@ -16,6 +16,10 @@ pub(crate) trait Device: Send {
     fn screenshot(&mut self) -> Result<Screenshot>;
     fn battery_millivolts(&mut self) -> Result<u16>;
     fn release(&mut self) -> Result<()>;
+    /// See [`Vna::rest`]; nothing for a device that may sit still.
+    fn rest(&mut self) -> Result<()> {
+        Ok(())
+    }
     fn as_lite_mut(&mut self) -> Option<&mut LiteVna>;
     /// What the next sweep is for. A real analyser measures whatever is on
     /// its port and has no use for this; the simulator puts the standard
@@ -39,6 +43,10 @@ impl Device for Vna {
 
     fn release(&mut self) -> Result<()> {
         Vna::release(self)
+    }
+
+    fn rest(&mut self) -> Result<()> {
+        Vna::rest(self)
     }
 
     fn as_lite_mut(&mut self) -> Option<&mut LiteVna> {

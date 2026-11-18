@@ -196,6 +196,10 @@ pub(crate) fn start(notify: Notify, options: Options) -> (Sender<Cmd>, Receiver<
 pub const CONNECT_FAILED: &str = "connecting to ";
 /// How often an idle worker looks whether the port of its device still exists.
 const IDLE_CHECK: Duration = Duration::from_millis(500);
+/// How long after a sweep, with no other in sight, the device is told to
+/// [rest](Device::rest). Far below the minutes that trouble a NanoVNA-F, and
+/// long enough not to come between the sweeps of someone at work.
+const REST_AFTER: Duration = Duration::from_secs(30);
 /// How often a worker that lost its link looks whether the port is back.
 const RECONNECT_POLL: Duration = Duration::from_millis(500);
 /// How long a worker waits for a lost device to come back.
@@ -306,6 +310,9 @@ struct Worker {
     /// When the device was last opened.
     linked_at: Option<Instant>,
     continuous: Option<(Vec<SweepConfig>, Purpose, usize)>,
+    /// When the last sweep ended, until the device has been told to rest or
+    /// was released.
+    swept_at: Option<Instant>,
     cmds: Receiver<Cmd>,
     /// Commands read from `cmds` while a sweep ran, to be handled in order after it.
     backlog: VecDeque<Cmd>,
@@ -341,6 +348,7 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify, options: Opti
         relinks: 0,
         linked_at: None,
         continuous: None,
+        swept_at: None,
         cmds,
         backlog: VecDeque::new(),
         events,
@@ -382,6 +390,8 @@ fn run(cmds: Receiver<Cmd>, events: Sender<Event>, notify: Notify, options: Opti
                     w.sweep_once(cfgs, purpose, repeat);
                 } else if w.dev.is_some() && w.port_vanished() {
                     w.lose("connection", "the device left the USB bus", Resume::Nothing);
+                } else if w.swept_at.is_some_and(|t| t.elapsed() >= REST_AFTER) {
+                    w.rest();
                 }
             }
         }
@@ -584,6 +594,7 @@ impl Worker {
             }
             Cmd::Stop => {
                 self.continuous = None;
+                self.swept_at = None;
                 if let Some(lost) = &mut self.lost {
                     lost.resume = Resume::Nothing;
                 }
@@ -630,7 +641,24 @@ impl Worker {
         }
     }
 
+    /// No sweep for [`REST_AFTER`]: the device may go on by itself.
+    fn rest(&mut self) {
+        self.swept_at = None;
+        if let Some(Err(e)) = self.dev.as_mut().map(|d| d.rest()) {
+            if e.is_link_failure() {
+                self.lose("resting the device", e, Resume::Nothing);
+            } else {
+                self.warn("resting the device", e);
+            }
+        }
+    }
+
     fn sweep_once(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose, repeat: usize) {
+        self.sweep_passes(cfgs, purpose, repeat);
+        self.swept_at = Some(Instant::now());
+    }
+
+    fn sweep_passes(&mut self, cfgs: Vec<SweepConfig>, purpose: Purpose, repeat: usize) {
         if cfgs.is_empty() {
             // Nothing to measure; as continuous sweeping it would spin.
             self.fail("sweep", "no segments given");

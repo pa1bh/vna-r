@@ -1881,6 +1881,37 @@ AppleDouble-bestanden in het archief, `vna-cli 0.4.1 (0db86c7)` en `vna-server 0
 `vna-server` uit het archief met de pagina ingebouwd, waar de testclient weer 23 van 23
 haalde. De andere archieven zijn niet uitgepakt.
 
+### 18 november, na de release: de NanoVNA-F verliest S11 na stilstaan
+
+PA1BH zag via de browser op de Pi een vlakke S11 rond −60 dB (SWR 1,00) met een antenne
+aan de NanoVNA-F 4.3 (firmware 1.0.4). Ook op het eigen scherm van het apparaat; alleen
+uit- en aanzetten hielp, geen enkele shell-opdracht.
+
+Wat gemeten is, steeds met de antenne eraan:
+
+- Een nacht (01:03–07:21) met de dienst uit, het apparaat sweept zelf 1–30 MHz, alleen
+  `data 0` en `data 1` meegelezen: S11 bleef goed. Het valt dus niet vanzelf uit. (Mijn
+  bewaker las maar de helft van elke meting en schreef om en om een valse nul; de
+  slotmeting met een goede lezing gaf mediaan 0,9 over 301 punten.)
+- Via de server van 0.4.1, verbinding open, losse sweeps met pauzes van 5, 5 en 8 minuten
+  en elke minuut de accu gevraagd: na elke pauze S11 −65 tot −67 dB. Drie keer van de
+  drie. Eerder was 150 s nog goed gegaan.
+- Een scan op 10–20 MHz na de pauze (zoals de driver voor S21 doet) herstelt het niet.
+  Twaalf minuten zelf sweepen daarna ook niet.
+- Rechtstreeks op de shell: scan, `resume`, zes minuten wachten, scan; drie keer goed
+  (0,13 op 430–440 MHz, 0,50–0,52 op 1–30 MHz).
+
+Conclusie: na een scan staat het apparaat stil, en minuten stilstaan kost het zijn
+reflectiemeting. Waarom is niet uitgezocht. Oplossing: 30 s na de laatste sweep laat de
+worker het apparaat rusten (`Vna::rest`, voor de shell hetzelfde als loslaten); de
+volgende sweep neemt het terug en doet de lage scan opnieuw. Een LiteVNA blijft
+ongemoeid.
+
+Getoetst met `vna-server` van deze stand, op de Pi gebouwd: dezelfde pauzes van 5, 5 en
+8 minuten, S11 elke keer goed (−5,5 dB op 1–30 MHz, −18,2 dB op 430–440 MHz, −14,3 dB op
+400–500 MHz). Niet getoetst: het programma met de NanoVNA-F aan de eigen USB-poort, en
+pauzes langer dan acht minuten.
+
 ### Niet door mij te doen
 
 Het venster van het programma (alleen de pagina in de browser is bekeken), alles waar een

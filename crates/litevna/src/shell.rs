@@ -858,6 +858,33 @@ mod tests {
         assert_eq!(tail, ["sweep 1000000 30000000 101", "cal on", "resume"], "all commands: {seen:?}");
     }
 
+    /// What [`crate::Vna::rest`] does between sweeps: the device goes on by
+    /// itself, and the next sweep takes it back as if it were the first.
+    #[test]
+    fn a_sweep_after_a_rest_starts_over() {
+        let (dev, commands) = FakeShell::new();
+        let (mut sh, _) = shell(dev);
+        let cfg = linear(2_000_000, 6_000_000, 5);
+        sh.sweep(&cfg).unwrap();
+        let before = commands.lock().unwrap().len();
+        sh.restore().unwrap();
+        sh.sweep(&cfg).unwrap();
+        let seen = commands.lock().unwrap().clone();
+        let after: Vec<&str> = seen[before..].iter().map(String::as_str).collect();
+        assert_eq!(
+            after,
+            [
+                "sweep 1000000 30000000 101",
+                "cal on",
+                "resume",
+                "sweep",
+                "cal",
+                PRIME,
+                "scan_bin 2000000 6000000 5 15",
+            ]
+        );
+    }
+
     #[test]
     fn a_calibrated_sweep_leaves_out_the_raw_bit() {
         let (dev, commands) = FakeShell::new();

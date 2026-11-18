@@ -12,6 +12,19 @@ things that are not backwards compatible, such as the format of the calibration 
 
 ## [Unreleased]
 
+### Fixed
+
+- **A NanoVNA-F that sat idle after a sweep lost its reflection.** Measured on a
+  NanoVNA-F 4.3 with firmware 1.0.4: left alone for some minutes after a single sweep
+  (150 s went well, 300 s did not), every sweep after it showed S11 near −66 dB, an SWR
+  of 1.00 on any antenna, on the device's own screen as well, until the device was
+  switched off and on. A scan leaves the device waiting; sweeping on its own it stays
+  right for hours. So 30 s after the last sweep vna-r now lets the device go on by
+  itself, as **Stop** already did, and the next sweep takes it back. Nothing changes for
+  a LiteVNA. Tried through `vna-server` on a Raspberry Pi 4 with pauses of 5, 5 and
+  8 minutes: wrong every time before, right every time after. **Not tried**: the program
+  with the device on its own USB port, which runs the same code.
+
 ## [0.4.1] - 2026-11-17
 
 A clean-up round: the whole code base read through for bugs, for places that break on

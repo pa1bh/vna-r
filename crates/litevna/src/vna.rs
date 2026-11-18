@@ -218,6 +218,21 @@ impl Vna {
         }
     }
 
+    /// Let a device that must not sit still go on by itself, when no sweep is
+    /// expected soon. The next sweep takes it back.
+    ///
+    /// Measured on a NanoVNA-F 4.3 with firmware 1.0.4: left paused for some
+    /// minutes after a scan (150 s went well, 300 s did not), it returns S11
+    /// at about -66 dB on every range, on its own screen as well, until it is
+    /// switched off and on. Sweeping on its own it stayed right for hours. A
+    /// LiteVNA has no such trouble and keeps its USB screen.
+    pub fn rest(&mut self) -> Result<()> {
+        match self {
+            Vna::Lite(_) => Ok(()),
+            Vna::Shell(d) => d.restore(),
+        }
+    }
+
     /// Whether dropping the handle releases the device (default `true`).
     pub fn set_release_on_drop(&mut self, on: bool) {
         match self {
