@@ -1912,6 +1912,17 @@ Getoetst met `vna-server` van deze stand, op de Pi gebouwd: dezelfde pauzes van 
 400–500 MHz). Niet getoetst: het programma met de NanoVNA-F aan de eigen USB-poort, en
 pauzes langer dan acht minuten.
 
+### 18 november: de release 0.4.2
+
+CI op de releasecommit (13f0db7) was groen op alle zeven jobs, daarna de tag. De
+release-workflow slaagde in één keer: zes archieven met hun checksums, geen pre-release.
+
+Op de Pi: het archief `aarch64-linux` klopt met zijn checksum, `vna-server 0.4.2
+(13f0db7)` als dienst geïnstalleerd, de NanoVNA-F eraan. Met de testclient losse sweeps
+met pauzes van 5 en 8 minuten, verbinding open: S11 na elke pauze goed (−5,5 dB op
+1–30 MHz, −18,1 dB op 430–440 MHz, −14,4 dB op 400–500 MHz). De andere archieven zijn
+niet uitgepakt.
+
 ### Niet door mij te doen
 
 Het venster van het programma (alleen de pagina in de browser is bekeken), alles waar een
