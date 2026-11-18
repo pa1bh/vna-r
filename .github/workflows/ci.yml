@@ -27,7 +27,7 @@ jobs:
         # ubuntu-24.04-arm is GitHub's arm64 runner; the release ships an aarch64-linux archive.
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -85,14 +85,14 @@ jobs:
     name: oldest supported Rust (1.95)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libudev-dev
 
-      - uses: dtolnay/rust-toolchain@1.95
+      - uses: dtolnay/rust-toolchain@1.120
 
       - uses: Swatinem/rust-cache@v2
 
@@ -107,7 +107,7 @@ jobs:
     name: browser build (wasm32)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux build dependencies
         # For vna-server, which is built with the page in it below.
@@ -145,7 +145,7 @@ jobs:
       # cache-nix-action deletes the superseded store caches.
       actions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable

@@ -26,7 +26,7 @@ jobs:
     name: browser build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -47,12 +47,12 @@ jobs:
           sha256sum "$name.zip" > "$name.zip.sha256"
           ls -l "$name.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web
           path: target/web/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-archive
           path: |
@@ -87,7 +87,7 @@ jobs:
             target: x86_64-windows
             cargo_target: ""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check that the tag matches the workspace version
         shell: bash
@@ -110,7 +110,7 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: web
           path: web
@@ -167,7 +167,7 @@ jobs:
           fi
           ls -l vna-r-*
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.target }}
           path: |
@@ -181,8 +181,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -195,7 +195,7 @@ jobs:
             echo "CHANGELOG.md has no section [$v]: a release needs its notes"; exit 1
           fi
           cat notes.md
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           # The archives only: dist also holds the loose files of the artifact
           # `web`, which the platform jobs built into vna-server.
